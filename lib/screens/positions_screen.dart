@@ -37,14 +37,14 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
+  // FIXED: Forces an embedded native WebView entirely inside the app.
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
     try {
-      // Switched to inAppBrowserView to avoid ActivityNotFoundException on Android 11+
-      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+      await launchUrl(url, mode: LaunchMode.inAppWebView);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check your defaults.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load internal webview.')));
       }
     }
   }
@@ -130,7 +130,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
-  // RESTORED: Mirror Real Trade Function
   Future<void> _mirrorRealTrade(int id, dynamic defaultAmount) async {
     final sizeCtrl = TextEditingController(text: defaultAmount?.toString() ?? '5.0');
     bool isSaving = false;
@@ -312,7 +311,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
       child: Column(
         children: [
           const SizedBox(height: 12),
-          // Tab Bar Row with Manual Refresh Button
           Row(
             children: [
               Expanded(
@@ -377,7 +375,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                               final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                               final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                               final isProfit = pnl >= 0;
-                              final isReal = p['is_real'] == 1 || p['is_real'] == '1'; // RESTORED LIVE/PAPER CHECK
+                              final isReal = p['is_real'] == 1 || p['is_real'] == '1';
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -386,7 +384,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Header Row
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -396,14 +393,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               children: [
                                                 Text(
                                                   _formatAddress(p['token_address'] ?? ''),
-                                                  style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13), // No underline
+                                                  style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                                 const SizedBox(width: 4),
                                                 const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 14),
                                               ],
                                             ),
                                           ),
-                                          // RESTORED BADGES
                                           Row(
                                             children: [
                                               if (isReal)
@@ -430,7 +426,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
                                       
-                                      // MCAP Row
                                       Row(
                                         children: [
                                           Expanded(
@@ -457,7 +452,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // PNL & Size Row
                                       Row(
                                         children: [
                                           Expanded(
@@ -490,7 +484,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // Time and Edit Buttons Row
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -541,7 +534,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 12),
                                       
-                                      // Action Buttons
                                       Column(
                                         children: [
                                           SizedBox(
@@ -556,7 +548,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               label: const Text('Close Trade Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                             ),
                                           ),
-                                          // RESTORED: DEPLOY REAL FUNDS BUTTON (Only shown for paper trades)
                                           if (!isReal) ...[
                                             const SizedBox(height: 8),
                                             SizedBox(
@@ -608,7 +599,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Header Row
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -618,7 +608,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               children: [
                                                 Text(
                                                   _formatAddress(p['token_address'] ?? ''),
-                                                  style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13), // No underline
+                                                  style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                                 const SizedBox(width: 4),
                                                 const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 14),
@@ -627,7 +617,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                           ),
                                           Row(
                                             children: [
-                                              // RESTORED LIVE/PAPER BADGE IN HISTORY
                                               if (isReal)
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -657,7 +646,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // MCAP Row
                                       Row(
                                         children: [
                                           Expanded(
@@ -684,7 +672,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // PNL & Size Row
                                       Row(
                                         children: [
                                           Expanded(
@@ -717,7 +704,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 16),
 
-                                      // Time Information Row
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
