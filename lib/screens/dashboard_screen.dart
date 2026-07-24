@@ -25,7 +25,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _solBalance = "0.00000";
   String _usdValue = "0.00";
   String _publicAddress = "Loading...";
-  Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0};
+  Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
 
@@ -70,27 +70,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _panicCloseAll() async {
+  // FIXED: Tri-Split button function handling parameters for API
+  Future<void> _panicClose(String type) async {
+    String title = 'PANIC SELL ALL';
+    String content = 'Are you sure you want to market-sell ALL active open positions immediately?';
+    if (type == 'manual') {
+      title = 'CLOSE MANUAL TRADES';
+      content = 'Are you sure you want to market-sell all your MANUAL open positions?';
+    } else if (type == 'copy') {
+      title = 'CLOSE COPY TRADES';
+      content = 'Are you sure you want to market-sell all COPY/BOT open positions?';
+    }
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('PANIC SELL ALL', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to market-sell ALL active open positions immediately?'),
+        title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        content: Text(content),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CLOSE ALL'),
+            child: const Text('YES, CLOSE TRADES'),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Executing Panic Close...'), backgroundColor: Colors.amber));
-      final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_all', {});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Executing...'), backgroundColor: Colors.amber));
+      final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_all', {'type': type});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action completed'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
         _fetchDashboardData();
@@ -120,23 +131,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final canTrade = isAdmin || apiService.allowManualTrade;
     final theme = Theme.of(context);
 
+    final List<NavigationDestination> navItems = [
+      NavigationDestination(icon: Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
+      NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
+      if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
+      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Bots'),
+      if (isAdmin) NavigationDestination(icon: Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
+      NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
+    ];
+
+    // Ensure profileIndex maps cleanly no matter how many nav items exist
+    final int profileIndex = navItems.length - 1;
+
     final List<Widget> pages = [
-      _buildPremiumHome(theme),
+      _buildPremiumHome(theme, profileIndex),
       const PositionsScreen(),
       if (canTrade) const TerminalScreen(),
       const CopyBotsScreen(),
       if (isAdmin) const AdminScreen(),
       const SettingsScreen(),
-    ];
-
-    final List<NavigationDestination> navItems = [
-      NavigationDestination(icon: Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
-      NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
-      if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
-      // FIXED: Changed "Copy Bots" to "Bots" to prevent text wrap bulkiness
-      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Bots'),
-      if (isAdmin) NavigationDestination(icon: Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
-      NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
     ];
 
     return Scaffold(
@@ -157,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPremiumHome(ThemeData theme) {
+  Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
     final double pnl = _stats['total_pnl'] != null ? (_stats['total_pnl'] as num).toDouble() : 0.0;
     final bool isProfit = pnl >= 0;
 
@@ -171,22 +184,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)])),
-                    child: const CircleAvatar(radius: 22, backgroundColor: Color(0xFF13131A), child: Icon(PhosphorIcons.userFill, color: Colors.white)),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Welcome back,', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                      Text('Osama Elguduwis', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
-                    ],
-                  ),
-                ],
+              // FIXED: Tap navigates directly to SettingsScreen
+              InkWell(
+                onTap: () => setState(() => _currentIndex = profileIndex),
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)])),
+                      child: const CircleAvatar(radius: 22, backgroundColor: Color(0xFF13131A), child: Icon(PhosphorIcons.userFill, color: Colors.white)),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Welcome back,', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                        Text(_stats['username'] ?? 'Loading...', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               IconButton(icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), onPressed: () => context.read<ApiService>().logout()),
             ],
@@ -236,7 +254,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NET PNL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18))])),
+                    // FIXED: 24-Hour Specifier applied here
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NET PNL (24H)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18))])),
                     Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
                     const SizedBox(width: 16),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${_stats['open_count'] ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))])),
@@ -247,19 +266,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
           
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _openPositions.isEmpty ? null : _panicCloseAll,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.redAccent.withOpacity(0.5)),
-                backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.redAccent.withOpacity(0.1),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // FIXED: Tri-Split Buttons for specific executions
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _openPositions.isEmpty ? null : () => _panicClose('all'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.redAccent.withOpacity(0.5)),
+                    backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.redAccent.withOpacity(0.1),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent),
+                  label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent)),
+                ),
               ),
-              icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent),
-              label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent)),
-            ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openPositions.isEmpty ? null : () => _panicClose('copy'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.orangeAccent.withOpacity(0.5)),
+                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.orangeAccent.withOpacity(0.1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: Icon(PhosphorIcons.robotFill, size: 16, color: _openPositions.isEmpty ? Colors.white54 : Colors.orangeAccent),
+                      label: Text('CLOSE COPY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? Colors.white54 : Colors.orangeAccent)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openPositions.isEmpty ? null : () => _panicClose('manual'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.blueAccent.withOpacity(0.5)),
+                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.blueAccent.withOpacity(0.1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: Icon(PhosphorIcons.handPalmFill, size: 16, color: _openPositions.isEmpty ? Colors.white54 : Colors.blueAccent),
+                      label: Text('CLOSE MANUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? Colors.white54 : Colors.blueAccent)),
+                    ),
+                  ),
+                ],
+              ),
+            ]
           ),
           const SizedBox(height: 24),
 
