@@ -4,9 +4,8 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
 
-// RESTORED: Your original external tab widgets
+// Your existing external tab widget
 import '../widgets/bot_engine_tab.dart';
-import '../widgets/tracked_wallets_tab.dart'; 
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -254,8 +253,8 @@ class _AdminScreenState extends State<AdminScreen> {
               border: Border.all(color: Colors.white.withOpacity(0.05)),
             ),
             child: TabBar(
-              isScrollable: true, // RESTORED: Your UI styling
-              tabAlignment: TabAlignment.start, // RESTORED: Your UI styling
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
               indicator: BoxDecoration(
@@ -266,7 +265,7 @@ class _AdminScreenState extends State<AdminScreen> {
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
               tabs: const [
-                Tab(text: 'Users'), // Renamed from Team Quotas
+                Tab(text: 'Users'),
                 Tab(text: 'Bot Engine'),
                 Tab(text: 'Tracked Wallets'),
               ],
@@ -274,13 +273,12 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Tab Views
           Expanded(
             child: TabBarView(
               children: [
                 _buildUsersTab(theme),
-                const BotEngineTab(), // RESTORED: Renders your separate widget
-                const TrackedWalletsTab(), // RESTORED: Renders your separate widget
+                const BotEngineTab(), 
+                _buildTrackedWalletsTab(theme), // Set back to inline method to fix missing file error
               ],
             ),
           ),
@@ -289,9 +287,6 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  // ==========================================
-  // USERS TAB
-  // ==========================================
   Widget _buildUsersTab(ThemeData theme) {
     if (_isLoadingUsers) return const Center(child: CircularProgressIndicator());
     
@@ -426,6 +421,16 @@ class _AdminScreenState extends State<AdminScreen> {
           );
         })
       ],
+    );
+  }
+
+  Widget _buildTrackedWalletsTab(ThemeData theme) {
+    // You can paste your tracked wallets code inside this method to restore it.
+    return const Center(
+      child: Text(
+        'Please paste your Tracked Wallets code here',
+        style: TextStyle(color: Colors.white54),
+      ),
     );
   }
 }
