@@ -4,6 +4,10 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
 
+// RESTORED: Your original external tab widgets
+import '../widgets/bot_engine_tab.dart';
+import '../widgets/tracked_wallets_tab.dart'; 
+
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
@@ -12,7 +16,7 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  bool _isLoading = true;
+  bool _isLoadingUsers = true;
   List<dynamic> _users = [];
 
   @override
@@ -22,19 +26,18 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _fetchUsers() async {
-    setState(() => _isLoading = true);
+    setState(() => _isLoadingUsers = true);
     final res = await context.read<ApiService>().getEndpoint('admin.php?action=fetch_users');
     if (mounted) {
       setState(() {
         if (res['status'] == 'success') {
           _users = res['data'] ?? [];
         }
-        _isLoading = false;
+        _isLoadingUsers = false;
       });
     }
   }
 
-  // 1. Instant Toggle Action Helper
   Future<void> _toggleSetting(String action, int userId, Map<String, dynamic> payload) async {
     final res = await context.read<ApiService>().postEndpoint('admin.php?action=$action', payload);
     if (mounted) {
@@ -46,7 +49,6 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  // 2. Modal Dialog to Create New User
   Future<void> _showCreateUserModal() async {
     final userCtrl = TextEditingController();
     final passCtrl = TextEditingController();
@@ -131,7 +133,6 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  // 3. Modal Dialog to Update Quotas
   Future<void> _showQuotaModal(int userId, dynamic daily, dynamic monthly, dynamic yearly) async {
     final dailyCtrl = TextEditingController(text: daily?.toString() ?? '');
     final monthlyCtrl = TextEditingController(text: monthly?.toString() ?? '');
@@ -240,192 +241,191 @@ class _AdminScreenState extends State<AdminScreen> {
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: 1,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Column(
-          children: [
-            const SizedBox(height: 12),
-            // Header Tab Row
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
+      length: 3,
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: TabBar(
+              isScrollable: true, // RESTORED: Your UI styling
+              tabAlignment: TabAlignment.start, // RESTORED: Your UI styling
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
               ),
-              child: Row(
+              labelColor: Colors.white,
+              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
+              tabs: const [
+                Tab(text: 'Users'), // Renamed from Team Quotas
+                Tab(text: 'Bot Engine'),
+                Tab(text: 'Tracked Wallets'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Tab Views
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildUsersTab(theme),
+                const BotEngineTab(), // RESTORED: Renders your separate widget
+                const TrackedWalletsTab(), // RESTORED: Renders your separate widget
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // USERS TAB
+  // ==========================================
+  Widget _buildUsersTab(ThemeData theme) {
+    if (_isLoadingUsers) return const Center(child: CircularProgressIndicator());
+    
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: _showCreateUserModal,
+            icon: const Icon(PhosphorIcons.userPlusFill, color: Colors.white, size: 18),
+            label: const Text('Create New User Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ..._users.map((u) {
+          final bool isActive = (u['is_active'] == 1 || u['is_active'] == '1' || u['is_active'] == true);
+          final bool allowManual = (u['allow_manual_trade'] == 1 || u['allow_manual_trade'] == '1' || u['allow_manual_trade'] == true);
+          final bool allowTelegram = (u['allow_telegram_alerts'] == 1 || u['allow_telegram_alerts'] == '1' || u['allow_telegram_alerts'] == true);
+          
+          final String daily = u['max_trades_daily']?.toString() ?? '∞';
+          final String monthly = u['max_trades_monthly']?.toString() ?? '∞';
+          final String yearly = u['max_trades_yearly']?.toString() ?? '∞';
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TabBar(
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      indicator: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(u['username'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 2),
+                          Text('Role: ${u['role']}', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
                       ),
-                      labelColor: Colors.white,
-                      unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      tabs: const [
-                        Tab(text: 'Users'), // Renamed from Team Quotas
-                      ],
-                    ),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _showQuotaModal(u['id'], u['max_trades_daily'], u['max_trades_monthly'], u['max_trades_yearly']),
+                        icon: const Icon(PhosphorIcons.ticket, color: Colors.white54, size: 14),
+                        label: const Text('Quotas', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Limits:  $daily/day   |   $monthly/mo   |   $yearly/yr', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  const SizedBox(height: 12),
+                  Container(height: 1, color: Colors.white.withOpacity(0.05)),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(PhosphorIcons.shieldCheck, color: isActive ? Colors.greenAccent : Colors.redAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Text('Account Access', style: TextStyle(color: isActive ? Colors.white : Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Switch(
+                        value: isActive,
+                        activeColor: Colors.greenAccent,
+                        inactiveThumbColor: Colors.redAccent,
+                        onChanged: (val) {
+                          setState(() => u['is_active'] = val);
+                          _toggleSetting('toggle_active', u['id'], {'user_id': u['id'], 'is_active': val ? 1 : 0});
+                        },
+                      ),
+                    ],
+                  ),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(PhosphorIcons.rocketLaunch, color: Colors.purpleAccent, size: 16),
+                          SizedBox(width: 8),
+                          Text('Allow Manual Snipe', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                      Switch(
+                        value: allowManual,
+                        activeColor: theme.primaryColor,
+                        onChanged: (val) {
+                          setState(() => u['allow_manual_trade'] = val);
+                          _toggleSetting('toggle_manual', u['id'], {'user_id': u['id'], 'allow_manual_trade': val ? 1 : 0});
+                        },
+                      ),
+                    ],
+                  ),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(PhosphorIcons.paperPlaneTilt, color: Colors.blueAccent, size: 16),
+                          SizedBox(width: 8),
+                          Text('Allow Telegram Alerts', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ],
+                      ),
+                      Switch(
+                        value: allowTelegram,
+                        activeColor: Colors.blueAccent,
+                        onChanged: (val) {
+                          setState(() => u['allow_telegram_alerts'] = val);
+                          _toggleSetting('toggle_telegram', u['id'], {'user_id': u['id'], 'allow_telegram_alerts': val ? 1 : 0});
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Main Content Area
-            Expanded(
-              child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      // Create User Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          onPressed: _showCreateUserModal,
-                          icon: const Icon(PhosphorIcons.userPlusFill, color: Colors.white, size: 18),
-                          label: const Text('Create New User Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Users List
-                      ..._users.map((u) {
-                        final bool isActive = (u['is_active'] == 1 || u['is_active'] == '1' || u['is_active'] == true);
-                        final bool allowManual = (u['allow_manual_trade'] == 1 || u['allow_manual_trade'] == '1' || u['allow_manual_trade'] == true);
-                        final bool allowTelegram = (u['allow_telegram_alerts'] == 1 || u['allow_telegram_alerts'] == '1' || u['allow_telegram_alerts'] == true);
-                        
-                        final String daily = u['max_trades_daily']?.toString() ?? '∞';
-                        final String monthly = u['max_trades_monthly']?.toString() ?? '∞';
-                        final String yearly = u['max_trades_yearly']?.toString() ?? '∞';
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: GlassCard(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Top Row: Username + Quotas Button
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(u['username'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                        const SizedBox(height: 2),
-                                        Text('Role: ${u['role']}', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                    OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                      onPressed: () => _showQuotaModal(u['id'], u['max_trades_daily'], u['max_trades_monthly'], u['max_trades_yearly']),
-                                      icon: const Icon(PhosphorIcons.ticket, color: Colors.white54, size: 14),
-                                      label: const Text('Quotas', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                
-                                Text('Limits:  $daily/day   |   $monthly/mo   |   $yearly/yr', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                                const SizedBox(height: 12),
-                                Container(height: 1, color: Colors.white.withOpacity(0.05)),
-                                const SizedBox(height: 8),
-
-                                // TOGGLE 1: Account Access (Active / Disabled)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(PhosphorIcons.shieldCheck, color: isActive ? Colors.greenAccent : Colors.redAccent, size: 16),
-                                        const SizedBox(width: 8),
-                                        Text('Account Access', style: TextStyle(color: isActive ? Colors.white : Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                    Switch(
-                                      value: isActive,
-                                      activeColor: Colors.greenAccent,
-                                      inactiveThumbColor: Colors.redAccent,
-                                      onChanged: (val) {
-                                        setState(() => u['is_active'] = val);
-                                        _toggleSetting('toggle_active', u['id'], {'user_id': u['id'], 'is_active': val ? 1 : 0});
-                                      },
-                                    ),
-                                  ],
-                                ),
-
-                                // TOGGLE 2: Manual Trade Permission
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(PhosphorIcons.rocketLaunch, color: Colors.purpleAccent, size: 16),
-                                        SizedBox(width: 8),
-                                        Text('Allow Manual Snipe', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                      ],
-                                    ),
-                                    Switch(
-                                      value: allowManual,
-                                      activeColor: theme.primaryColor,
-                                      onChanged: (val) {
-                                        setState(() => u['allow_manual_trade'] = val);
-                                        _toggleSetting('toggle_manual', u['id'], {'user_id': u['id'], 'allow_manual_trade': val ? 1 : 0});
-                                      },
-                                    ),
-                                  ],
-                                ),
-
-                                // TOGGLE 3: Telegram Alerts Permission
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(PhosphorIcons.paperPlaneTilt, color: Colors.blueAccent, size: 16),
-                                        SizedBox(width: 8),
-                                        Text('Allow Telegram Alerts', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                      ],
-                                    ),
-                                    Switch(
-                                      value: allowTelegram,
-                                      activeColor: Colors.blueAccent,
-                                      onChanged: (val) {
-                                        setState(() => u['allow_telegram_alerts'] = val);
-                                        _toggleSetting('toggle_telegram', u['id'], {'user_id': u['id'], 'allow_telegram_alerts': val ? 1 : 0});
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      })
-                    ],
-                  ),
-            ),
-          ],
-        ),
-      ),
+          );
+        })
+      ],
     );
   }
 }
