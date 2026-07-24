@@ -10,6 +10,7 @@ import 'positions_screen.dart';
 import 'admin_screen.dart';
 import 'settings_screen.dart';
 import 'terminal_screen.dart';
+import 'copy_bots_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -119,18 +120,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final canTrade = isAdmin || apiService.allowManualTrade;
     final theme = Theme.of(context);
 
+    // CORRECT ORDER: Home -> Positions -> Manual -> Copy Bots -> Admin -> Profile
     final List<Widget> pages = [
       _buildPremiumHome(theme),
-      if (canTrade) const TerminalScreen(),
       const PositionsScreen(),
+      if (canTrade) const TerminalScreen(),
+      const CopyBotsScreen(),
       if (isAdmin) const AdminScreen(),
       const SettingsScreen(),
     ];
 
     final List<NavigationDestination> navItems = [
       NavigationDestination(icon: Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
-      if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Terminal'),
-      NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Ledger'),
+      NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
+      if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
+      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Copy Bots'),
       if (isAdmin) NavigationDestination(icon: Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
       NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
     ];
