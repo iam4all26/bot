@@ -40,11 +40,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
     try {
-      // Bypasses the canLaunchUrl block on Android 11+
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+      // Switched to inAppBrowserView to avoid ActivityNotFoundException on Android 11+
+      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check your defaults.')));
       }
     }
   }
@@ -55,7 +55,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
       String formattedStr = utcString.replaceAll(' ', 'T');
       if (!formattedStr.endsWith('Z')) formattedStr += 'Z';
       final utcDateTime = DateTime.parse(formattedStr);
-      final lagosDateTime = utcDateTime.add(const Duration(hours: 1)); // WAT = UTC+1
+      final lagosDateTime = utcDateTime.add(const Duration(hours: 1)); 
       
       final hour24 = lagosDateTime.hour;
       final hour12 = (hour24 % 12 == 0) ? 12 : hour24 % 12;
@@ -128,6 +128,75 @@ class _PositionsScreenState extends State<PositionsScreen> {
       ));
       _fetchPositions();
     }
+  }
+
+  // RESTORED: Mirror Real Trade Function
+  Future<void> _mirrorRealTrade(int id, dynamic defaultAmount) async {
+    final sizeCtrl = TextEditingController(text: defaultAmount?.toString() ?? '5.0');
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF13131A),
+          title: Row(
+            children: [
+              const Icon(PhosphorIcons.rocketLaunchFill, color: Colors.greenAccent),
+              const SizedBox(width: 8),
+              const Text('Deploy Real Funds', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter the USD amount to execute live on-chain using this paper signal.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: sizeCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  labelText: 'Trade Size (USD)',
+                  prefixIcon: const Icon(PhosphorIcons.currencyDollar, color: Colors.greenAccent),
+                  labelStyle: const TextStyle(color: Colors.greenAccent),
+                  filled: true,
+                  fillColor: Colors.black26,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, foregroundColor: Colors.black),
+              onPressed: isSaving ? null : () async {
+                setStateDialog(() => isSaving = true);
+                final res = await this.context.read<ApiService>().postEndpoint(
+                  'trade.php?action=mirror_real',
+                  {'id': id, 'trade_usd': sizeCtrl.text.trim()},
+                );
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
+                    content: Text(res['message'] ?? ''),
+                    backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+                  ));
+                  _fetchPositions();
+                }
+              },
+              child: isSaving 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
+                : const Text('Execute Trade', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openEditModal(int id, String currentTp, String currentSl) async {
@@ -282,7 +351,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                 child: IconButton(
                   icon: const Icon(PhosphorIcons.arrowsClockwiseBold, color: Colors.white, size: 20),
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Refreshing live market data...'), duration: Duration(seconds: 1)));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Refreshing market data...'), duration: Duration(seconds: 1)));
                     _fetchPositions();
                   },
                 ),
@@ -308,6 +377,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                               final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                               final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                               final isProfit = pnl >= 0;
+                              final isReal = p['is_real'] == 1 || p['is_real'] == '1'; // RESTORED LIVE/PAPER CHECK
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -333,10 +403,29 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               ],
                                             ),
                                           ),
-                                          Text(
-                                            p['wallet_label'] ?? 'Manual',
-                                            style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
-                                          ),
+                                          // RESTORED BADGES
+                                          Row(
+                                            children: [
+                                              if (isReal)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  margin: const EdgeInsets.only(right: 6),
+                                                  decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+                                                  child: const Text('LIVE', style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                )
+                                              else
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  margin: const EdgeInsets.only(right: 6),
+                                                  decoration: BoxDecoration(color: Colors.orangeAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.orangeAccent.withOpacity(0.3))),
+                                                  child: const Text('PAPER', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ),
+                                              Text(
+                                                p['wallet_label'] ?? 'Manual',
+                                                style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          )
                                         ],
                                       ),
                                       const SizedBox(height: 16),
@@ -452,18 +541,40 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                       ),
                                       const SizedBox(height: 12),
                                       
-                                      // Close Button
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.redAccent),
-                                            foregroundColor: Colors.redAccent,
+                                      // Action Buttons
+                                      Column(
+                                        children: [
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                side: const BorderSide(color: Colors.redAccent),
+                                                foregroundColor: Colors.redAccent,
+                                              ),
+                                              onPressed: () => _closePosition(p['id']),
+                                              icon: const Icon(PhosphorIcons.handPalm, size: 16),
+                                              label: const Text('Close Trade Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                            ),
                                           ),
-                                          onPressed: () => _closePosition(p['id']),
-                                          icon: const Icon(PhosphorIcons.handPalm, size: 16),
-                                          label: const Text('Close Trade Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                        ),
+                                          // RESTORED: DEPLOY REAL FUNDS BUTTON (Only shown for paper trades)
+                                          if (!isReal) ...[
+                                            const SizedBox(height: 8),
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton.icon(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.greenAccent.withOpacity(0.2),
+                                                  foregroundColor: Colors.greenAccent,
+                                                  elevation: 0,
+                                                  side: BorderSide(color: Colors.greenAccent.withOpacity(0.5)),
+                                                ),
+                                                onPressed: () => _mirrorRealTrade(p['id'], p['virtual_usd_amount']),
+                                                icon: const Icon(PhosphorIcons.rocketLaunch, size: 16),
+                                                label: const Text('Deploy Real Funds', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                              ),
+                                            ),
+                                          ]
+                                        ],
                                       )
                                     ],
                                   ),
@@ -485,6 +596,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                               final p = _closedPositions[index];
                               final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
                               final isProfit = pnl >= 0;
+                              final isReal = p['is_real'] == 1 || p['is_real'] == '1';
                               
                               String badgeText = p['close_reason'] == 'TP_HIT' ? 'TP Hit' : (p['close_reason'] == 'SL_HIT' ? 'SL Hit' : 'Manual');
                               Color badgeColor = p['close_reason'] == 'TP_HIT' ? Colors.greenAccent : (p['close_reason'] == 'SL_HIT' ? Colors.redAccent : Colors.blueAccent);
@@ -513,14 +625,33 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               ],
                                             ),
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: badgeColor.withOpacity(0.1),
-                                              border: Border.all(color: badgeColor.withOpacity(0.3)),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Row(
+                                            children: [
+                                              // RESTORED LIVE/PAPER BADGE IN HISTORY
+                                              if (isReal)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  margin: const EdgeInsets.only(right: 6),
+                                                  decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+                                                  child: const Text('LIVE', style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                )
+                                              else
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  margin: const EdgeInsets.only(right: 6),
+                                                  decoration: BoxDecoration(color: Colors.orangeAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.orangeAccent.withOpacity(0.3))),
+                                                  child: const Text('PAPER', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: badgeColor.withOpacity(0.1),
+                                                  border: Border.all(color: badgeColor.withOpacity(0.3)),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ],
                                           )
                                         ],
                                       ),
