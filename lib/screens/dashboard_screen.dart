@@ -120,7 +120,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final canTrade = isAdmin || apiService.allowManualTrade;
     final theme = Theme.of(context);
 
-    // CORRECT ORDER: Home -> Positions -> Manual -> Copy Bots -> Admin -> Profile
     final List<Widget> pages = [
       _buildPremiumHome(theme),
       const PositionsScreen(),
@@ -134,7 +133,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       NavigationDestination(icon: Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
       NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
       if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
-      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Copy Bots'),
+      // FIXED: Changed "Copy Bots" to "Bots" to prevent text wrap bulkiness
+      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Bots'),
       if (isAdmin) NavigationDestination(icon: Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
       NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
     ];

@@ -81,115 +81,120 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
         final concCtrl = TextEditingController(text: bot['max_concurrent']?.toString() ?? '');
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.only(bottom: 16),
           child: GlassCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: EdgeInsets.zero,
+            child: Theme(
+              // Hide the default divider lines for a cleaner look
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                collapsedIconColor: Colors.white54,
+                iconColor: theme.primaryColor,
+                title: Row(
                   children: [
-                    Row(
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isEnabled ? theme.primaryColor.withOpacity(0.2) : Colors.white10,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : Colors.white54),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isEnabled ? theme.primaryColor.withOpacity(0.2) : Colors.white10,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : Colors.white54),
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Text(bot['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: Switch(
+                  value: isEnabled,
+                  activeColor: theme.primaryColor,
+                  onChanged: (val) {
+                    setState(() {
+                      bot['enabled'] = val;
+                    });
+                    _saveBotConfig(bot, tradeCtrl, tpCtrl, slCtrl, concCtrl);
+                  },
+                ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(height: 1, color: Colors.white.withOpacity(0.05)),
+                        const SizedBox(height: 16),
+                        const Text('Leave fields blank to use system defaults. Enter 0 in TP/SL for no limits.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        const SizedBox(height: 16),
+                        
+                        Row(
                           children: [
-                            Text(bot['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                            Expanded(
+                              child: TextField(
+                                controller: tradeCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(labelText: 'Trade Size (\$)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: concCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(labelText: 'Max Concurrent', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                              ),
+                            ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: tpCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                                decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: slCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                                decoration: InputDecoration(labelText: 'Stop Loss (%)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(color: theme.primaryColor.withOpacity(0.5)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () => _saveBotConfig(bot, tradeCtrl, tpCtrl, slCtrl, concCtrl),
+                            icon: Icon(PhosphorIcons.floppyDiskFill, color: theme.primaryColor, size: 18),
+                            label: Text('Save Configuration', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+                          ),
                         ),
                       ],
                     ),
-                    Switch(
-                      value: isEnabled,
-                      activeColor: theme.primaryColor,
-                      onChanged: (val) {
-                        setState(() {
-                          bot['enabled'] = val;
-                        });
-                        // Auto-save toggle state immediately
-                        _saveBotConfig(bot, tradeCtrl, tpCtrl, slCtrl, concCtrl);
-                      },
-                    ),
-                  ],
-                ),
-                
-                // FIXED: Removed the `if (isEnabled)` wrapper so fields are ALWAYS visible for configuration
-                const SizedBox(height: 16),
-                Container(height: 1, color: Colors.white.withOpacity(0.05)),
-                const SizedBox(height: 16),
-                const Text('Leave fields blank to use system defaults. Enter 0 in TP/SL for no limits.', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                const SizedBox(height: 16),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: tradeCtrl,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                        decoration: InputDecoration(labelText: 'Trade Size (\$)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: concCtrl,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                        decoration: InputDecoration(labelText: 'Max Concurrent', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: tpCtrl,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold),
-                        decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: slCtrl,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
-                        decoration: InputDecoration(labelText: 'Stop Loss (%)', filled: true, fillColor: Colors.black26, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: theme.primaryColor.withOpacity(0.5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => _saveBotConfig(bot, tradeCtrl, tpCtrl, slCtrl, concCtrl),
-                    icon: Icon(PhosphorIcons.floppyDiskFill, color: theme.primaryColor, size: 18),
-                    label: Text('Save Configuration', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
+                  )
+                ],
+              ),
             ),
           ),
         );
