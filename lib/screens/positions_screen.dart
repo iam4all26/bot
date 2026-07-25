@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
+import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 
 class PositionsScreen extends StatefulWidget {
@@ -37,7 +38,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
-  // FIXED: Forces an embedded native WebView entirely inside the app.
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
     try {
@@ -305,6 +305,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currency = context.watch<CurrencyProvider>();
 
     return DefaultTabController(
       length: 2,
@@ -464,6 +465,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   '${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${isProfit ? '+' : ''}${pct.toStringAsFixed(1)}%)',
                                                   style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
+                                                if (currency.isNaira)
+                                                  Text(
+                                                    '≈ ${isProfit && pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                                                    style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 10),
+                                                  ),
                                               ],
                                             ),
                                           ),
@@ -477,6 +483,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   '\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}',
                                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
+                                                if (currency.isNaira)
+                                                  Text(
+                                                    '≈ ${currency.format(p['virtual_usd_amount'])}',
+                                                    style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
                                               ],
                                             ),
                                           ),
@@ -684,6 +695,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   '${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)}',
                                                   style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
                                                 ),
+                                                if (currency.isNaira)
+                                                  Text(
+                                                    '≈ ${isProfit && pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                                                    style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11),
+                                                  ),
                                               ],
                                             ),
                                           ),
@@ -697,6 +713,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   '\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}',
                                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
+                                                if (currency.isNaira)
+                                                  Text(
+                                                    '≈ ${currency.format(p['virtual_usd_amount'])}',
+                                                    style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
                                               ],
                                             ),
                                           ),
