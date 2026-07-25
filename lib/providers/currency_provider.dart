@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
 class CurrencyProvider extends ChangeNotifier {
@@ -7,9 +8,29 @@ class CurrencyProvider extends ChangeNotifier {
 
   bool get isNaira => _isNaira;
 
-  void toggleCurrency() {
+  CurrencyProvider() {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isNaira = prefs.getBool('is_naira_preferred') ?? false;
+      notifyListeners();
+    } catch (e) {
+      // Fallback to false if prefs not available
+    }
+  }
+
+  Future<void> toggleCurrency() async {
     _isNaira = !_isNaira;
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_naira_preferred', _isNaira);
+    } catch (e) {
+      // Ignore write errors
+    }
   }
 
   Future<void> fetchLiveRate(ApiService api) async {
@@ -28,7 +49,6 @@ class CurrencyProvider extends ChangeNotifier {
     if (usdValue == null) return '-';
     double val = double.tryParse(usdValue.toString()) ?? 0.0;
     
-    // Check if it's a negative number, then work with the absolute value
     bool isNegative = val < 0;
     double absVal = val.abs();
     

@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   final _maxTradeCtrl = TextEditingController();
   final _dailyCapCtrl = TextEditingController();
+  final _slippageCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -46,6 +47,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _maxTradeCtrl.text = res['data']['user_max_per_trade_usd']?.toString() ?? '';
           _dailyCapCtrl.text = res['data']['user_daily_spend_cap']?.toString() ?? '';
           _botUsername = res['data']['telegram_bot_username']?.toString() ?? '';
+          
+          double slippageBps = (double.tryParse(res['data']['slippage_bps']?.toString() ?? '500') ?? 500);
+          _slippageCtrl.text = (slippageBps / 100).toStringAsFixed(1);
         }
         _isLoading = false;
       });
@@ -72,6 +76,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+    }
+  }
+
+  Future<void> _saveSlippage() async {
+    FocusScope.of(context).unfocus();
+    double pct = double.tryParse(_slippageCtrl.text.trim()) ?? 5.0;
+    int bps = (pct * 100).round();
+    final res = await context.read<ApiService>().postEndpoint(
+      'wallet.php?action=set_slippage',
+      {'slippage_bps': bps},
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Slippage updated'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
     }
   }
 
@@ -208,7 +225,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // ADDED: Currency Toggle
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -255,7 +271,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 3. Personal Trade Limits
+            // 3. DEX Execution Safety (Slippage)
+            GlassCard(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(children: [Icon(PhosphorIcons.shieldWarningFill, color: Colors.amberAccent), SizedBox(width: 8), Text('DEX Execution Safety', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))]),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Slippage protects trades during high market volatility. Too low (e.g. 1%), and trades fail with 0x1771 errors. Default for meme coins is 5.0%.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _slippageCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          decoration: InputDecoration(
+                            labelText: 'Max Slippage Tolerance (%)',
+                            labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                            filled: true,
+                            fillColor: Colors.black26,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            suffixText: '%',
+                            suffixStyle: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amberAccent.withOpacity(0.2),
+                          foregroundColor: Colors.amberAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _saveSlippage,
+                        icon: const Icon(PhosphorIcons.floppyDisk, size: 18),
+                        label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 4. Personal Trade Limits
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -279,7 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 4. Telegram Alerts
+            // 5. Telegram Alerts
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -292,8 +358,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   else ...[
                     const Text('Required Setup:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 12),
-                    const Text('1. Start @userinfobot to get your ID.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    
+                    // STEP 1: INTERACTIVE USERINFOBOT
+                    const Text('1. Start @userinfobot to get your ID:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
+                      decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      child: Row(
+                        children: [
+                          const Expanded(child: Text('@userinfobot', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 14))),
+                          IconButton(
+                            icon: const Icon(PhosphorIcons.copy, color: Colors.blueAccent, size: 18),
+                            onPressed: () {
+                              Clipboard.setData(const ClipboardData(text: 'https://t.me/userinfobot'));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('@userinfobot link copied!')));
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 18),
+                            onPressed: () async {
+                              final url = Uri.parse('https://t.me/userinfobot');
+                              if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // STEP 2: OFFICIAL BOT
                     const Text('2. Start our official bot:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 6),
                     Container(
@@ -318,6 +412,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    
+                    // STEP 3: PASTE ID
                     const Text('3. Paste the ID below.', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 12),
                     Row(
