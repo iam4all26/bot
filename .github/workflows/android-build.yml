@@ -46,6 +46,8 @@ jobs:
           rm -rf android/
           flutter create --org com.kainuwa --project-name bot .
           rm -f android/app/build.gradle.kts
+          rm -f android/build.gradle.kts
+          rm -f android/settings.gradle.kts
 
       - name: Apply Permanent Keystore & Firebase Config
         run: |
@@ -74,17 +76,50 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.buildDir = '../build'
+
+          def newBuildDir = rootProject.layout.buildDirectory.dir("../build").get()
+          rootProject.layout.buildDirectory.value(newBuildDir)
           subprojects {
-              project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+              def newSubprojectBuildDir = newBuildDir.dir(project.name)
+              project.layout.buildDirectory.value(newSubprojectBuildDir)
           }
           subprojects {
               project.evaluationDependsOn(':app')
           }
           tasks.register("clean", Delete) {
-              delete rootProject.buildDir
+              delete rootProject.layout.buildDirectory
           }
           top_gradle_EOF
+
+      - name: Configure Settings Gradle
+        run: |
+          cat << 'settings_gradle_EOF' > android/settings.gradle
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.7.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+          }
+
+          include ":app"
+          settings_gradle_EOF
 
       - name: Configure App-Level Gradle & Application ID
         run: |
@@ -153,7 +188,7 @@ jobs:
 
               <application
                   android:label="Kainuwa Trading"
-                  android:name="\${applicationName}"
+                  android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
                   <activity
