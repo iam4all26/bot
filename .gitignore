@@ -8,3 +8,6 @@ build/
 kainuwa_keystore.jks
 *.jks
 key.properties
+kainuwa_keystore.jks
+*.jks
+key.properties
