@@ -145,7 +145,7 @@ jobs:
 
               defaultConfig {
                   applicationId "com.kainuwa.bot"
-                  minSdk 21
+                  minSdk 23
                   targetSdk 36
                   versionCode 1
                   versionName "1.0.0"
@@ -191,7 +191,7 @@ jobs:
 
               <application
                   android:label="Kainuwa Trading"
-                  android:name="${applicationName}"
+                  android:name="\${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
                   <activity
