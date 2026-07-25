@@ -98,9 +98,10 @@ jobs:
 
           android {
               namespace "com.kainuwa.bot"
-              compileSdk 34
+              compileSdk 36
 
               compileOptions {
+                  coreLibraryDesugaringEnabled true
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
@@ -112,7 +113,7 @@ jobs:
               defaultConfig {
                   applicationId "com.kainuwa.bot"
                   minSdk 21
-                  targetSdk 34
+                  targetSdk 36
                   versionCode 1
                   versionName "1.0.0"
               }
@@ -141,6 +142,7 @@ jobs:
 
           dependencies {
               implementation platform('com.google.firebase:firebase-bom:32.7.0')
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
           }
           gradle_EOF
 
