@@ -231,10 +231,26 @@ jobs:
           flutter pub get
           dart run flutter_launcher_icons
 
-      - name: Compile Signed Release APK
-        run: flutter build apk --release
+      - name: Compile Signed Release APK (via Gradle directly)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Locate and Stage APK
+        run: |
+          echo "Searching for built APK..."
+          find /home/runner/work/bot/bot -name "*.apk" -type f
+          APK_PATH=$(find /home/runner/work/bot/bot -name "app-release.apk" -type f | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: No app-release.apk found anywhere in the workspace."
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
+          mkdir -p /home/runner/work/bot/bot/final-output
+          cp "$APK_PATH" /home/runner/work/bot/bot/final-output/app-release.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: android/app/build/outputs/flutter-apk/app-release.apk
+          path: final-output/app-release.apk
