@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/api_service.dart';
-import 'services/notification_service.dart';
 import 'providers/currency_provider.dart';
 import 'screens/splash_screen.dart';
 
@@ -25,7 +24,8 @@ class _KainuwaBotAppState extends State<KainuwaBotApp> {
   void initState() {
     super.initState();
     _apiService = ApiService();
-    NotificationService.initialize(_apiService);
+    // REMOVED: NotificationService.initialize(_apiService);
+    // This was triggering a 401 Unauthorized error before the user could log in.
   }
 
   @override
