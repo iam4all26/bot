@@ -56,7 +56,7 @@ jobs:
             echo "WARNING: google-services.json not found in repository root!"
           fi
 
-      - name: Configure Top-Level Gradle (Gradle 8 Compatible)
+      - name: Configure Top-Level Gradle (Strict Gradle 8 Format)
         run: |
           cat << 'top_gradle_EOF' > android/build.gradle
           buildscript {
@@ -74,9 +74,9 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.layout.buildDirectory.value(file("../build"))
+          rootProject.layout.buildDirectory.value(rootProject.layout.projectDirectory.dir("../build"))
           subprojects {
-              project.layout.buildDirectory.value(file("\${rootProject.layout.buildDirectory.get().asFile}/\${project.name}"))
+              project.layout.buildDirectory.value(rootProject.layout.buildDirectory.dir(project.name))
           }
           subprojects {
               project.evaluationDependsOn(':app')
