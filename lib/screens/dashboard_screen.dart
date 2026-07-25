@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../providers/currency_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
 import 'positions_screen.dart';
@@ -70,7 +71,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // FIXED: Tri-Split button function handling parameters for API
   Future<void> _panicClose(String type) async {
     String title = 'PANIC SELL ALL';
     String content = 'Are you sure you want to market-sell ALL active open positions immediately?';
@@ -140,7 +140,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
     ];
 
-    // Ensure profileIndex maps cleanly no matter how many nav items exist
     final int profileIndex = navItems.length - 1;
 
     final List<Widget> pages = [
@@ -171,6 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
+    final currency = context.watch<CurrencyProvider>(); 
     final double pnl = _stats['total_pnl'] != null ? (_stats['total_pnl'] as num).toDouble() : 0.0;
     final bool isProfit = pnl >= 0;
 
@@ -184,7 +184,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // FIXED: Tap navigates directly to SettingsScreen
               InkWell(
                 onTap: () => setState(() => _currentIndex = profileIndex),
                 borderRadius: BorderRadius.circular(12),
@@ -247,6 +246,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text('\$$_usdValue', style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 40)),
+                if (currency.isNaira) ...[
+                  const SizedBox(height: 2),
+                  Text('≈ ${currency.format(_usdValue)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
                 const SizedBox(height: 4),
                 Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 24),
@@ -254,8 +257,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    // FIXED: 24-Hour Specifier applied here
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NET PNL (24H)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18))])),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, 
+                        children: [
+                          Text('NET PNL (24H)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), 
+                          const SizedBox(height: 4), 
+                          Text('${isProfit && pnl > 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                          if (currency.isNaira)
+                            Text('≈ ${isProfit && pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11)),
+                        ]
+                      )
+                    ),
                     Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
                     const SizedBox(width: 16),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${_stats['open_count'] ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))])),
@@ -266,7 +279,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
           
-          // FIXED: Tri-Split Buttons for specific executions
           Column(
             children: [
               SizedBox(
@@ -332,10 +344,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     dense: true,
                     leading: Icon(PhosphorIcons.trendUp, size: 16, color: theme.primaryColor),
                     title: Text(_formatAddress(p['token_address']), style: const TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                    subtitle: Text('Size: \$${p['virtual_usd_amount']}  |  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
-                    trailing: Text(
-                      cpnl != null ? '${cpIsProfit ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? Colors.greenAccent : Colors.redAccent),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Size: \$${p['virtual_usd_amount']}  |  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
+                        if (currency.isNaira)
+                          Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 10, color: Colors.greenAccent.withOpacity(0.7))),
+                      ],
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? Colors.greenAccent : Colors.redAccent),
+                        ),
+                        if (currency.isNaira && cpnl != null)
+                          Text(
+                            '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7)),
+                          ),
+                      ],
                     ),
                   );
                 }).toList(),
