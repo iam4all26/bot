@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -74,10 +75,12 @@ class _LoginScreenState extends State<LoginScreen> {
           } else {
             // Success! 
             NotificationService.initialize(apiService);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login Successful!'), backgroundColor: Colors.green),
+            
+            // Navigate to the Dashboard
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
             );
-            // Add your navigation to Dashboard here if it's missing!
           }
         } else {
           _showErrorDialog('Unknown Format', 'Server returned an unknown format:\n\n$result');
