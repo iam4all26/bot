@@ -19,6 +19,24 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Generate and Save Permanent Keystore (If Missing)
+        run: |
+          if [ ! -f "kainuwa_keystore.jks" ]; then
+            echo "Keystore missing. Generating and committing to repository..."
+            keytool -genkey -v -keystore kainuwa_keystore.jks \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias kainuwa_key -storepass kainuwa123 -keypass kainuwa123 \
+              -dname "CN=Kainuwa, OU=Dev, O=Kainuwa Digital, L=Abuja, S=FCT, C=NG"
+            
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add kainuwa_keystore.jks
+            git commit -m "chore: auto-generate permanent Android release keystore"
+            git push
+          else
+            echo "Permanent keystore found. Reusing it for signature consistency."
+          fi
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -28,37 +46,17 @@ jobs:
           rm -rf android/
           flutter create --org com.kainuwa --project-name bot .
           rm -f android/app/build.gradle.kts
-          rm -f android/build.gradle.kts
-          rm -f android/settings.gradle.kts
 
-      - name: Decode Keystore from Secret
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Apply Permanent Keystore & Firebase Config
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-
-      - name: Write key.properties from Secrets
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          cat << KEYPROPS_EOF > android/key.properties
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=keystore.jks
-          KEYPROPS_EOF
-
-      - name: Apply Firebase Config
-        run: |
+          cp kainuwa_keystore.jks android/app/keystore.jks
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
           else
             echo "WARNING: google-services.json not found in repository root!"
           fi
 
-      - name: Configure Top-Level Gradle
+      - name: Configure Top-Level Gradle (Gradle 8 Compatible)
         run: |
           cat << 'top_gradle_EOF' > android/build.gradle
           buildscript {
@@ -67,8 +65,7 @@ jobs:
                   mavenCentral()
               }
               dependencies {
-                  classpath 'com.android.tools.build:gradle:8.11.1'
-                  classpath 'com.google.gms:google-services:4.4.0'
+                  classpath 'com.google.gms:google-services:4.4.1'
               }
           }
           allprojects {
@@ -77,40 +74,17 @@ jobs:
                   mavenCentral()
               }
           }
+          rootProject.layout.buildDirectory.value(file("../build"))
+          subprojects {
+              project.layout.buildDirectory.value(file("${rootProject.layout.buildDirectory.get().asFile}/${project.name}"))
+          }
           subprojects {
               project.evaluationDependsOn(':app')
           }
+          tasks.register("clean", Delete) {
+              delete rootProject.layout.buildDirectory
+          }
           top_gradle_EOF
-
-      - name: Configure Settings Gradle
-        run: |
-          cat << 'settings_gradle_EOF' > android/settings.gradle
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.11.1" apply false
-              id "org.jetbrains.kotlin.android" version "2.2.20" apply false
-          }
-
-          include ":app"
-          settings_gradle_EOF
 
       - name: Configure App-Level Gradle & Application ID
         run: |
@@ -122,19 +96,11 @@ jobs:
               id "com.google.gms.google-services"
           }
 
-          def keystoreProperties = new Properties()
-          def keystorePropertiesFile = rootProject.file('key.properties')
-          if (keystorePropertiesFile.exists()) {
-              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-          }
-
           android {
               namespace "com.kainuwa.bot"
-              compileSdk 36
-              ndkVersion "28.2.13676358"
+              compileSdk 34
 
               compileOptions {
-                  coreLibraryDesugaringEnabled true
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
@@ -145,19 +111,18 @@ jobs:
 
               defaultConfig {
                   applicationId "com.kainuwa.bot"
-                  minSdk 24
-                  targetSdk 36
+                  minSdk 21
+                  targetSdk 34
                   versionCode 1
                   versionName "1.0.0"
-                  multiDexEnabled true
               }
 
               signingConfigs {
                   release {
-                      keyAlias keystoreProperties['keyAlias']
-                      keyPassword keystoreProperties['keyPassword']
-                      storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-                      storePassword keystoreProperties['storePassword']
+                      storeFile file("keystore.jks")
+                      storePassword "kainuwa123"
+                      keyAlias "kainuwa_key"
+                      keyPassword "kainuwa123"
                   }
               }
 
@@ -176,7 +141,6 @@ jobs:
 
           dependencies {
               implementation platform('com.google.firebase:firebase-bom:32.7.0')
-              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
           }
           gradle_EOF
 
@@ -186,12 +150,10 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.VIBRATE"/>
 
               <application
                   android:label="Kainuwa Trading"
-                  android:name="\${applicationName}"
+                  android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
                   <activity
@@ -231,26 +193,10 @@ jobs:
           flutter pub get
           dart run flutter_launcher_icons
 
-      - name: Compile Signed Release APK (via Gradle directly)
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
-
-      - name: Locate and Stage APK
-        run: |
-          echo "Searching for built APK..."
-          find /home/runner/work/bot/bot -name "*.apk" -type f
-          APK_PATH=$(find /home/runner/work/bot/bot -name "app-release.apk" -type f | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: No app-release.apk found anywhere in the workspace."
-            exit 1
-          fi
-          echo "Found APK at: $APK_PATH"
-          mkdir -p /home/runner/work/bot/bot/final-output
-          cp "$APK_PATH" /home/runner/work/bot/bot/final-output/app-release.apk
+      - name: Compile Signed Release APK
+        run: flutter build apk --release
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: final-output/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
