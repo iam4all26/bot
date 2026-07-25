@@ -52,7 +52,13 @@ class _BalanceCardState extends State<BalanceCard> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -62,7 +68,13 @@ class _BalanceCardState extends State<BalanceCard> {
                 const Icon(PhosphorIcons.warningCircleFill, color: Colors.red),
                 const SizedBox(width: 8),
                 Expanded(child: Text(_errorMessage, style: const TextStyle(color: Colors.red))),
-                IconButton(icon: const Icon(PhosphorIcons.arrowsClockwise), onPressed: () { setState(() { _isLoading = true; _errorMessage = ""; }); _fetchBalance(); })
+                IconButton(
+                  icon: const Icon(PhosphorIcons.arrowsClockwise),
+                  onPressed: () {
+                    setState(() { _isLoading = true; _errorMessage = ""; });
+                    _fetchBalance();
+                  },
+                )
               ],
             )
           : Column(
@@ -71,28 +83,86 @@ class _BalanceCardState extends State<BalanceCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('MASTER WALLET BALANCE', style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: theme.colorScheme.onSurfaceVariant)),
-                    InkWell(onTap: () { setState(() => _isLoading = true); _fetchBalance(); }, child: Icon(PhosphorIcons.arrowsClockwise, size: 16, color: theme.primaryColor)),
+                    Text(
+                      'MASTER WALLET BALANCE',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() => _isLoading = true);
+                        _fetchBalance();
+                      },
+                      child: Icon(PhosphorIcons.arrowsClockwise, size: 16, color: theme.primaryColor),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(_solBalance, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+                    Text(
+                      _solBalance,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Padding(padding: const EdgeInsets.only(bottom: 4.0), child: Text('SOL', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor))),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4.0),
+                      child: Text(
+                        'SOL',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.green.withOpacity(0.2))),
-                  // APPLIED MASK HERE
-                  child: Text(
-                    currency.format(_usdValue),
-                    style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        '\$$_usdValue USD',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (currency.isNaira) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.greenAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.greenAccent.withOpacity(0.2)),
+                        ),
+                        child: Text(
+                          '≈ ${currency.format(_usdValue)}',
+                          style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
