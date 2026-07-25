@@ -155,7 +155,7 @@ jobs:
 
               <application
                   android:label="Kainuwa Trading"
-                  android:name="\${applicationName}"
+                  android:name="android.app.Application"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
                   <activity
