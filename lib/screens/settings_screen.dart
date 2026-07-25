@@ -29,6 +29,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _dailyCapCtrl = TextEditingController();
   final _slippageCtrl = TextEditingController();
 
+  // Password Controllers
+  final _oldPasswordCtrl = TextEditingController();
+  final _newPasswordCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +59,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _changePassword() async {
+    if (_oldPasswordCtrl.text.trim().isEmpty || _newPasswordCtrl.text.trim().isEmpty) return;
+    FocusScope.of(context).unfocus();
+    
+    final res = await context.read<ApiService>().postEndpoint(
+      'auth.php?action=change_password',
+      {
+        'old_password': _oldPasswordCtrl.text.trim(),
+        'new_password': _newPasswordCtrl.text.trim()
+      },
+    );
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] ?? ''), 
+        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red
+      ));
+      if (res['status'] == 'success') {
+        _oldPasswordCtrl.clear();
+        _newPasswordCtrl.clear();
+      }
     }
   }
 
@@ -156,7 +184,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 2. Push Notifications Card
+            // 2. Change Password Card
+            GlassCard(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(PhosphorIcons.passwordFill, color: theme.primaryColor),
+                      const SizedBox(width: 8),
+                      const Text('Change Password', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _oldPasswordCtrl,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Current Password',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _newPasswordCtrl,
+                          obscureText: true,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'New Password',
+                            hintStyle: const TextStyle(color: Colors.white38),
+                            filled: true,
+                            fillColor: Colors.black26,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 14)), 
+                        onPressed: _changePassword, 
+                        child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 3. Push Notifications Card
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -171,37 +255,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text('Receive real-time push alerts on your phone whenever trades open, close, or hit targets.', style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 3. Execution Wallet
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [Icon(PhosphorIcons.walletFill, color: theme.primaryColor), const SizedBox(width: 8), const Text('Execution Wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))]),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('PUBLIC ADDRESS', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(_hasWallet ? (_publicAddress ?? 'Error loading') : 'No wallet connected', style: TextStyle(color: _hasWallet ? Colors.white : Colors.white38, fontFamily: 'monospace', fontSize: 13))),
-                        if (_hasWallet) const Icon(PhosphorIcons.checkCircleFill, color: Colors.greenAccent, size: 18),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -293,6 +346,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
+                    if (_botUsername.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text('2. Start the trading bot to receive alerts:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
+                        decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('@$_botUsername', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 14))),
+                            IconButton(
+                              icon: const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 18),
+                              onPressed: () async {
+                                final url = Uri.parse('https://t.me/$_botUsername');
+                                if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
