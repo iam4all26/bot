@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Explicitly grant the Action permission to push the keystore back to your repo
     permissions:
       contents: write
 
@@ -48,18 +47,53 @@ jobs:
           flutter create --org com.kainuwa --project-name bot .
           rm -f android/app/build.gradle.kts
 
-      - name: Apply Permanent Keystore
+      - name: Apply Permanent Keystore & Firebase Config
         run: |
-          # Copy the permanent keystore into the newly created android/app directory
           cp kainuwa_keystore.jks android/app/keystore.jks
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/
+          else
+            echo "WARNING: google-services.json not found in repository root!"
+          fi
 
-      - name: Configure Gradle Signing & Application ID
+      - name: Configure Top-Level Gradle
+        run: |
+          cat << 'top_gradle_EOF' > android/build.gradle
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.google.gms:google-services:4.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          top_gradle_EOF
+
+      - name: Configure App-Level Gradle & Application ID
         run: |
           cat << 'gradle_EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
               id "kotlin-android"
               id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
           }
 
           android {
@@ -104,12 +138,55 @@ jobs:
           flutter {
               source "../.."
           }
+
+          dependencies {
+              implementation platform('com.google.firebase:firebase-bom:32.7.0')
+          }
           gradle_EOF
 
       - name: Configure Manifest
         run: |
-          sed -i 's/android:label=".*"/android:label="Kainuwa Bot"/' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' android/app/src/main/AndroidManifest.xml
+          cat << 'manifest_EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+              <application
+                  android:label="Kainuwa Trading"
+                  android:name="\${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                        android:name="io.flutter.embedding.android.NormalTheme"
+                        android:resource="@style/NormalTheme"
+                        />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.VIEW" />
+                      <category android:name="android.intent.category.BROWSABLE" />
+                      <data android:scheme="https" />
+                  </intent>
+              </queries>
+          </manifest>
+          manifest_EOF
 
       - name: Generate App Launcher Icons
         run: |

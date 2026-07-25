@@ -15,6 +15,9 @@ dependencies:
   phosphoricons_flutter: ^1.0.0
   google_fonts: ^6.2.1
   url_launcher: ^6.2.5
+  firebase_core: any
+  firebase_messaging: any
+  flutter_local_notifications: any
 
 dev_dependencies:
   flutter_test:
