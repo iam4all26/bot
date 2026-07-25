@@ -30,7 +30,7 @@ jobs:
             
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add kainuwa_keystore.jks
+            git add -f kainuwa_keystore.jks
             git commit -m "chore: auto-generate permanent Android release keystore"
             git push
           else
@@ -76,7 +76,7 @@ jobs:
           }
           rootProject.layout.buildDirectory.value(file("../build"))
           subprojects {
-              project.layout.buildDirectory.value(file("${rootProject.layout.buildDirectory.get().asFile}/${project.name}"))
+              project.layout.buildDirectory.value(file("\${rootProject.layout.buildDirectory.get().asFile}/\${project.name}"))
           }
           subprojects {
               project.evaluationDependsOn(':app')
@@ -153,7 +153,7 @@ jobs:
 
               <application
                   android:label="Kainuwa Trading"
-                  android:name="${applicationName}"
+                  android:name="\${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
                   <activity
