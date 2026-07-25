@@ -28,15 +28,23 @@ class CurrencyProvider extends ChangeNotifier {
     if (usdValue == null) return '-';
     double val = double.tryParse(usdValue.toString()) ?? 0.0;
     
+    // Check if it's a negative number, then work with the absolute value
+    bool isNegative = val < 0;
+    double absVal = val.abs();
+    
     if (_isNaira) {
-      double nairaVal = val * _exchangeRate;
-      if (nairaVal >= 1000000) return '₦${(nairaVal / 1000000).toStringAsFixed(2)}M';
-      if (nairaVal >= 1000) return '₦${(nairaVal / 1000).toStringAsFixed(1)}K';
-      return '₦${nairaVal.toStringAsFixed(2)}';
+      double nairaVal = absVal * _exchangeRate;
+      String prefix = isNegative ? '-₦' : '₦';
+      
+      if (nairaVal >= 1000000) return '$prefix${(nairaVal / 1000000).toStringAsFixed(2)}M';
+      if (nairaVal >= 1000) return '$prefix${(nairaVal / 1000).toStringAsFixed(1)}K';
+      return '$prefix${nairaVal.toStringAsFixed(2)}';
     } else {
-      if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
-      if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
-      return '\$${val.toStringAsFixed(2)}';
+      String prefix = isNegative ? '-\$' : '\$';
+      
+      if (absVal >= 1000000) return '$prefix${(absVal / 1000000).toStringAsFixed(2)}M';
+      if (absVal >= 1000) return '$prefix${(absVal / 1000).toStringAsFixed(1)}K';
+      return '$prefix${absVal.toStringAsFixed(2)}';
     }
   }
 }
