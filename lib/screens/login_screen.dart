@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
 
@@ -32,10 +33,15 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? 'Login failed'), backgroundColor: Colors.redAccent),
         );
-      } else if (result['status'] == 'success' && !apiService.isAuthenticated) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful, but device failed to securely store session.'), backgroundColor: Colors.orange),
-        );
+      } else if (result['status'] == 'success') {
+        if (!apiService.isAuthenticated) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Login successful, but device failed to securely store session.'), backgroundColor: Colors.orange),
+          );
+        } else {
+          // Safely initialize push notifications now that the user is fully authenticated
+          NotificationService.initialize(apiService);
+        }
       }
     }
   }
