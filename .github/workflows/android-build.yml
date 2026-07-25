@@ -19,24 +19,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Generate and Save Permanent Keystore (If Missing)
-        run: |
-          if [ ! -f "kainuwa_keystore.jks" ]; then
-            echo "Keystore missing. Generating and committing to repository..."
-            keytool -genkey -v -keystore kainuwa_keystore.jks \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -alias kainuwa_key -storepass kainuwa123 -keypass kainuwa123 \
-              -dname "CN=Kainuwa, OU=Dev, O=Kainuwa Digital, L=Abuja, S=FCT, C=NG"
-            
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add kainuwa_keystore.jks
-            git commit -m "chore: auto-generate permanent Android release keystore"
-            git push
-          else
-            echo "Permanent keystore found. Reusing it for signature consistency."
-          fi
-
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -49,9 +31,27 @@ jobs:
           rm -f android/build.gradle.kts
           rm -f android/settings.gradle.kts
 
-      - name: Apply Permanent Keystore & Firebase Config
+      - name: Decode Keystore from Secret
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          cp kainuwa_keystore.jks android/app/keystore.jks
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+
+      - name: Write key.properties from Secrets
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat << KEYPROPS_EOF > android/key.properties
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=keystore.jks
+          KEYPROPS_EOF
+
+      - name: Apply Firebase Config
+        run: |
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
           else
@@ -67,6 +67,7 @@ jobs:
                   mavenCentral()
               }
               dependencies {
+                  classpath 'com.android.tools.build:gradle:8.11.1'
                   classpath 'com.google.gms:google-services:4.4.0'
               }
           }
@@ -114,8 +115,8 @@ jobs:
 
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.7.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+              id "com.android.application" version "8.11.1" apply false
+              id "org.jetbrains.kotlin.android" version "2.2.20" apply false
           }
 
           include ":app"
@@ -124,6 +125,12 @@ jobs:
       - name: Configure App-Level Gradle & Application ID
         run: |
           cat << 'gradle_EOF' > android/app/build.gradle
+          def keystoreProperties = new Properties()
+          def keystorePropertiesFile = rootProject.file('key.properties')
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
           plugins {
               id "com.android.application"
               id "kotlin-android"
@@ -134,8 +141,10 @@ jobs:
           android {
               namespace "com.kainuwa.bot"
               compileSdk 36
+              ndkVersion "28.2.13676358"
 
               compileOptions {
+                  coreLibraryDesugaringEnabled true
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
@@ -150,14 +159,15 @@ jobs:
                   targetSdk 36
                   versionCode 1
                   versionName "1.0.0"
+                  multiDexEnabled true
               }
 
               signingConfigs {
                   release {
-                      storeFile file("keystore.jks")
-                      storePassword "kainuwa123"
-                      keyAlias "kainuwa_key"
-                      keyPassword "kainuwa123"
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                      storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                      storePassword keystoreProperties['storePassword']
                   }
               }
 
@@ -176,6 +186,7 @@ jobs:
 
           dependencies {
               implementation platform('com.google.firebase:firebase-bom:32.7.0')
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
           }
           gradle_EOF
 
@@ -185,6 +196,8 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.VIBRATE"/>
 
               <application
                   android:label="Kainuwa Trading"
