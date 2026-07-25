@@ -26,7 +26,7 @@ class NotificationService {
         const AndroidInitializationSettings androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
         const InitializationSettings initSettings = InitializationSettings(android: androidInit);
 
-        await _localNotifications.initialize(initSettings);
+        await _localNotifications.initialize(settings: initSettings);
 
         const AndroidNotificationChannel channel = AndroidNotificationChannel(
           'trade_alerts',
@@ -54,10 +54,10 @@ class NotificationService {
 
           if (notification != null && android != null) {
             _localNotifications.show(
-              notification.hashCode,
-              notification.title,
-              notification.body,
-              NotificationDetails(
+              id: notification.hashCode,
+              title: notification.title,
+              body: notification.body,
+              notificationDetails: NotificationDetails(
                 android: AndroidNotificationDetails(
                   channel.id,
                   channel.name,
