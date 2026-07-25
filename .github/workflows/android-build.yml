@@ -77,18 +77,8 @@ jobs:
                   mavenCentral()
               }
           }
-
-          def newBuildDir = rootProject.layout.buildDirectory.dir("../build").get()
-          rootProject.layout.buildDirectory.value(newBuildDir)
-          subprojects {
-              def newSubprojectBuildDir = newBuildDir.dir(project.name)
-              project.layout.buildDirectory.value(newSubprojectBuildDir)
-          }
           subprojects {
               project.evaluationDependsOn(':app')
-          }
-          tasks.register("clean", Delete) {
-              delete rootProject.layout.buildDirectory
           }
           top_gradle_EOF
 
@@ -247,4 +237,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: android/app/build/outputs/flutter-apk/app-release.apk
