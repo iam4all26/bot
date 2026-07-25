@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/bot_engine_tab.dart'; // Your external file
+import '../widgets/bot_engine_tab.dart'; 
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -37,7 +37,7 @@ class AdminScreen extends StatelessWidget {
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
               tabs: const [
-                Tab(text: 'Users'), // Upgraded from Team Quotas
+                Tab(text: 'Users'), 
                 Tab(text: 'Bot Engine'), 
                 Tab(text: 'Tracked Wallets')
               ],
@@ -49,7 +49,7 @@ class AdminScreen extends StatelessWidget {
               children: [
                 UsersTab(), 
                 BotEngineTab(), 
-                TrackedWalletsTab() // Restored your original class below
+                TrackedWalletsTab() 
               ]
             )
           ),
@@ -59,7 +59,7 @@ class AdminScreen extends StatelessWidget {
   }
 }
 
-// ==================== TAB 1: USERS (New Management UI) ====================
+// ==================== TAB 1: USERS & ECONOMY ====================
 class UsersTab extends StatefulWidget {
   const UsersTab({super.key});
   @override State<UsersTab> createState() => _UsersTabState();
@@ -68,6 +68,9 @@ class UsersTab extends StatefulWidget {
 class _UsersTabState extends State<UsersTab> {
   bool _isLoadingUsers = true;
   List<dynamic> _users = [];
+  
+  final _rateCtrl = TextEditingController();
+  bool _isSavingRate = false;
 
   @override
   void initState() {
@@ -85,6 +88,28 @@ class _UsersTabState extends State<UsersTab> {
         }
         _isLoadingUsers = false;
       });
+    }
+  }
+
+  Future<void> _saveCustomRate() async {
+    final val = _rateCtrl.text.trim();
+    if (val.isEmpty) return;
+    
+    setState(() => _isSavingRate = true);
+    FocusScope.of(context).unfocus();
+    
+    final res = await context.read<ApiService>().postEndpoint(
+      'admin.php?action=set_exchange_rate', 
+      {'custom_ngn_rate': val}
+    );
+    
+    if (mounted) {
+      setState(() => _isSavingRate = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] ?? ''),
+        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+      ));
+      _rateCtrl.clear();
     }
   }
 
@@ -297,6 +322,58 @@ class _UsersTabState extends State<UsersTab> {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
+          // 1. EXCHANGE RATE CONTROL CARD
+          GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(PhosphorIcons.currencyCircleDollarFill, color: Colors.greenAccent),
+                    SizedBox(width: 8),
+                    Text('Global Exchange Rate (₦/USD)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Set to 0 to automatically fetch the live market rate.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _rateCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. 1600 or 0',
+                          hintStyle: const TextStyle(color: Colors.white38),
+                          filled: true,
+                          fillColor: Colors.black26,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent, 
+                        foregroundColor: Colors.black, 
+                        padding: const EdgeInsets.symmetric(vertical: 14)
+                      ),
+                      onPressed: _isSavingRate ? null : _saveCustomRate,
+                      child: _isSavingRate 
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                        : const Text('Set Rate', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 2. CREATE USER BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -311,6 +388,8 @@ class _UsersTabState extends State<UsersTab> {
             ),
           ),
           const SizedBox(height: 16),
+          
+          // 3. USERS LIST
           ..._users.map((u) {
             final bool isActive = (u['is_active'] == 1 || u['is_active'] == '1' || u['is_active'] == true);
             final bool allowManual = (u['allow_manual_trade'] == 1 || u['allow_manual_trade'] == '1' || u['allow_manual_trade'] == true);
