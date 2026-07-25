@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
@@ -20,28 +21,72 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  void _showErrorDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF13131A),
+        title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            content,
+            style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: content));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error copied to clipboard')));
+            },
+            child: const Text('COPY', style: TextStyle(color: Colors.blueAccent)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     
-    final apiService = context.read<ApiService>();
-    final result = await apiService.login(_usernameController.text.trim(), _passwordController.text);
+    try {
+      final apiService = context.read<ApiService>();
+      final result = await apiService.login(_usernameController.text.trim(), _passwordController.text);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (result['status'] == 'error') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Login failed'), backgroundColor: Colors.redAccent),
-        );
-      } else if (result['status'] == 'success') {
-        if (!apiService.isAuthenticated) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login successful, but device failed to securely store session.'), backgroundColor: Colors.orange),
-          );
-        } else {
-          // Safely initialize push notifications now that the user is fully authenticated
-          NotificationService.initialize(apiService);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (result == null) {
+          _showErrorDialog('Null Response', 'The API returned a null result. Check network connection or API URL.');
+          return;
         }
+
+        if (result['status'] == 'error') {
+          _showErrorDialog('Login Rejected', result['message'] ?? 'Raw Result: $result');
+        } else if (result['status'] == 'success') {
+          if (!apiService.isAuthenticated) {
+            _showErrorDialog('Storage Error', 'Login successful on server, but device failed to securely store session token.');
+          } else {
+            // Success! 
+            NotificationService.initialize(apiService);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Login Successful!'), backgroundColor: Colors.green),
+            );
+            // Add your navigation to Dashboard here if it's missing!
+          }
+        } else {
+          _showErrorDialog('Unknown Format', 'Server returned an unknown format:\n\n$result');
+        }
+      }
+    } catch (e, stackTrace) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showErrorDialog('App Crash / Exception', 'Error:\n$e\n\nStack:\n$stackTrace');
       }
     }
   }
