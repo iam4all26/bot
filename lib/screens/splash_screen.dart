@@ -19,13 +19,24 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateNext() async {
-    // Wait for animation and allow ApiService to load tokens from secure storage
+    // 1. Give the UI animation time to play
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
     
     final apiService = context.read<ApiService>();
 
-    // Route based on actual authentication state
+    // 2. FIX: The Race Condition.
+    // If the API service is still loading the token from SharedPreferences, 
+    // wait in a loop for up to 3 seconds before assuming we are logged out.
+    int retries = 0;
+    while (!apiService.isAuthenticated && retries < 15) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      retries++;
+    }
+
+    if (!mounted) return;
+
+    // Route based on verified authentication state
     if (apiService.isAuthenticated) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const DashboardScreen()),

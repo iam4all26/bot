@@ -3,7 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/bot_engine_tab.dart'; 
+import '../widgets/bot_engine_tab.dart';
+import '../widgets/broadcast_dialog.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -387,9 +388,34 @@ class _UsersTabState extends State<UsersTab> {
               label: const Text('Create New User Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
             ),
           ),
+          const SizedBox(height: 8),
+          
+          // 3. BROADCAST PUSH NOTIFICATION BUTTON
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.withOpacity(0.2),
+                foregroundColor: Colors.amber,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: Colors.amber.withOpacity(0.5))
+                ),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const BroadcastPushDialog(),
+                );
+              },
+              icon: const Icon(PhosphorIcons.megaphoneFill, size: 18),
+              label: const Text('Send Push Broadcast', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
           const SizedBox(height: 16),
           
-          // 3. USERS LIST
+          // 4. USERS LIST
           ..._users.map((u) {
             final bool isActive = (u['is_active'] == 1 || u['is_active'] == '1' || u['is_active'] == true);
             final bool allowManual = (u['allow_manual_trade'] == 1 || u['allow_manual_trade'] == '1' || u['allow_manual_trade'] == true);

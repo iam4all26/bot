@@ -12,6 +12,7 @@ import 'admin_screen.dart';
 import 'settings_screen.dart';
 import 'terminal_screen.dart';
 import 'copy_bots_screen.dart';
+import 'login_screen.dart'; // Ensure LoginScreen is accessible
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -205,7 +206,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-              IconButton(icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), onPressed: () => context.read<ApiService>().logout()),
+              IconButton(
+                icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), 
+                onPressed: () async {
+                  // FIX: Explicitly await logout and push the user back to the login screen
+                  await context.read<ApiService>().logout();
+                  if (mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
