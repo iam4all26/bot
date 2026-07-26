@@ -253,7 +253,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 2. Push Notifications Card (Restored)
+            // 2. Push Notifications Card
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -273,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 3. Execution Wallet (Recovered with Modals)
+            // 3. Execution Wallet
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -357,7 +357,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 5. Personal Trade Limits (Recovered)
+            // 5. Personal Trade Limits
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -381,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 6. Telegram Alerts
+            // 6. Telegram Alerts (UPDATED FOR NATIVE BOT ONLY)
             GlassCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -394,9 +394,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   else ...[
                     const Text('Required Setup:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 12),
-                    const Text('1. Start @userinfobot to get your ID.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    const SizedBox(height: 6),
-                    const Text('2. Start our official bot:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const Text('1. Start our official bot to get your ID:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
@@ -420,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text('3. Paste the ID below.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const Text('2. Paste the ID below.', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
