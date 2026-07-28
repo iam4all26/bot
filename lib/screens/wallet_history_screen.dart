@@ -124,7 +124,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('WIN RATE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                            Icon(PhosphorIcons.targetDuotone, color: winRate >= 50 ? Colors.greenAccent : Colors.amberAccent, size: 20),
+                            Icon(PhosphorIcons.targetFill, color: winRate >= 50 ? Colors.greenAccent : Colors.amberAccent, size: 20),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -146,7 +146,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('ACTIVE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                            Icon(PhosphorIcons.folderOpenDuotone, color: Color(0xFF7351FF), size: 20),
+                            Icon(PhosphorIcons.folderOpenFill, color: Color(0xFF7351FF), size: 20),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -172,7 +172,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           children: [
                             Text('TOTAL P&L', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                             SizedBox(width: 4),
-                            Icon(PhosphorIcons.currencyCircleDollarDuotone, color: Colors.greenAccent, size: 16),
+                            Icon(PhosphorIcons.currencyCircleDollarFill, color: Colors.greenAccent, size: 16),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -199,7 +199,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                             children: [
                               Text('DEPLOYED', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                               SizedBox(width: 4),
-                              Icon(PhosphorIcons.chartBarDuotone, color: Colors.blueAccent, size: 16),
+                              Icon(PhosphorIcons.chartBarFill, color: Colors.blueAccent, size: 16),
                             ],
                           ),
                           const SizedBox(height: 8),
