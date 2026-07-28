@@ -41,11 +41,16 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Regenerate Android Architecture
+      - name: Regenerate Android Architecture & Upgrade Kotlin
         run: |
           rm -rf android/
           flutter create --org com.kainuwa --project-name bot .
           rm -f android/app/build.gradle.kts
+          
+          # CRITICAL FIX: Upgrade Kotlin to 1.9.24 to support jni-1.0.1
+          if [ -f "android/settings.gradle" ]; then
+            sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/' android/settings.gradle
+          fi
 
       - name: Apply Permanent Keystore & Firebase Config
         run: |
