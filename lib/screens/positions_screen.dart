@@ -15,6 +15,7 @@ class PositionsScreen extends StatefulWidget {
 
 class _PositionsScreenState extends State<PositionsScreen> {
   bool _isLoading = true;
+  String _searchQuery = '';
   List<dynamic> _openPositions = [];
   List<dynamic> _closedPositions = [];
 
@@ -307,6 +308,24 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
 
+    final filteredOpen = _openPositions.where((p) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final addr = (p['token_address'] ?? '').toString().toLowerCase();
+      final label = (p['wallet_label'] ?? '').toString().toLowerCase();
+      final display = (p['display_name'] ?? '').toString().toLowerCase();
+      return addr.contains(query) || label.contains(query) || display.contains(query);
+    }).toList();
+
+    final filteredClosed = _closedPositions.where((p) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final addr = (p['token_address'] ?? '').toString().toLowerCase();
+      final label = (p['wallet_label'] ?? '').toString().toLowerCase();
+      final display = (p['display_name'] ?? '').toString().toLowerCase();
+      return addr.contains(query) || label.contains(query) || display.contains(query);
+    }).toList();
+
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -334,8 +353,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
                     unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
                     labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     tabs: [
-                      Tab(text: 'Open (${_openPositions.length})'),
-                      Tab(text: 'Closed (${_closedPositions.length})'),
+                      Tab(text: 'Open (${filteredOpen.length})'),
+                      Tab(text: 'Closed (${filteredClosed.length})'),
                     ],
                   ),
                 ),
@@ -357,7 +376,43 @@ class _PositionsScreenState extends State<PositionsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          
+          // SEARCH FILTER BAR
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: SizedBox(
+              height: 44,
+              child: TextField(
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Search by Shark, Bot, or Token...',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  prefixIcon: const Icon(PhosphorIcons.magnifyingGlass, color: Colors.white54, size: 18),
+                  filled: true,
+                  fillColor: Colors.black.withOpacity(0.3),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val;
+                  });
+                },
+              ),
+            ),
+          ),
+          
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator()) 
@@ -366,13 +421,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
                     // ================== OPEN POSITIONS TAB ==================
                     RefreshIndicator(
                       onRefresh: _fetchPositions,
-                      child: _openPositions.isEmpty 
+                      child: filteredOpen.isEmpty 
                         ? const Center(child: Text('No active open positions.', style: TextStyle(color: Colors.white54)))
                         : ListView.builder(
                             padding: const EdgeInsets.all(20),
-                            itemCount: _openPositions.length,
+                            itemCount: filteredOpen.length,
                             itemBuilder: (context, index) {
-                              final p = _openPositions[index];
+                              final p = filteredOpen[index];
                               final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                               final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                               final isProfit = pnl >= 0;
@@ -418,7 +473,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   child: const Text('PAPER', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                                 ),
                                               Text(
-                                                p['wallet_label'] ?? 'Manual',
+                                                p['display_name'] ?? p['wallet_label'] ?? 'Manual',
                                                 style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -589,14 +644,17 @@ class _PositionsScreenState extends State<PositionsScreen> {
                     // ================== CLOSED POSITIONS TAB ==================
                     RefreshIndicator(
                       onRefresh: _fetchPositions,
-                      child: _closedPositions.isEmpty 
+                      child: filteredClosed.isEmpty 
                         ? const Center(child: Text('No closed trade history.', style: TextStyle(color: Colors.white54)))
                         : ListView.builder(
                             padding: const EdgeInsets.all(20),
-                            itemCount: _closedPositions.length,
+                            itemCount: filteredClosed.length,
                             itemBuilder: (context, index) {
-                              final p = _closedPositions[index];
+                              final p = filteredClosed[index];
                               final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
+                              final size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
+                              final pct = size > 0 ? (pnl / size) * 100 : 0.0;
+                              
                               final isProfit = pnl >= 0;
                               final isReal = p['is_real'] == 1 || p['is_real'] == '1';
                               
@@ -644,12 +702,17 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 ),
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                margin: const EdgeInsets.only(right: 6),
                                                 decoration: BoxDecoration(
                                                   color: badgeColor.withOpacity(0.1),
                                                   border: Border.all(color: badgeColor.withOpacity(0.3)),
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
                                                 child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                              Text(
+                                                p['display_name'] ?? p['wallet_label'] ?? 'Manual',
+                                                style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           )
@@ -692,8 +755,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 const Text('REALIZED P&L', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  '${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)}',
-                                                  style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                                                  '${isProfit ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${isProfit ? '+' : ''}${pct.toStringAsFixed(1)}%)',
+                                                  style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14),
                                                 ),
                                                 if (currency.isNaira)
                                                   Text(
@@ -710,7 +773,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 const Text('TRADE SIZE', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  '\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}',
+                                                  '\$${size.toStringAsFixed(2)}',
                                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                                 if (currency.isNaira)
