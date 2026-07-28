@@ -158,7 +158,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
-  // FIXED: Execute closes sequentially using standard endpoints to avoid FormatExceptions
   Future<void> _executeBatchClose(List<int> ids, String description) async {
     if (ids.isEmpty) return;
 
@@ -363,24 +362,41 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final finalOpenList = _openPositions.where(_passesEnvFilter).toList();
     final finalClosedList = _filteredClosedPositions;
 
-    // Calculate Closed Stats based on Filtered List
+    // Calculate Comprehensive P&L & Stats dynamically based on Filtered List
     int statsToday = 0, statsWeek = 0, statsMonth = 0;
-    double totProfit = 0, totLoss = 0;
+    double profToday = 0, profWeek = 0, profMonth = 0, profAll = 0;
+    double lossToday = 0, lossWeek = 0, lossMonth = 0, lossAll = 0;
     final now = DateTime.now();
 
     Map<String, List<dynamic>> monthlyGroupedTrades = {};
 
     for (var p in finalClosedList) {
       double pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
-      if (pnl > 0) totProfit += pnl; else if (pnl < 0) totLoss += pnl;
-
+      
+      bool isToday = false, isWeek = false, isMonth = false;
       try {
         DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
         int days = now.difference(dt).inDays;
-        if (days == 0 && now.day == dt.day) statsToday++;
-        if (days < 7) statsWeek++;
-        if (days < 30) statsMonth++;
+        isToday = (days == 0 && now.day == dt.day);
+        isWeek = days < 7;
+        isMonth = days < 30;
+
+        if (isToday) statsToday++;
+        if (isWeek) statsWeek++;
+        if (isMonth) statsMonth++;
       } catch (_) {}
+
+      if (pnl > 0) {
+        profAll += pnl;
+        if (isToday) profToday += pnl;
+        if (isWeek) profWeek += pnl;
+        if (isMonth) profMonth += pnl;
+      } else if (pnl < 0) {
+        lossAll += pnl;
+        if (isToday) lossToday += pnl;
+        if (isWeek) lossWeek += pnl;
+        if (isMonth) lossMonth += pnl;
+      }
 
       // Group for Monthly View
       String monthKey = _formatMonthYear(p['closed_at']);
@@ -477,6 +493,10 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
+                                            // Top Level: Bot Name & Win Rate (Full Width to avoid cutting)
+                                            Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            const SizedBox(height: 8),
+
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
@@ -484,19 +504,16 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   onTap: () => _launchDexScreener(p['token_address'] ?? ''),
                                                   child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(width: 4), const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 14)]),
                                                 ),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), margin: const EdgeInsets.only(right: 6),
-                                                      decoration: BoxDecoration(color: isReal ? Colors.redAccent.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: isReal ? Colors.redAccent.withOpacity(0.3) : Colors.orangeAccent.withOpacity(0.3))),
-                                                      child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? Colors.redAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                                                    ),
-                                                    Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                  ],
-                                                )
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(color: isReal ? Colors.redAccent.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? Colors.redAccent.withOpacity(0.3) : Colors.orangeAccent.withOpacity(0.3))),
+                                                  child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? Colors.redAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                                ),
                                               ],
                                             ),
                                             const SizedBox(height: 16),
+                                            
+                                            // RESTORED METRICS: Entry / Exit Mcap
                                             Row(
                                               children: [
                                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('ENTRY MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
@@ -504,6 +521,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 16),
+
                                             Row(
                                               children: [
                                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -518,7 +536,18 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 ])),
                                               ],
                                             ),
+                                            const SizedBox(height: 16),
+
+                                            // RESTORED METRICS: Time and Date
+                                            Row(
+                                              children: [
+                                                const Icon(PhosphorIcons.clock, color: Colors.purpleAccent, size: 12),
+                                                const SizedBox(width: 4),
+                                                Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                              ],
+                                            ),
                                             const SizedBox(height: 12),
+
                                             Column(
                                               children: [
                                                 SizedBox(width: double.infinity, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.redAccent), foregroundColor: Colors.redAccent), onPressed: () => _closeSinglePosition(p['id']), icon: const Icon(PhosphorIcons.handPalm, size: 16), label: const Text('Close Trade Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
@@ -545,32 +574,20 @@ class _PositionsScreenState extends State<PositionsScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               child: Column(
                                 children: [
-                                  // Profit / Loss Summary Container
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
-                                    child: Row(
-                                      children: [
-                                        Expanded(child: Column(children: [const Text('Total Profit', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)), const SizedBox(height: 4), Text('+\$${totProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18)), if (currency.isNaira) Text('≈ +${currency.format(totProfit)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
-                                        Container(width: 1, height: 40, color: Colors.white10),
-                                        Expanded(child: Column(children: [const Text('Total Loss', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)), const SizedBox(height: 4), Text('-\$${totLoss.abs().toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)), if (currency.isNaira) Text('≈ -${currency.format(totLoss.abs())}', style: TextStyle(color: Colors.redAccent.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
-                                      ]
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Time-Based Statistics Row
+                                  // Comprehensive P&L Summary Matrix
                                   SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
                                       children: [
-                                        _buildStatBox('Today', statsToday, Colors.blueAccent), const SizedBox(width: 8),
-                                        _buildStatBox('This Week', statsWeek, Colors.purpleAccent), const SizedBox(width: 8),
-                                        _buildStatBox('This Month', statsMonth, Colors.orangeAccent), const SizedBox(width: 8),
-                                        _buildStatBox('All Time', finalClosedList.length, Colors.white),
+                                        _buildPnLBox('Today', statsToday, profToday, lossToday, currency), const SizedBox(width: 12),
+                                        _buildPnLBox('This Week', statsWeek, profWeek, lossWeek, currency), const SizedBox(width: 12),
+                                        _buildPnLBox('This Month', statsMonth, profMonth, lossMonth, currency), const SizedBox(width: 12),
+                                        _buildPnLBox('All Time', finalClosedList.length, profAll, lossAll, currency),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(height: 16),
+                                  
                                   // Search Bar
                                   SizedBox(
                                     height: 44,
@@ -586,15 +603,20 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  // Filters
+                                  
+                                  // Filters (RESTORED MANUAL & COPY)
                                   SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
                                       children: [
                                         _buildFilterChip('All', _selectedClosedType == ClosedFilterType.all, () => setState(() => _selectedClosedType = ClosedFilterType.all)), const SizedBox(width: 6),
                                         _buildFilterChip('Profits', _selectedClosedType == ClosedFilterType.profit, () => setState(() => _selectedClosedType = ClosedFilterType.profit), color: Colors.greenAccent), const SizedBox(width: 6),
-                                        _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () => setState(() => _selectedClosedType = ClosedFilterType.loss), color: Colors.redAccent),
+                                        _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () => setState(() => _selectedClosedType = ClosedFilterType.loss), color: Colors.redAccent), const SizedBox(width: 6),
+                                        _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () => setState(() => _selectedClosedType = ClosedFilterType.copy), color: Colors.blueAccent), const SizedBox(width: 6),
+                                        _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () => setState(() => _selectedClosedType = ClosedFilterType.manual), color: Colors.purpleAccent),
+                                        
                                         const SizedBox(width: 12), Container(height: 20, width: 1, color: Colors.white24), const SizedBox(width: 12),
+                                        
                                         DropdownButton<String>(
                                           value: _selectedClosedBot ?? 'All Bots', dropdownColor: const Color(0xFF13131A), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold), underline: const SizedBox(),
                                           icon: const Icon(PhosphorIcons.caretDownBold, color: Colors.white54, size: 12),
@@ -645,6 +667,10 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
+                                                // Top Level: Bot Name & Win Rate
+                                                Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                                const SizedBox(height: 8),
+
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
@@ -652,17 +678,36 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                     Row(
                                                       children: [
                                                         Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: isReal ? Colors.redAccent.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: isReal ? Colors.redAccent.withOpacity(0.3) : Colors.orangeAccent.withOpacity(0.3))), child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? Colors.redAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold))),
-                                                        Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: badgeColor.withOpacity(0.1), border: Border.all(color: badgeColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)), child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold))),
-                                                        Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                        Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: badgeColor.withOpacity(0.1), border: Border.all(color: badgeColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(4)), child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold))),
                                                       ],
                                                     )
                                                   ],
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 16),
+                                                
+                                                // RESTORED METRICS: Entry / Exit Mcap
+                                                Row(
+                                                  children: [
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('ENTRY MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('EXIT MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['close_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 16),
+
                                                 Row(
                                                   children: [
                                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('REALIZED P&L', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)), if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11))])),
                                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('TRADE SIZE', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), if (currency.isNaira) Text('≈ ${currency.format(size)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold))])),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 16),
+
+                                                // RESTORED METRICS: Time and Date
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(children: [const Icon(PhosphorIcons.clock, color: Colors.white54, size: 12), const SizedBox(width: 4), Text(formatLagosTime(p['closed_at']), style: const TextStyle(color: Colors.white54, fontSize: 10))]),
+                                                    Row(children: [const Icon(PhosphorIcons.hourglassHigh, color: Colors.amberAccent, size: 12), const SizedBox(width: 4), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11))]),
                                                   ],
                                                 ),
                                               ],
@@ -687,15 +732,29 @@ class _PositionsScreenState extends State<PositionsScreen> {
     );
   }
 
-  Widget _buildStatBox(String label, int value, Color color) {
+  Widget _buildPnLBox(String label, int totalTrades, double profitUsd, double lossUsd, CurrencyProvider currency) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      width: 260,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-          const SizedBox(height: 4),
-          Text('$value', style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)), child: Text('$totalTrades Trades', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Total Profit', style: TextStyle(color: Colors.white38, fontSize: 10)), const SizedBox(height: 2), Text('+\$${profitUsd.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ +${currency.format(profitUsd)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
+              Container(width: 1, height: 30, color: Colors.white10, margin: const EdgeInsets.symmetric(horizontal: 12)),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Total Loss', style: TextStyle(color: Colors.white38, fontSize: 10)), const SizedBox(height: 2), Text('-\$${lossUsd.abs().toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ -${currency.format(lossUsd.abs())}', style: TextStyle(color: Colors.redAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
+            ],
+          ),
         ],
       ),
     );
@@ -706,7 +765,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(color: isSelected ? activeColor.withOpacity(0.2) : Colors.black26, border: Border.all(color: isSelected ? activeColor : Colors.white10), borderRadius: BorderRadius.circular(10)),
         child: Text(label, style: TextStyle(color: isSelected ? activeColor : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
       ),
