@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 
 class TerminalScreen extends StatefulWidget {
@@ -147,9 +148,27 @@ class _TerminalScreenState extends State<TerminalScreen> {
     return '\$${val.toStringAsFixed(2)}';
   }
 
+  Widget _buildFallbackIcon(ThemeData theme) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: theme.primaryColor.withOpacity(0.2),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          _tokenData!['symbol']?.toString().substring(0, 1).toUpperCase() ?? '?',
+          style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currency = context.watch<CurrencyProvider>();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -199,7 +218,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                 ),
               ),
 
-              // LIVE TOKEN TELEMETRY CARD (Auto-displays below address input)
+              // LIVE TOKEN TELEMETRY CARD
               if (_isFetchingToken) ...[
                 const SizedBox(height: 12),
                 GlassCard(
@@ -224,18 +243,37 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  '${_tokenData!['name']} (${_tokenData!['symbol']})',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'DEX: ${_tokenData!['dex']}',
-                                  style: TextStyle(color: theme.primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                if (_tokenData!['image_url'] != null && _tokenData!['image_url'].toString().isNotEmpty)
+                                  ClipOval(
+                                    child: Image.network(
+                                      _tokenData!['image_url'],
+                                      width: 36,
+                                      height: 36,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx, err, stack) => _buildFallbackIcon(theme),
+                                    ),
+                                  )
+                                else
+                                  _buildFallbackIcon(theme),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${_tokenData!['name']} (${_tokenData!['symbol']})',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'DEX: ${_tokenData!['dex']}',
+                                        style: TextStyle(color: theme.primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -251,7 +289,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                               children: [
                                 Icon(PhosphorIcons.checkCircleFill, color: Colors.greenAccent, size: 12),
                                 SizedBox(width: 4),
-                                Text('Verified Pair', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text('Verified', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                               ],
                             ),
                           )
@@ -371,7 +409,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Projected Profit:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                          Text('+\$${_expectedProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('+\$${_expectedProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                              if (currency.isNaira)
+                                Text('≈ +${currency.format(_expectedProfit).replaceFirst('₦-', '-₦')}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                         ],
                       ),
                     ),
