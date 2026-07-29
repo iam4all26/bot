@@ -175,7 +175,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('MANUAL TRADE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2, color: Colors.white)),
+        title: Text('MANUAL TRADE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2, color: theme.colorScheme.onSurface)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -194,13 +194,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       children: [
                         Icon(PhosphorIcons.coinsFill, color: theme.primaryColor),
                         const SizedBox(width: 8),
-                        const Text('Token Address', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Token Address', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _tokenController,
-                      style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13),
+                      style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 13),
                       decoration: InputDecoration(
                         labelText: 'Paste Solana Token Address',
                         labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
@@ -209,7 +209,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           onPressed: _pasteFromClipboard,
                         ),
                         filled: true,
-                        fillColor: Colors.black.withOpacity(0.2),
+                        fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                       validator: _validateSolanaAddress,
@@ -228,7 +228,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     children: [
                       SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor)),
                       const SizedBox(width: 12),
-                      const Text('Fetching live token metrics...', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text('Fetching live token metrics...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -264,7 +264,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                                     children: [
                                       Text(
                                         '${_tokenData!['name']} (${_tokenData!['symbol']})',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 2),
@@ -296,7 +296,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Container(height: 1, color: Colors.white.withOpacity(0.05)),
+                      Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.05)),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -304,9 +304,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('MARKET CAP', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                                Text('MARKET CAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1)),
                                 const SizedBox(height: 4),
-                                Text(_formatCurrency(_tokenData!['mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(_formatCurrency(_tokenData!['mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
                               ],
                             ),
                           ),
@@ -314,7 +314,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('LIQUIDITY', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                                Text('LIQUIDITY', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1)),
                                 const SizedBox(height: 4),
                                 Text(_formatCurrency(_tokenData!['liquidity']), style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
                               ],
@@ -347,7 +347,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('TRADE SETTINGS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
+                    Text('TRADE SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -355,12 +355,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           child: TextFormField(
                             controller: _usdController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
                             decoration: InputDecoration(
                               labelText: 'Trade Size (\$)',
                               labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                               filled: true,
-                              fillColor: Colors.black.withOpacity(0.2),
+                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             ),
                           ),
@@ -375,7 +375,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                               labelText: 'Take Profit (%)',
                               labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                               filled: true,
-                              fillColor: Colors.black.withOpacity(0.2),
+                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             ),
                           ),
@@ -394,7 +394,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                               labelText: 'Stop Loss (%)',
                               labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                               filled: true,
-                              fillColor: Colors.black.withOpacity(0.2),
+                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             ),
                           ),
@@ -404,7 +404,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -452,6 +452,179 @@ class _TerminalScreenState extends State<TerminalScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+cat << 'EOF' > lib/widgets/balance_card.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import '../services/api_service.dart';
+import '../providers/currency_provider.dart';
+
+class BalanceCard extends StatefulWidget {
+  const BalanceCard({super.key});
+
+  @override
+  State<BalanceCard> createState() => _BalanceCardState();
+}
+
+class _BalanceCardState extends State<BalanceCard> {
+  bool _isLoading = true;
+  String _solBalance = "0.00000";
+  String _usdValue = "0.00";
+  String _errorMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBalance();
+  }
+
+  Future<void> _fetchBalance() async {
+    final api = context.read<ApiService>();
+    final res = await api.getEndpoint('balance.php');
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (res['status'] == 'success') {
+          _solBalance = res['data']['sol_balance'];
+          _usdValue = res['data']['usd_value'];
+        } else {
+          _errorMessage = res['message'] ?? 'Failed to load balance';
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final currency = context.watch<CurrencyProvider>();
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : _errorMessage.isNotEmpty
+          ? Row(
+              children: [
+                const Icon(PhosphorIcons.warningCircleFill, color: Colors.red),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_errorMessage, style: const TextStyle(color: Colors.red))),
+                IconButton(
+                  icon: const Icon(PhosphorIcons.arrowsClockwise),
+                  onPressed: () {
+                    setState(() { _isLoading = true; _errorMessage = ""; });
+                    _fetchBalance();
+                  },
+                )
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'MASTER WALLET BALANCE',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() => _isLoading = true);
+                        _fetchBalance();
+                      },
+                      child: Icon(PhosphorIcons.arrowsClockwise, size: 16, color: theme.primaryColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _solBalance,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4.0),
+                      child: Text(
+                        'SOL',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        '\$$_usdValue USD',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (currency.isNaira) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.greenAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.greenAccent.withOpacity(0.2)),
+                        ),
+                        child: Text(
+                          '≈ ${currency.format(_usdValue)}',
+                          style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }
