@@ -27,8 +27,10 @@ class _AnimatedCryptoBackgroundState extends State<AnimatedCryptoBackground> wit
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
-      color: AppTheme.darkBackground,
+      color: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
       child: Stack(
         children: [
           AnimatedBuilder(
@@ -41,7 +43,7 @@ class _AnimatedCryptoBackgroundState extends State<AnimatedCryptoBackground> wit
                     left: -50,
                     child: Container(
                       width: 350, height: 350,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.kainuwaPurple.withOpacity(0.15)),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.kainuwaPurple.withOpacity(isDark ? 0.15 : 0.08)),
                     ),
                   ),
                   Positioned(
@@ -49,7 +51,7 @@ class _AnimatedCryptoBackgroundState extends State<AnimatedCryptoBackground> wit
                     right: -100,
                     child: Container(
                       width: 400, height: 400,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFE024CE).withOpacity(0.1)),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.kainuwaGold.withOpacity(isDark ? 0.1 : 0.05)),
                     ),
                   ),
                 ],
