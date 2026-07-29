@@ -31,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _publicAddress = "Loading...";
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
-  List<dynamic> _closedPositions = []; // ADDED: To calculate Daily PNL locally
+  List<dynamic> _closedPositions = [];
   Timer? _pollingTimer;
   DateTime? _lastPressedAt;
 
@@ -69,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
           _openPositions = responses[1]['open_positions'] ?? [];
-          _closedPositions = responses[1]['closed_positions'] ?? []; // Store closed positions
+          _closedPositions = responses[1]['closed_positions'] ?? [];
         }
         if (responses[2]['status'] == 'success') {
           _publicAddress = responses[2]['data']['public_address'] ?? 'No Wallet Connected';
@@ -219,7 +219,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
 
-    // DYNAMIC DAILY PNL CALCULATION (Matches Positions "Today" Tab exactly)
     double dailyPnl = 0.0;
     final now = DateTime.now();
     for (var p in _closedPositions) {
@@ -507,8 +506,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // ----------------------------------------------------------------------
-// CURRENCY CALCULATOR DIALOG WIDGET
+// CURRENCY CALCULATOR FORMATTERS & DIALOG
 // ----------------------------------------------------------------------
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String text = newValue.text.replaceAll(RegExp(r'[^0-9.]'), '');
+    int dotCount = text.split('.').length - 1;
+    if (dotCount > 1) return oldValue;
+    
+    List<String> parts = text.split('.');
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String mathFunc(Match match) => '${match[1]},';
+    String whole = parts[0].replaceAllMapped(reg, mathFunc);
+    String finalString = parts.length > 1 ? '$whole.${parts[1]}' : whole;
+    
+    int cursorOffset = newValue.selection.end + (finalString.length - newValue.text.length);
+    if (cursorOffset < 0) cursorOffset = 0;
+    if (cursorOffset > finalString.length) cursorOffset = finalString.length;
+    
+    return TextEditingValue(
+      text: finalString,
+      selection: TextSelection.collapsed(offset: cursorOffset),
+    );
+  }
+}
+
 class CurrencyCalculatorDialog extends StatefulWidget {
   const CurrencyCalculatorDialog({super.key});
 
@@ -522,6 +547,9 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   
   double _activeRate = 1500.0;
   bool _isInitialized = false;
+
+  String _usdWords = "";
+  String _ngnWords = "";
 
   @override
   void didChangeDependencies() {
@@ -541,24 +569,83 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     }
   }
 
+  String _numberToWords(int number) {
+    if (number == 0) return "Zero";
+    if (number < 0) return "Minus ${_numberToWords(number.abs())}";
+    String words = "";
+    if ((number / 1000000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000000).floor())} Billion ";
+      number %= 1000000000;
+    }
+    if ((number / 1000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000).floor())} Million ";
+      number %= 1000000;
+    }
+    if ((number / 1000).floor() > 0) {
+      words += "${_numberToWords((number / 1000).floor())} Thousand ";
+      number %= 1000;
+    }
+    if ((number / 100).floor() > 0) {
+      words += "${_numberToWords((number / 100).floor())} Hundred ";
+      number %= 100;
+    }
+    if (number > 0) {
+      if (words != "") words += "and ";
+      var unitsMap = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      var tensMap = ["Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+      if (number < 20) {
+        words += unitsMap[number];
+      } else {
+        words += tensMap[(number / 10).floor()];
+        if ((number % 10) > 0) {
+          words += "-${unitsMap[number % 10]}";
+        }
+      }
+    }
+    return words.trim();
+  }
+
+  String _formatWithCommas(String text) {
+    List<String> parts = text.split('.');
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String mathFunc(Match match) => '${match[1]},';
+    String whole = parts[0].replaceAllMapped(reg, mathFunc);
+    return parts.length > 1 ? '$whole.${parts[1]}' : whole;
+  }
+
+  void _updateWords() {
+    double usd = double.tryParse(_usdController.text.replaceAll(',', '')) ?? 0;
+    double ngn = double.tryParse(_ngnController.text.replaceAll(',', '')) ?? 0;
+    setState(() {
+      _usdWords = usd > 0 ? '${_numberToWords(usd.floor())} Dollars' : '';
+      _ngnWords = ngn > 0 ? '${_numberToWords(ngn.floor())} Naira' : '';
+    });
+  }
+
   void _onUsdChanged(String value) {
     if (value.isEmpty) {
       _ngnController.clear();
+      _updateWords();
       return;
     }
-    double usd = double.tryParse(value) ?? 0;
-    _ngnController.text = (usd * _activeRate).toStringAsFixed(2);
+    double usd = double.tryParse(value.replaceAll(',', '')) ?? 0;
+    String ngnRaw = (usd * _activeRate).toStringAsFixed(2);
+    _ngnController.text = _formatWithCommas(ngnRaw);
+    _updateWords();
   }
 
   void _onNgnChanged(String value) {
     if (value.isEmpty) {
       _usdController.clear();
+      _updateWords();
       return;
     }
-    double ngn = double.tryParse(value) ?? 0;
+    double ngn = double.tryParse(value.replaceAll(',', '')) ?? 0;
     if (_activeRate > 0) {
-      _usdController.text = (ngn / _activeRate).toStringAsFixed(2);
+      String usdRaw = (ngn / _activeRate).toStringAsFixed(2);
+      _usdController.text = _formatWithCommas(usdRaw);
     }
+    _updateWords();
   }
 
   @override
@@ -603,7 +690,7 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-              child: Text('Active Rate: 1 USD = ₦${_activeRate.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+              child: Text('Active Rate: 1 USD = ₦${_formatWithCommas(_activeRate.toStringAsFixed(2))}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 24),
             
@@ -612,6 +699,7 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
             TextField(
               controller: _usdController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [ThousandsSeparatorInputFormatter()],
               style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18),
               decoration: InputDecoration(
                 prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant),
@@ -623,6 +711,11 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
               ),
               onChanged: _onUsdChanged,
             ),
+            if (_usdWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(_usdWords, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontStyle: FontStyle.italic)),
+              ),
             
             const SizedBox(height: 16),
             Center(child: Icon(PhosphorIcons.arrowsDownUp, color: theme.colorScheme.onSurfaceVariant, size: 24)),
@@ -633,6 +726,7 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
             TextField(
               controller: _ngnController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [ThousandsSeparatorInputFormatter()],
               style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
               decoration: InputDecoration(
                 prefixIcon: const Padding(
@@ -647,6 +741,11 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
               ),
               onChanged: _onNgnChanged,
             ),
+            if (_ngnWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(_ngnWords, style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontStyle: FontStyle.italic)),
+              ),
             const SizedBox(height: 8),
           ],
         ),
