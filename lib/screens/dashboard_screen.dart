@@ -251,6 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isAdmin = apiService.role == 'admin';
     final canTrade = isAdmin || apiService.allowManualTrade;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final List<Widget> pages = [
       _buildPremiumHome(theme, isAdmin ? 3 : 2),
@@ -271,8 +272,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBody: true, // Prevents FAB jumping and lets background flow under Notch
         body: AnimatedCryptoBackground(
-          child: SafeArea(child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
+          child: SafeArea(bottom: false, child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _showActionMenu(canTrade),
@@ -283,7 +285,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold]),
+              gradient: const LinearGradient(
+                colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
+                stops: [0.0, 0.9], // Tuned balance
+              ),
               boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 4))],
             ),
             child: const Icon(PhosphorIcons.arrowsLeftRightBold, color: Colors.white, size: 28),
@@ -294,8 +299,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: theme.colorScheme.surface,
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
-          elevation: 20,
-          shadowColor: Colors.black.withOpacity(0.5),
+          elevation: isDark ? 10 : 4, // Softened Light Mode Shadow
+          shadowColor: Colors.black.withOpacity(isDark ? 0.5 : 0.05), // Removed muddy black rings
           child: SizedBox(
             height: 64,
             child: Row(
@@ -303,7 +308,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme),
                 _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Positions', 1, theme),
-                const SizedBox(width: 48), // The notch space
+                const SizedBox(width: 48), 
                 if (isAdmin) _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 2, theme),
                 _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', isAdmin ? 3 : 2, theme),
               ],
@@ -335,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: theme.primaryColor,
       backgroundColor: theme.colorScheme.surface,
       child: ListView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120), // Extra padding for Notch
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -347,7 +352,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold])),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle, 
+                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold], stops: [0.0, 0.9])
+                      ),
                       child: CircleAvatar(radius: 20, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface, size: 20)),
                     ),
                     const SizedBox(width: 12),
@@ -396,6 +404,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 24),
 
           GlassCard(
+            hasBubbles: true,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -412,8 +421,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 4),
                   Text('≈ ${currency.format(_usdValue)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
-                const SizedBox(height: 4),
-                Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+                      child: const Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
               ],
             ),
           ),
@@ -423,7 +442,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Expanded(
                 child: GlassCard(
-                  padding: const EdgeInsets.all(16),
+                  hasBubbles: true,
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -436,7 +456,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 18)),
-                      // RESTORED NAIRA PNL IN DASHBOARD
                       if (currency.isNaira)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -449,7 +468,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: GlassCard(
-                  padding: const EdgeInsets.all(16),
+                  hasBubbles: true,
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -610,7 +630,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 80), 
         ],
       ),
     );
@@ -672,7 +691,6 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     }
   }
 
-  // RESTORED WORD CONVERTER FOR CALCULATOR
   String _numberToWords(int number) {
     if (number == 0) return "Zero";
     if (number < 0) return "Minus ${_numberToWords(number.abs())}";
