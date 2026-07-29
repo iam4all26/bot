@@ -7,6 +7,7 @@ class CurrencyProvider extends ChangeNotifier {
   double _exchangeRate = 1500.0;
 
   bool get isNaira => _isNaira;
+  double get exchangeRate => _exchangeRate; // FIXED: Expose raw numerical rate for the calculator
 
   CurrencyProvider() {
     _loadPreference();

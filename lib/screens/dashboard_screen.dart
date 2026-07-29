@@ -32,7 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  DateTime? _lastPressedAt; // Tracks the back button press for exit
+  DateTime? _lastPressedAt;
 
   @override
   void initState() {
@@ -106,9 +106,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-        content: Text(content),
+        content: Text(content, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
@@ -151,12 +151,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final theme = Theme.of(context);
 
     final List<NavigationDestination> navItems = [
-      NavigationDestination(icon: Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
-      NavigationDestination(icon: Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
-      if (canTrade) NavigationDestination(icon: Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
-      NavigationDestination(icon: Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Bots'),
-      if (isAdmin) NavigationDestination(icon: Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
-      NavigationDestination(icon: Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
+      NavigationDestination(icon: const Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
+      NavigationDestination(icon: const Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
+      if (canTrade) NavigationDestination(icon: const Icon(PhosphorIcons.rocketLaunch), selectedIcon: Icon(PhosphorIcons.rocketLaunchFill, color: theme.primaryColor), label: 'Manual'),
+      NavigationDestination(icon: const Icon(PhosphorIcons.robot), selectedIcon: Icon(PhosphorIcons.robotFill, color: theme.primaryColor), label: 'Bots'),
+      if (isAdmin) NavigationDestination(icon: const Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
+      NavigationDestination(icon: const Icon(PhosphorIcons.userCircle), selectedIcon: Icon(PhosphorIcons.userCircleFill, color: theme.primaryColor), label: 'Profile'),
     ];
 
     final int profileIndex = navItems.length - 1;
@@ -174,14 +174,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       canPop: false,
       onPopInvoked: (bool didPop) {
         if (didPop) return;
-        
-        // If they are not on the Home tab, pressing back should just take them to the Home tab
         if (_currentIndex != 0) {
           setState(() => _currentIndex = 0);
           return;
         }
-
-        // If they ARE on the Home tab, initiate the double-tap-to-exit logic
         final now = DateTime.now();
         if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
           _lastPressedAt = now;
@@ -204,12 +200,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: SafeArea(child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
         ),
         bottomNavigationBar: Container(
-          decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.8), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
+          decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.9), border: Border(top: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.05)))),
           child: NavigationBar(
             backgroundColor: Colors.transparent, elevation: 0,
             selectedIndex: _currentIndex > navItems.length - 1 ? 0 : _currentIndex,
             onDestinationSelected: (index) => setState(() => _currentIndex = index),
-            indicatorColor: theme.primaryColor.withOpacity(0.3),
+            indicatorColor: theme.primaryColor.withOpacity(0.2),
             destinations: navItems,
           ),
         ),
@@ -241,7 +237,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)])),
-                      child: const CircleAvatar(radius: 22, backgroundColor: Color(0xFF13131A), child: Icon(PhosphorIcons.userFill, color: Colors.white)),
+                      child: CircleAvatar(radius: 22, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface)),
                     ),
                     const SizedBox(width: 16),
                     Column(
@@ -298,7 +294,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.1))),
+              decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.1))),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -319,7 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('TOTAL PORTFOLIO VALUE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
-                    if (_isLoading && !_isRefreshing) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    if (_isLoading && !_isRefreshing) SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor))
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -525,9 +521,8 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   void _initializeRate() {
     try {
       final currency = context.read<CurrencyProvider>();
-      String formatted = currency.format(1.0); 
-      String numStr = formatted.replaceAll(RegExp(r'[^0-9.]'), '');
-      _activeRate = double.tryParse(numStr) ?? 1500.0;
+      // FIXED: Pulling the exact unformatted double rate directly from the provider
+      _activeRate = currency.exchangeRate; 
     } catch (_) {
       _activeRate = 1500.0;
     }

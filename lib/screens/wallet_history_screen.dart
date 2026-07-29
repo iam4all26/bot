@@ -184,14 +184,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('WIN RATE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              Icon(PhosphorIcons.targetFill, color: winRate >= 50 ? Colors.greenAccent : Colors.amberAccent, size: 20),
+                              Text('TOTAL TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              Icon(PhosphorIcons.hashBold, color: theme.primaryColor, size: 20),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text('${winRate.toStringAsFixed(1)}%', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text('$totalClosed', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('$totalClosed Trades (W: $totalWins | L: $totalLosses)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
+                          Text('W: $totalWins | L: $totalLosses', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -206,14 +206,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('ACTIVE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              Icon(PhosphorIcons.folderOpenFill, color: theme.primaryColor, size: 20),
+                              Text('WIN RATE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              Icon(PhosphorIcons.targetFill, color: winRate >= 50 ? Colors.greenAccent : Colors.amberAccent, size: 20),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text('${_stats?['open_trades'] ?? 0}', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text('${winRate.toStringAsFixed(1)}%', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('Currently holding', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
+                          Text('Includes manual profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
                         ],
                       ),
                     ),
@@ -324,7 +324,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                               else if (isLoss)
                                 Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.redAccent.withOpacity(0.3))), child: const Text('LOSS', style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold)))
                               else
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.white24)), child: const Text('MANUAL', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold))),
+                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.2))), child: Text('MANUAL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold))),
                             ],
                           ),
                           const SizedBox(height: 16),
