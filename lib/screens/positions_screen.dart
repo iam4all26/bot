@@ -30,7 +30,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
   void initState() {
     super.initState();
     _fetchPositions();
-    // Fast auto-polling for instant Open Position updates
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _fetchPositions(silent: true));
   }
 
@@ -287,7 +286,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
         title: Text('OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
         centerTitle: false,
         actions: [
-          // The new small inline refresh button (no page pull-to-refresh)
           IconButton(
             icon: _isManualRefreshing 
                 ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor))
@@ -357,30 +355,23 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
 
-                      // SHARK NAME & BOT BADGE LOGIC
+                      // PERFECTED BOT BADGE LOGIC
                       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
                       String mainTitle = 'Manual Trade';
                       String? adminBadge;
 
                       if (isCopy) {
-                         String display = p['display_name']?.toString() ?? '';
-                         String label = p['wallet_label']?.toString() ?? '';
-                         
-                         if (display.isEmpty) {
-                            final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                            if (botIdRaw != null && botIdRaw.isNotEmpty) {
-                               display = 'System Bot ${botIdRaw.padLeft(2, '0')}';
-                            } else {
-                               display = 'System Bot';
-                            }
-                         }
+                         String label = p['wallet_label']?.toString() ?? ''; // The real Shark Name
+                         final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                         final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
 
                          if (isAdmin && label.isNotEmpty && label != 'Manual') {
-                            mainTitle = label;
-                            adminBadge = '🤖 $display';
+                            mainTitle = label; // Admin sees Shark Name
+                            adminBadge = '🤖 $sysBotName'; // Admin sees Bot ID badge
                          } else {
-                            mainTitle = display; // Users only see "System Bot 02"
+                            mainTitle = sysBotName; // Users only see "System Bot 02"
+                            // Users see NO adminBadge
                          }
                       }
 
