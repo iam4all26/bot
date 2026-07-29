@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'services/api_service.dart';
 import 'providers/currency_provider.dart';
+import 'providers/theme_provider.dart';
+import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -24,8 +25,6 @@ class _KainuwaBotAppState extends State<KainuwaBotApp> {
   void initState() {
     super.initState();
     _apiService = ApiService();
-    // REMOVED: NotificationService.initialize(_apiService);
-    // This was triggering a 401 Unauthorized error before the user could log in.
   }
 
   @override
@@ -34,22 +33,19 @@ class _KainuwaBotAppState extends State<KainuwaBotApp> {
       providers: [
         Provider<ApiService>.value(value: _apiService),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()..fetchLiveRate(_apiService)),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
-        title: 'Kainuwa Bot',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF0A0A0F),
-          primaryColor: const Color(0xFF8B5CF6),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF8B5CF6),
-            surface: Color(0xFF13131A),
-          ),
-          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-          useMaterial3: true,
-        ),
-        home: const SplashScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Kainuwa Bot',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }

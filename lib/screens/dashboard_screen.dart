@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
 import 'positions_screen.dart';
@@ -190,6 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currency = context.watch<CurrencyProvider>(); 
     final double pnl = _stats['total_pnl'] != null ? (_stats['total_pnl'] as num).toDouble() : 0.0;
     final bool isProfit = pnl >= 0;
+    final isDark = theme.brightness == Brightness.dark;
 
     return RefreshIndicator(
       onRefresh: () => _fetchDashboardData(),
@@ -216,24 +218,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Welcome back,', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                        Text(_stats['username'] ?? 'Loading...', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(_stats['username'] ?? 'Loading...', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                       ],
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), 
-                onPressed: () async {
-                  await context.read<ApiService>().logout();
-                  if (mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  }
-                },
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(isDark ? PhosphorIcons.sunFill : PhosphorIcons.moonFill, color: theme.colorScheme.onSurfaceVariant), 
+                    onPressed: () => context.read<ThemeProvider>().toggleTheme(),
+                  ),
+                  IconButton(
+                    icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), 
+                    onPressed: () async {
+                      await context.read<ApiService>().logout();
+                      if (mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -253,7 +263,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(children: [Icon(PhosphorIcons.wallet, size: 16, color: theme.primaryColor), const SizedBox(width: 8), Text(_formatAddress(_publicAddress), style: const TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white))]),
+                  Row(children: [Icon(PhosphorIcons.wallet, size: 16, color: theme.primaryColor), const SizedBox(width: 8), Text(_formatAddress(_publicAddress), style: TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))]),
                   Icon(PhosphorIcons.copy, size: 16, color: theme.colorScheme.onSurfaceVariant),
                 ],
               ),
@@ -274,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('\$$_usdValue', style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 40)),
+                Text('\$$_usdValue', style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, fontSize: 40)),
                 if (currency.isNaira) ...[
                   const SizedBox(height: 2),
                   Text('≈ ${currency.format(_usdValue)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -282,7 +292,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 4),
                 Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 24),
-                Container(height: 1, color: Colors.white.withOpacity(0.1)),
+                Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.1)),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -298,9 +308,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ]
                       )
                     ),
-                    Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+                    Container(width: 1, height: 40, color: theme.colorScheme.onSurface.withOpacity(0.1)),
                     const SizedBox(width: 16),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${_stats['open_count'] ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))])),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${_stats['open_count'] ?? 0}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18))])),
                   ],
                 ),
               ],
@@ -315,13 +325,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _openPositions.isEmpty ? null : () => _panicClose('all'),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.redAccent.withOpacity(0.5)),
+                    side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.redAccent.withOpacity(0.5)),
                     backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.redAccent.withOpacity(0.1),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent),
-                  label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? Colors.white54 : Colors.redAccent)),
+                  icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.redAccent),
+                  label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.redAccent)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -331,13 +341,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _openPositions.isEmpty ? null : () => _panicClose('copy'),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.orangeAccent.withOpacity(0.5)),
+                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.5)),
                         backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.orangeAccent.withOpacity(0.1),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: Icon(PhosphorIcons.robotFill, size: 16, color: _openPositions.isEmpty ? Colors.white54 : Colors.orangeAccent),
-                      label: Text('CLOSE COPY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? Colors.white54 : Colors.orangeAccent)),
+                      icon: Icon(PhosphorIcons.robotFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.orangeAccent),
+                      label: Text('CLOSE COPY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.orangeAccent)),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -345,13 +355,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _openPositions.isEmpty ? null : () => _panicClose('manual'),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: _openPositions.isEmpty ? Colors.white24 : Colors.blueAccent.withOpacity(0.5)),
+                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.blueAccent.withOpacity(0.5)),
                         backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.blueAccent.withOpacity(0.1),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: Icon(PhosphorIcons.handPalmFill, size: 16, color: _openPositions.isEmpty ? Colors.white54 : Colors.blueAccent),
-                      label: Text('CLOSE MANUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? Colors.white54 : Colors.blueAccent)),
+                      icon: Icon(PhosphorIcons.handPalmFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.blueAccent),
+                      label: Text('CLOSE MANUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.blueAccent)),
                     ),
                   ),
                 ],
@@ -370,10 +380,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), shape: BoxShape.circle),
                     child: _isRefreshing 
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
-                        : const Icon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: Colors.white),
+                        ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSurfaceVariant))
+                        : Icon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: theme.colorScheme.onSurface),
                   ),
                 ),
               ],
@@ -393,9 +403,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     leading: Icon(PhosphorIcons.trendUp, size: 16, color: theme.primaryColor),
                     title: Row(
                       children: [
-                        Text(_formatAddress(p['token_address']), style: const TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        Text(_formatAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 6),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)), child: Text(botName, style: const TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.bold))),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(botName, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
                       ],
                     ),
                     subtitle: Column(
