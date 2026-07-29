@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
 import 'dashboard_screen.dart';
@@ -14,64 +16,79 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  void _showErrorDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF13131A),
+        title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            content,
+            style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: content));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error copied to clipboard')));
+            },
+            child: const Text('COPY', style: TextStyle(color: Colors.blueAccent)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
-  Future<void> _login() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-
-    if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter username and password'), backgroundColor: Colors.amber),
-      );
-      return;
-    }
-
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    final api = context.read<ApiService>();
-
+    
     try {
-      final res = await api.postEndpoint('auth.php?action=login', {
-        'username': username,
-        'password': password,
-      });
+      final apiService = context.read<ApiService>();
+      final result = await apiService.login(_usernameController.text.trim(), _passwordController.text);
 
       if (mounted) {
         setState(() => _isLoading = false);
+        
+        if (result == null) {
+          _showErrorDialog('Null Response', 'The API returned a null result. Check network connection or API URL.');
+          return;
+        }
 
-        if (res['status'] == 'success') {
-          final data = res['data'];
-          
-          // FIXED: Pass exactly 2 positional arguments to api.login()
-          await api.login(
-            data['token'],
-            data['role'],
-          );
-
-          // CHECK FOR MANDATORY PASSWORD CHANGE
-          if (data['must_change_password'] == 1) {
-            if (mounted) {
-              Navigator.pushReplacement(
+        if (result['status'] == 'error') {
+          _showErrorDialog('Login Rejected', result['message'] ?? 'Raw Result: $result');
+        } else if (result['status'] == 'success') {
+          if (!apiService.isAuthenticated) {
+            _showErrorDialog('Storage Error', 'Login successful on server, but device failed to securely store session token.');
+          } else {
+            // Success! 
+            NotificationService.initialize(apiService);
+            
+            // CHECK FOR MANDATORY PASSWORD CHANGE
+            final data = result['data'];
+            if (data != null && data['must_change_password'] == 1) {
+               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ForcePasswordChangeScreen(
-                    currentPassword: password,
+                    currentPassword: _passwordController.text, // Pass original password for validation
                   ),
                 ),
               );
-            }
-          } else {
-            if (mounted) {
+            } else {
+              // Navigate to Dashboard normally
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -79,17 +96,13 @@ class _LoginScreenState extends State<LoginScreen> {
             }
           }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(res['message'] ?? 'Login failed'), backgroundColor: Colors.red),
-          );
+          _showErrorDialog('Unknown Format', 'Server returned an unknown format:\n\n$result');
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error. Please try again.'), backgroundColor: Colors.red),
-        );
+        _showErrorDialog('App Crash / Exception', 'Error:\n$e\n\nStack:\n$stackTrace');
       }
     }
   }
@@ -97,78 +110,93 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: AnimatedCryptoBackground(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: theme.primaryColor.withOpacity(0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.5), blurRadius: 40, spreadRadius: 5)],
+                        gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
+                      ),
+                      child: const Icon(PhosphorIcons.rocketLaunchFill, size: 48, color: Colors.white),
                     ),
-                    child: Icon(PhosphorIcons.rocketLaunchFill, size: 64, color: theme.primaryColor),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Welcome to Kainuwa', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 8),
-                  Text('Sign in to access your terminal', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                  const SizedBox(height: 32),
-                  GlassCard(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _usernameController,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            prefixIcon: Icon(PhosphorIcons.user, color: theme.primaryColor),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(PhosphorIcons.lockKey, color: theme.primaryColor),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? PhosphorIcons.eyeClosed : PhosphorIcons.eye),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    const SizedBox(height: 32),
+                    Text('Welcome to Kainuwa', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+                    const SizedBox(height: 8),
+                    Text('Sign in to access your terminal', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
+                    const SizedBox(height: 48),
+                    GlassCard(
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _usernameController,
+                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            decoration: InputDecoration(
+                              labelText: 'Username',
+                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                              prefixIcon: Icon(PhosphorIcons.user, color: theme.colorScheme.onSurfaceVariant),
+                              filled: true,
+                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                             ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            style: TextStyle(color: theme.colorScheme.onSurface),
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                              prefixIcon: Icon(PhosphorIcons.lockKey, color: theme.colorScheme.onSurfaceVariant),
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscurePassword ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                             ),
-                            child: _isLoading
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text('Secure Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
+                                boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  padding: const EdgeInsets.symmetric(vertical: 20),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Text('Secure Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -268,11 +296,11 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           automaticallyImplyLeading: false,
-          title: const Text('Update Required', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Text('Update Required', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
           centerTitle: true,
           actions: [
             IconButton(
-              icon: const Icon(PhosphorIcons.signOut),
+              icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurface),
               tooltip: 'Logout',
               onPressed: () async {
                 await context.read<ApiService>().logout();
@@ -311,12 +339,15 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                           style: TextStyle(color: theme.colorScheme.onSurface),
                           decoration: InputDecoration(
                             labelText: 'New Password',
+                            labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                             prefixIcon: Icon(PhosphorIcons.lockKey, color: theme.primaryColor),
                             suffixIcon: IconButton(
-                              icon: Icon(_obscureNew ? PhosphorIcons.eyeClosed : PhosphorIcons.eye),
+                              icon: Icon(_obscureNew ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
                               onPressed: () => setState(() => _obscureNew = !_obscureNew),
                             ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -326,28 +357,38 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
                           style: TextStyle(color: theme.colorScheme.onSurface),
                           decoration: InputDecoration(
                             labelText: 'Confirm New Password',
+                            labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                             prefixIcon: Icon(PhosphorIcons.checkCircle, color: theme.primaryColor),
                             suffixIcon: IconButton(
-                              icon: Icon(_obscureConfirm ? PhosphorIcons.eyeClosed : PhosphorIcons.eye),
+                              icon: Icon(_obscureConfirm ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
                               onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                             ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                           ),
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _updatePassword,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
+                              boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
                             ),
-                            child: _isLoading
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _updatePassword,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                            ),
                           ),
                         ),
                       ],
