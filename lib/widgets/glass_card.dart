@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -19,22 +20,34 @@ class GlassCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     if (!isDark) {
-      // Light Mode: Solid, elevated, crisp card
+      // Light Mode: Solid card with Kainuwa Purple-to-Gold Gradient Border
       return Container(
-        padding: padding,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(borderRadius),
-          border: Border.all(color: theme.colorScheme.outline),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x14111827), // rgba(17,24,39,0.08)
-              blurRadius: 16,
-              offset: Offset(0, 4),
+              color: Color(0x0F111827), 
+              blurRadius: 20,
+              offset: Offset(0, 6),
             )
           ],
+          gradient: const LinearGradient(
+            colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-        child: child,
+        child: Padding(
+          padding: const EdgeInsets.all(1.5), // Border thickness
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(borderRadius - 1.5),
+            ),
+            child: child,
+          ),
+        ),
       );
     }
 
