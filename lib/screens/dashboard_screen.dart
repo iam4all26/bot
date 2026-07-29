@@ -175,7 +175,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const CopyBotsScreen()));
                   },
                 ),
-                // Explicitly added Calculator to action sheet so it's never lost
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: Container(
@@ -213,6 +212,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '\$${val.round()}';
   }
 
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, ThemeData theme) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _currentIndex = index),
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: EdgeInsets.only(bottom: isSelected ? 2 : 0),
+            child: Icon(
+              isSelected ? activeIcon : icon, 
+              color: isSelected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
+              size: 26
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label, 
+            style: TextStyle(
+              color: isSelected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
+              fontSize: 10, 
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500
+            )
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final apiService = context.watch<ApiService>();
@@ -220,17 +252,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final canTrade = isAdmin || apiService.allowManualTrade;
     final theme = Theme.of(context);
 
-    final List<NavigationDestination> navItems = [
-      NavigationDestination(icon: const Icon(PhosphorIcons.squaresFour), selectedIcon: Icon(PhosphorIcons.squaresFourFill, color: theme.primaryColor), label: 'Home'),
-      NavigationDestination(icon: const Icon(PhosphorIcons.chartLineUp), selectedIcon: Icon(PhosphorIcons.chartLineUpFill, color: theme.primaryColor), label: 'Positions'),
-      if (isAdmin) NavigationDestination(icon: const Icon(PhosphorIcons.shieldCheck), selectedIcon: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor), label: 'Admin'),
-      NavigationDestination(icon: const Icon(PhosphorIcons.gear), selectedIcon: Icon(PhosphorIcons.gearFill, color: theme.primaryColor), label: 'Settings'),
-    ];
-
-    final int profileIndex = navItems.length - 1;
-
     final List<Widget> pages = [
-      _buildPremiumHome(theme, profileIndex),
+      _buildPremiumHome(theme, isAdmin ? 3 : 2),
       const PositionsScreen(),
       if (isAdmin) const AdminScreen(),
       const SettingsScreen(),
@@ -256,25 +279,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: Container(
-            width: 56,
-            height: 56,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold]),
               boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 4))],
             ),
-            child: const Icon(PhosphorIcons.arrowsLeftRightBold, color: Colors.white, size: 24),
+            child: const Icon(PhosphorIcons.arrowsLeftRightBold, color: Colors.white, size: 28),
           ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: NavigationBar(
-          backgroundColor: theme.colorScheme.surface, 
-          elevation: 10,
-          shadowColor: Colors.black.withOpacity(0.1),
-          selectedIndex: _currentIndex > navItems.length - 1 ? 0 : _currentIndex,
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
-          indicatorColor: theme.primaryColor.withOpacity(0.12),
-          destinations: navItems,
+        bottomNavigationBar: BottomAppBar(
+          color: theme.colorScheme.surface,
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
+          elevation: 20,
+          shadowColor: Colors.black.withOpacity(0.5),
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme),
+                _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Positions', 1, theme),
+                const SizedBox(width: 48), // The "hole" for the FAB
+                if (isAdmin) _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 2, theme),
+                _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', isAdmin ? 3 : 2, theme),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -385,7 +419,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
           
-          // HIGHLIGHTED STATS ROW
           Row(
             children: [
               Expanded(
@@ -559,14 +592,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 80), // Padding for the FAB
+          const SizedBox(height: 80), // Extra Padding for FAB and Nav
         ],
       ),
     );
   }
 }
 
-// Ensure the calculator class remains in dashboard_screen.dart:
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {

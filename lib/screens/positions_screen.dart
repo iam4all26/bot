@@ -208,9 +208,9 @@ class _PositionsScreenState extends State<PositionsScreen> {
                 if (botToIdsMap.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text('CLOSE BY BOT / SHARK', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   ...botToIdsMap.entries.map((entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.only(bottom: 12.0),
                     child: InkWell(
                       onTap: () { Navigator.pop(ctx); _executeBatchClose(entry.value, 'Bot ${entry.key}'); },
                       borderRadius: BorderRadius.circular(16),
@@ -218,7 +218,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
                         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Row(children: [Icon(PhosphorIcons.robot, color: AppTheme.info(context), size: 18), const SizedBox(width: 8), Text(entry.key, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))]),
+                          Row(children: [Icon(PhosphorIcons.robot, color: AppTheme.info(context), size: 18), const SizedBox(width: 12), Text(entry.key, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))]),
                           Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.12), borderRadius: BorderRadius.circular(8)), child: Text('Close ${entry.value.length}', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 12)))
                         ]),
                       ),
@@ -379,7 +379,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
               : finalOpenList.isEmpty 
                 ? Center(child: Text('No active open positions.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 100), // Extra padding for FAB
                     itemCount: finalOpenList.length,
                     itemBuilder: (context, index) {
                       final p = finalOpenList[index];

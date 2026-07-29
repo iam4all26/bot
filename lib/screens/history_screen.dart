@@ -257,54 +257,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Container(
       width: 300,
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface, 
-        borderRadius: BorderRadius.circular(20), 
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A111827),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          )
-        ]
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label.toUpperCase(), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)), child: Text('$totalTrades Trades', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 10, fontWeight: FontWeight.bold))),
-            ],
+      child: Padding(
+        padding: const EdgeInsets.all(1.5), // Gradient Border thickness
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20.5),
+          child: Container(
+            color: theme.colorScheme.surface,
+            child: Stack(
+              children: [
+                // Top-right Bubble
+                Positioned(
+                  top: -30,
+                  right: -30,
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: theme.primaryColor.withOpacity(0.08),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(label.toUpperCase(), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)), child: Text('$totalTrades Trades', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 10, fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)), const SizedBox(height: 4), Text('+\$${profitUsd.toStringAsFixed(2)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ +${currency.format(profitUsd)}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
+                          Container(width: 1, height: 40, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(horizontal: 16)),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Loss', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)), const SizedBox(height: 4), Text('-\$${lossUsd.abs().toStringAsFixed(2)}', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ -${currency.format(lossUsd.abs())}', style: TextStyle(color: AppTheme.danger(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(height: 1, color: theme.colorScheme.outlineVariant),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('NET P&L:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${isNetProfit ? '+' : ''}\$${netPnl.toStringAsFixed(2)}', style: TextStyle(color: isNetProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)),
+                              if (currency.isNaira) Text('≈ ${isNetProfit ? '+' : ''}${currency.format(netPnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isNetProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))
+                            ],
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)), const SizedBox(height: 4), Text('+\$${profitUsd.toStringAsFixed(2)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ +${currency.format(profitUsd)}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
-              Container(width: 1, height: 40, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(horizontal: 16)),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Loss', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)), const SizedBox(height: 4), Text('-\$${lossUsd.abs().toStringAsFixed(2)}', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ -${currency.format(lossUsd.abs())}', style: TextStyle(color: AppTheme.danger(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))])),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(height: 1, color: theme.colorScheme.outlineVariant),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('NET P&L:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('${isNetProfit ? '+' : ''}\$${netPnl.toStringAsFixed(2)}', style: TextStyle(color: isNetProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)),
-                  if (currency.isNaira) Text('≈ ${isNetProfit ? '+' : ''}${currency.format(netPnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isNetProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold))
-                ],
-              )
-            ],
-          )
-        ],
+        ),
       ),
     );
   }
@@ -404,6 +424,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               const SizedBox(height: 16),
                               
+                              // PROMINENT BOT FILTER DISPLAY
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(PhosphorIcons.robot, size: 18, color: AppTheme.info(context)),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            isExpanded: true,
+                                            value: _selectedClosedBot ?? 'All Bots', 
+                                            dropdownColor: theme.colorScheme.surface, 
+                                            style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold), 
+                                            icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 16),
+                                            items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Text(bot))).toList(),
+                                            onChanged: (val) {
+                                              _selectedClosedBot = (val == 'All Bots') ? null : val;
+                                              _processData();
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              
                               SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -414,21 +470,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () { _selectedClosedType = ClosedFilterType.loss; _processData(); }, color: AppTheme.danger(context), theme: theme), const SizedBox(width: 8),
                                     _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () { _selectedClosedType = ClosedFilterType.copy; _processData(); }, color: AppTheme.info(context), theme: theme), const SizedBox(width: 8),
                                     _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () { _selectedClosedType = ClosedFilterType.manual; _processData(); }, color: const Color(0xFF9333EA), theme: theme),
-                                    
-                                    const SizedBox(width: 16), Container(height: 24, width: 1, color: theme.colorScheme.outlineVariant), const SizedBox(width: 16),
-                                    
-                                    DropdownButton<String>(
-                                      value: _selectedClosedBot ?? 'All Bots', 
-                                      dropdownColor: theme.colorScheme.surface, 
-                                      style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.bold), 
-                                      underline: const SizedBox(),
-                                      icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 14),
-                                      items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Row(children: [Icon(PhosphorIcons.robot, color: AppTheme.info(context), size: 16), const SizedBox(width: 8), Text(bot)]))).toList(),
-                                      onChanged: (val) {
-                                        _selectedClosedBot = (val == 'All Bots') ? null : val;
-                                        _processData();
-                                      },
-                                    ),
                                   ],
                                 ),
                               ),
@@ -562,7 +603,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14), const SizedBox(width: 6), Text(formatLagosTime(p['closed_at']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500))]),
-                                          Row(children: [Icon(PhosphorIcons.hourglassHigh, color: AppTheme.warning(context), size: 14), const SizedBox(width: 6), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: TextStyle(color: AppTheme.warning(context), fontWeight: FontWeight.bold, fontSize: 11))]),
+                                          Row(children: [Icon(PhosphorIcons.hourglassHigh, color: AppTheme.warning(context), size: 14), const SizedBox(width: 6), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: TextStyle(color: AppTheme.warning(context), fontWeight: FontWeight.bold, fontSize: 12))]),
                                         ],
                                       ),
                                     ],
