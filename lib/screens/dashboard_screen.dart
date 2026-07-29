@@ -32,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
+  DateTime? _lastPressedAt; // Tracks the back button press for exit
 
   @override
   void initState() {
@@ -169,19 +170,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SettingsScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AnimatedCryptoBackground(
-        child: SafeArea(child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.8), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
-        child: NavigationBar(
-          backgroundColor: Colors.transparent, elevation: 0,
-          selectedIndex: _currentIndex > navItems.length - 1 ? 0 : _currentIndex,
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
-          indicatorColor: theme.primaryColor.withOpacity(0.3),
-          destinations: navItems,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (didPop) return;
+        
+        // If they are not on the Home tab, pressing back should just take them to the Home tab
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+          return;
+        }
+
+        // If they ARE on the Home tab, initiate the double-tap-to-exit logic
+        final now = DateTime.now();
+        if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
+          _lastPressedAt = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Tap back again to exit', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
+              backgroundColor: theme.colorScheme.surface,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          return;
+        }
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: AnimatedCryptoBackground(
+          child: SafeArea(child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.8), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
+          child: NavigationBar(
+            backgroundColor: Colors.transparent, elevation: 0,
+            selectedIndex: _currentIndex > navItems.length - 1 ? 0 : _currentIndex,
+            onDestinationSelected: (index) => setState(() => _currentIndex = index),
+            indicatorColor: theme.primaryColor.withOpacity(0.3),
+            destinations: navItems,
+          ),
         ),
       ),
     );
@@ -495,12 +525,11 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   void _initializeRate() {
     try {
       final currency = context.read<CurrencyProvider>();
-      // Safely extract the exact numerical rate stored in the provider by passing 1.0
       String formatted = currency.format(1.0); 
       String numStr = formatted.replaceAll(RegExp(r'[^0-9.]'), '');
       _activeRate = double.tryParse(numStr) ?? 1500.0;
     } catch (_) {
-      _activeRate = 1500.0; // Failsafe
+      _activeRate = 1500.0;
     }
   }
 
