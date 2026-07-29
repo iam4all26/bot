@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
+import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../theme/app_theme.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -24,7 +26,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
   double _expectedProfit = 5.00;
   bool _isLoading = false;
 
-  // Live Token Lookup States
   bool _isFetchingToken = false;
   Map<String, dynamic>? _tokenData;
   String? _tokenError;
@@ -128,7 +129,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(res['message'] ?? 'Trade submitted!'),
-        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+        backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
       ));
       if (res['status'] == 'success') {
         _tokenController.clear();
@@ -136,6 +137,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           _tokenData = null;
           _tokenError = null;
         });
+        Navigator.pop(context); // Return to dashboard after successful manual snipe
       }
     }
   }
@@ -148,307 +150,214 @@ class _TerminalScreenState extends State<TerminalScreen> {
     return '\$${val.toStringAsFixed(2)}';
   }
 
-  Widget _buildFallbackIcon(ThemeData theme) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: theme.primaryColor.withOpacity(0.2),
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Text(
-          _tokenData!['symbol']?.toString().substring(0, 1).toUpperCase() ?? '?',
-          style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text('MANUAL TRADE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 2, color: theme.colorScheme.onSurface)),
-        centerTitle: true,
+        title: Text('MANUAL TRADE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1, color: theme.colorScheme.onSurface)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // Token Address Input Card
-              GlassCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(PhosphorIcons.coinsFill, color: theme.primaryColor),
-                        const SizedBox(width: 8),
-                        Text('Token Address', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _tokenController,
-                      style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 13),
-                      decoration: InputDecoration(
-                        labelText: 'Paste Solana Token Address',
-                        labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                        suffixIcon: IconButton(
-                          icon: Icon(PhosphorIcons.clipboard, color: theme.primaryColor),
-                          onPressed: _pasteFromClipboard,
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      ),
-                      validator: _validateSolanaAddress,
-                    ),
-                  ],
-                ),
-              ),
-
-              // LIVE TOKEN TELEMETRY CARD
-              if (_isFetchingToken) ...[
-                const SizedBox(height: 12),
+      body: AnimatedCryptoBackground(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
                 GlassCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor)),
-                      const SizedBox(width: 12),
-                      Text('Fetching live token metrics...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ] else if (_tokenData != null) ...[
-                const SizedBox(height: 12),
-                GlassCard(
-                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                if (_tokenData!['image_url'] != null && _tokenData!['image_url'].toString().isNotEmpty)
-                                  ClipOval(
-                                    child: Image.network(
-                                      _tokenData!['image_url'],
-                                      width: 36,
-                                      height: 36,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (ctx, err, stack) => _buildFallbackIcon(theme),
-                                    ),
-                                  )
-                                else
-                                  _buildFallbackIcon(theme),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${_tokenData!['name']} (${_tokenData!['symbol']})',
-                                        style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'DEX: ${_tokenData!['dex']}',
-                                        style: TextStyle(color: theme.primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(PhosphorIcons.checkCircleFill, color: Colors.greenAccent, size: 12),
-                                SizedBox(width: 4),
-                                Text('Verified', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          )
+                          Icon(PhosphorIcons.coinsFill, color: theme.primaryColor),
+                          const SizedBox(width: 12),
+                          Text('Token Target', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.05)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _tokenController,
+                        style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: 'Paste Solana Token Address',
+                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          suffixIcon: IconButton(
+                            icon: Icon(PhosphorIcons.clipboard, color: theme.primaryColor),
+                            onPressed: _pasteFromClipboard,
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        ),
+                        validator: _validateSolanaAddress,
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_isFetchingToken) ...[
+                  const SizedBox(height: 16),
+                  GlassCard(
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor)),
+                        const SizedBox(width: 12),
+                        Text('Fetching live token metrics...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ] else if (_tokenData != null) ...[
+                  const SizedBox(height: 16),
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  if (_tokenData!['image_url'] != null && _tokenData!['image_url'].toString().isNotEmpty)
+                                    ClipOval(child: Image.network(_tokenData!['image_url'], width: 40, height: 40, fit: BoxFit.cover))
+                                  else
+                                    Container(width: 40, height: 40, decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.12), shape: BoxShape.circle), child: Center(child: Text(_tokenData!['symbol']?.toString().substring(0, 1).toUpperCase() ?? '?', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18)))),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('${_tokenData!['name']} (${_tokenData!['symbol']})', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                                        const SizedBox(height: 4),
+                                        Text('DEX: ${_tokenData!['dex']}', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.success(context).withOpacity(0.3))),
+                              child: Row(children: [Icon(PhosphorIcons.checkCircleFill, color: AppTheme.success(context), size: 14), const SizedBox(width: 6), Text('Verified', style: TextStyle(color: AppTheme.success(context), fontSize: 11, fontWeight: FontWeight.bold))]),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Container(height: 1, color: theme.colorScheme.outlineVariant),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('MARKET CAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15))])),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIQUIDITY', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['liquidity']), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15))])),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (_tokenError != null) ...[
+                  const SizedBox(height: 16),
+                  GlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Icon(PhosphorIcons.warningCircleFill, color: AppTheme.warning(context), size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(_tokenError!, style: TextStyle(color: AppTheme.warning(context), fontSize: 14))),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('TRADE EXECUTION SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
+                      const SizedBox(height: 24),
                       Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('MARKET CAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1)),
-                                const SizedBox(height: 4),
-                                Text(_formatCurrency(_tokenData!['mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
+                            child: TextFormField(
+                              controller: _usdController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
+                              decoration: InputDecoration(labelText: 'Trade Size (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                             ),
                           ),
+                          const SizedBox(width: 16),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: TextFormField(
+                              controller: _tpController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 16),
+                              decoration: InputDecoration(labelText: 'Take Profit (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _slController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 16),
+                              decoration: InputDecoration(labelText: 'Stop Loss (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Projected Profit:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text('LIQUIDITY', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1)),
-                                const SizedBox(height: 4),
-                                Text(_formatCurrency(_tokenData!['liquidity']), style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text('+\$${_expectedProfit.toStringAsFixed(2)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 16)),
+                                if (currency.isNaira) Text('≈ +${currency.format(_expectedProfit).replaceFirst('₦-', '-₦')}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold)),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ] else if (_tokenError != null) ...[
-                const SizedBox(height: 12),
-                GlassCard(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(PhosphorIcons.warningCircleFill, color: Colors.amber, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(_tokenError!, style: const TextStyle(color: Colors.amber, fontSize: 12))),
-                    ],
-                  ),
-                ),
-              ],
+                const SizedBox(height: 32),
 
-              const SizedBox(height: 16),
-
-              // Trade Settings Card
-              GlassCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('TRADE SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _usdController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                            decoration: InputDecoration(
-                              labelText: 'Trade Size (\$)',
-                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                              filled: true,
-                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _tpController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-                            decoration: InputDecoration(
-                              labelText: 'Take Profit (%)',
-                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                              filled: true,
-                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _slController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                            decoration: InputDecoration(
-                              labelText: 'Stop Loss (%)',
-                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                              filled: true,
-                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.03), borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Projected Profit:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text('+\$${_expectedProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
-                              if (currency.isNaira)
-                                Text('≈ +${currency.format(_expectedProfit).replaceFirst('₦-', '-₦')}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Action Button
-              SizedBox(
-                width: double.infinity,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
-                    boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 15, offset: const Offset(0, 5))],
-                  ),
+                SizedBox(
+                  width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _executeTrade,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 18)),
-                    icon: _isLoading
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Icon(PhosphorIcons.shoppingCartSimpleFill, color: Colors.white),
-                    label: Text(
-                      _isLoading ? 'EXECUTING BUY...' : 'BUY TOKEN NOW',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.5),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
                     ),
+                    icon: _isLoading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.shoppingCartSimpleFill, color: Colors.white, size: 24),
+                    label: Text(_isLoading ? 'EXECUTING BUY...' : 'BUY TOKEN NOW', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1)),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 48),
+              ],
+            ),
           ),
         ),
       ),

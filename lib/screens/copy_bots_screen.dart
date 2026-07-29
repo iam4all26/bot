@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/glass_card.dart';
+import '../theme/app_theme.dart';
+import '../widgets/animated_background.dart';
 
 class CopyBotsScreen extends StatefulWidget {
   const CopyBotsScreen({super.key});
@@ -39,7 +41,7 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(res['message'] ?? 'Saved'),
-        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+        backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
       ));
     }
   }
@@ -48,21 +50,30 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    if (_isLoading) return Center(child: CircularProgressIndicator(color: theme.primaryColor));
-    if (_bots.isEmpty) return Center(child: Text('No active copy bots available.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: _bots.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: BotConfigCard(
-            bot: _bots[index],
-            onSave: _saveBotConfig,
-          ),
-        );
-      },
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('COPY BOTS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1, color: theme.colorScheme.onSurface)),
+      ),
+      body: AnimatedCryptoBackground(
+        child: _isLoading 
+            ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+            : _bots.isEmpty 
+                ? Center(child: Text('No active copy bots available.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(24),
+                    itemCount: _bots.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: BotConfigCard(
+                          bot: _bots[index],
+                          onSave: _saveBotConfig,
+                        ),
+                      );
+                    },
+                  ),
+      ),
     );
   }
 }
@@ -165,22 +176,22 @@ class _BotConfigCardState extends State<BotConfigCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
-        const SizedBox(height: 6),
+        Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 48,
+          height: 56,
           child: TextField(
             controller: ctrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 15),
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: iconColor, size: 16),
+              prefixIcon: Icon(icon, color: iconColor, size: 20),
               filled: true,
-              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+              fillColor: theme.colorScheme.surfaceContainerHighest,
               hintText: hint,
               hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             ),
           ),
         ),
@@ -197,15 +208,15 @@ class _BotConfigCardState extends State<BotConfigCard> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           collapsedIconColor: theme.colorScheme.onSurfaceVariant,
           iconColor: theme.primaryColor,
           title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isEnabled ? theme.primaryColor.withOpacity(0.2) : theme.colorScheme.onSurface.withOpacity(0.05),
+                  color: isEnabled ? theme.primaryColor.withOpacity(0.12) : theme.colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : theme.colorScheme.onSurfaceVariant),
@@ -216,74 +227,68 @@ class _BotConfigCardState extends State<BotConfigCard> {
                 children: [
                   Text(widget.bot['name'], style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                 ],
               ),
             ],
           ),
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+              padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.05)),
-                  const SizedBox(height: 16),
+                  Container(height: 1, color: theme.colorScheme.outlineVariant),
+                  const SizedBox(height: 24),
                   
                   Row(
                     children: [
                       Expanded(child: _buildInput('TRADE \$', '5.00', tradeCtrl, PhosphorIcons.currencyDollar, theme.colorScheme.onSurface, theme)),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInput('TP %', '100.00', tpCtrl, PhosphorIcons.trendUp, Colors.greenAccent, theme)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildInput('TP %', '100.00', tpCtrl, PhosphorIcons.trendUp, AppTheme.success(context), theme)),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(child: _buildInput('TARGET XS', '2.00', xCtrl, PhosphorIcons.x, theme.primaryColor, theme)),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInput('SL %', '90.00', slCtrl, PhosphorIcons.trendDown, Colors.redAccent, theme)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildInput('SL %', '90.00', slCtrl, PhosphorIcons.trendDown, AppTheme.danger(context), theme)),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(child: _buildInput('MAX OPEN', '∞', concCtrl, PhosphorIcons.infinity, theme.colorScheme.onSurfaceVariant, theme)),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 16),
                       const Spacer(),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                  // Expected Profit Banner
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
-                      color: Colors.greenAccent.withOpacity(0.05),
-                      border: Border.all(color: Colors.greenAccent.withOpacity(0.2)),
-                      borderRadius: BorderRadius.circular(12)
+                      color: AppTheme.success(context).withOpacity(0.08),
+                      border: Border.all(color: AppTheme.success(context).withOpacity(0.2)),
+                      borderRadius: BorderRadius.circular(16)
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            Icon(PhosphorIcons.calculatorFill, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 8),
-                            Text('EXPECTED PROFIT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
+                            Icon(PhosphorIcons.calculatorFill, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 12),
+                            Text('EXPECTED PROFIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                          child: Text('+\$${expectedProfit.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                        )
+                        Text('+\$${expectedProfit.toStringAsFixed(2)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 16)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                  // Action Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -297,19 +302,21 @@ class _BotConfigCardState extends State<BotConfigCard> {
                               _handleSave();
                             },
                           ),
-                          Text('Strategy Active', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Text('Strategy Active', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.primaryColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: _handleSave,
-                        icon: const Icon(PhosphorIcons.floppyDiskFill, size: 16),
-                        label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                        icon: const Icon(PhosphorIcons.floppyDiskFill, size: 18),
+                        label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       ),
                     ],
                   ),

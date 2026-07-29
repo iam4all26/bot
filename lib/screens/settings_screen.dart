@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
+import '../theme/app_theme.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -58,32 +60,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _togglePushAlerts(bool value) async {
-    setState(() => _allowPush = value);
-    final res = await context.read<ApiService>().postEndpoint(
-      'wallet.php?action=toggle_push_alerts',
-      {'allow_push_alerts': value ? '1' : '0'},
-    );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res['message'] ?? 'Settings updated'),
-        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
-      ));
-    }
-  }
-
-  Future<void> _saveTelegramId() async {
-    if (_telegramCtrl.text.trim().isEmpty) return;
-    FocusScope.of(context).unfocus();
-    final res = await context.read<ApiService>().postEndpoint(
-      'wallet.php?action=set_telegram',
-      {'telegram_chat_id': _telegramCtrl.text.trim()},
-    );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
-    }
-  }
-
   Future<void> _saveTradeLimits() async {
     FocusScope.of(context).unfocus();
     final res = await context.read<ApiService>().postEndpoint(
@@ -91,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       {'user_max_per_trade_usd': _maxTradeCtrl.text.trim(), 'user_daily_spend_cap': _dailyCapCtrl.text.trim()},
     );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
     }
   }
 
@@ -104,51 +80,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       {'slippage_bps': bps},
     );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Slippage updated'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Slippage updated'), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
     }
-  }
-
-  Future<void> _showChangePasswordModal() async {
-    final oldCtrl = TextEditingController();
-    final newCtrl = TextEditingController();
-    bool isSubmitting = false;
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) {
-          final theme = Theme.of(context);
-          return AlertDialog(
-            backgroundColor: theme.colorScheme.surface,
-            title: Row(children: [Icon(PhosphorIcons.lockKeyFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Change Password', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: oldCtrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13), decoration: InputDecoration(labelText: 'Current Password', filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
-                const SizedBox(height: 12),
-                TextField(controller: newCtrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13), decoration: InputDecoration(labelText: 'New Password', filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white),
-                onPressed: isSubmitting ? null : () async {
-                  if (oldCtrl.text.isEmpty || newCtrl.text.isEmpty) return;
-                  setStateDialog(() => isSubmitting = true);
-                  final res = await this.context.read<ApiService>().postEndpoint('auth.php?action=change_password', {'old_password': oldCtrl.text, 'new_password': newCtrl.text});
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
-                  }
-                },
-                child: isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Save'),
-              ),
-            ],
-          );
-        }
-      ),
-    );
   }
 
   Future<void> _showUpdateKeyModal() async {
@@ -163,7 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return AlertDialog(
             backgroundColor: theme.colorScheme.surface,
             title: Row(children: [Icon(PhosphorIcons.keyFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Update Private Key', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
-            content: TextField(controller: ctrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12), decoration: InputDecoration(hintText: 'Paste Solana Base58 Private Key', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
+            content: TextField(controller: ctrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12), decoration: InputDecoration(hintText: 'Paste Solana Base58 Private Key', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
               ElevatedButton(
@@ -174,7 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final res = await this.context.read<ApiService>().postEndpoint('wallet.php?action=set_key', {'private_key': ctrl.text.trim()});
                   if (mounted) {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
                     if (res['status'] == 'success' && res['data'] != null) {
                       setState(() { _hasWallet = true; _publicAddress = res['data']['public_address']; });
                     }
@@ -189,259 +122,146 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _showDeleteKeyModal() async {
-    final bool? confirm = await showDialog<bool>(
-      context: context, 
-      builder: (ctx) {
-        final theme = Theme.of(context);
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface, 
-          title: Row(children: [const Icon(PhosphorIcons.warningCircleFill, color: Colors.redAccent), const SizedBox(width: 8), Text('Remove Wallet?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]), 
-          content: Text('This will permanently delete your encrypted private key from the server. You will not be able to execute trades until you add a new one.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)), 
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))), 
-            ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, Delete'))
-          ],
-        );
-      }
-    );
-    
-    if (confirm == true && mounted) {
-      final res = await context.read<ApiService>().postEndpoint('wallet.php?action=delete_key', {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
-      if (res['status'] == 'success') setState(() { _hasWallet = false; _publicAddress = null; });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
 
-    return _isLoading 
-      ? const Center(child: CircularProgressIndicator()) 
-      : ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            // 1. Account Credentials & Security
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle), child: Icon(PhosphorIcons.shieldCheckFill, color: theme.primaryColor)),
-                          const SizedBox(width: 16),
-                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Account Security', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)), Text('Manage app access', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12))]),
-                        ],
-                      ),
-                      IconButton(icon: Icon(PhosphorIcons.pencilSimple, color: theme.colorScheme.onSurfaceVariant), onPressed: _showChangePasswordModal),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [Icon(PhosphorIcons.fingerprint, color: theme.colorScheme.onSurfaceVariant, size: 20), const SizedBox(width: 8), Text('Biometric Quick-Lock', style: TextStyle(color: theme.colorScheme.onSurface))]),
-                      Switch(value: _biometricEnabled, activeColor: theme.primaryColor, onChanged: (v) => setState(() => _biometricEnabled = v)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [Icon(PhosphorIcons.moneyFill, color: theme.colorScheme.onSurfaceVariant, size: 20), const SizedBox(width: 8), Text('Display in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurface))]),
-                      Switch(value: currency.isNaira, activeColor: theme.primaryColor, onChanged: (_) => currency.toggleCurrency()),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 2. Push Notifications Card
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [Icon(PhosphorIcons.bellRingingFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Push Notifications', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-                      Switch(value: _allowPush, activeColor: theme.primaryColor, onChanged: _togglePushAlerts),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Receive real-time push alerts on your phone whenever trades open, close, or hit targets.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 3. Execution Wallet
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(children: [Icon(PhosphorIcons.walletFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Execution Wallet', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-                      if (_hasWallet) IconButton(icon: const Icon(PhosphorIcons.trash, color: Colors.redAccent, size: 20), onPressed: _showDeleteKeyModal, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text('PUBLIC ADDRESS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-                    child: Row(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: Text('SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
+        actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant),
+            onPressed: () async {
+              await context.read<ApiService>().logout();
+              if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+            },
+          )
+        ],
+      ),
+      body: _isLoading 
+        ? Center(child: CircularProgressIndicator(color: theme.primaryColor)) 
+        : ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              // Execution Wallet
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: Text(_hasWallet ? (_publicAddress ?? 'Error loading') : 'No wallet connected', style: TextStyle(color: _hasWallet ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant, fontFamily: 'monospace', fontSize: 13))),
-                        if (_hasWallet) const Icon(PhosphorIcons.checkCircleFill, color: Colors.greenAccent, size: 18),
+                        Row(children: [Icon(PhosphorIcons.walletFill, color: theme.primaryColor), const SizedBox(width: 12), Text('Execution Wallet', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(width: double.infinity, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.1)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: _showUpdateKeyModal, icon: Icon(PhosphorIcons.key, color: theme.colorScheme.onSurface), label: Text(_hasWallet ? 'Update Key' : 'Add Private Key', style: TextStyle(color: theme.colorScheme.onSurface)))),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 4. DEX Execution Safety (Slippage)
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [const Icon(PhosphorIcons.shieldWarningFill, color: Colors.amberAccent), const SizedBox(width: 8), Text('DEX Execution Safety', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Slippage protects trades during high market volatility. Too low (e.g. 1%), and trades fail with 0x1771 errors. Default for meme coins is 5.0%.',
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _slippageCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            labelText: 'Max Slippage Tolerance (%)',
-                            labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
-                            filled: true,
-                            fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            suffixText: '%',
-                            suffixStyle: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amberAccent.withOpacity(0.2),
-                          foregroundColor: Colors.amberAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _saveSlippage,
-                        icon: const Icon(PhosphorIcons.floppyDisk, size: 18),
-                        label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 5. Personal Trade Limits
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [const Icon(PhosphorIcons.slidersHorizontalFill, color: Colors.amberAccent), const SizedBox(width: 8), Text('Personal Trade Limits', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-                  const SizedBox(height: 16),
-                  Text('Leave blank to use system defaults.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _maxTradeCtrl, keyboardType: TextInputType.number, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13), decoration: InputDecoration(labelText: 'Max Per Trade (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11), filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: _dailyCapCtrl, keyboardType: TextInputType.number, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13), decoration: InputDecoration(labelText: 'Daily Cap (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11), filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(width: double.infinity, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent.withOpacity(0.2), foregroundColor: Colors.amberAccent, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: _saveTradeLimits, icon: const Icon(PhosphorIcons.floppyDisk, size: 18), label: const Text('Save Risk Limits', style: TextStyle(fontWeight: FontWeight.bold)))),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // 6. Telegram Alerts
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [const Icon(PhosphorIcons.telegramLogoFill, color: Colors.blueAccent), const SizedBox(width: 8), Text('Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-                  const SizedBox(height: 16),
-                  if (!_allowTelegram)
-                    const Text('Admin has disabled personal alerts.', style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold))
-                  else ...[
-                    Text('Required Setup:', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 12),
-                    Text('1. Start our official bot to get your ID:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 24),
+                    Text('PUBLIC ADDRESS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
-                      decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
                       child: Row(
                         children: [
-                          Expanded(child: Text(_botUsername.isNotEmpty ? _botUsername : '(Ask Admin)', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 14))),
-                          if (_botUsername.isNotEmpty) ...[
-                            IconButton(icon: const Icon(PhosphorIcons.copy, color: Colors.blueAccent, size: 18), onPressed: () {
-                              final cleanUsername = _botUsername.replaceAll('@', '');
-                              Clipboard.setData(ClipboardData(text: 'https://t.me/$cleanUsername'));
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bot URL copied to clipboard!')));
-                            }),
-                            IconButton(icon: const Icon(PhosphorIcons.arrowUpRight, color: Colors.blueAccent, size: 18), onPressed: () async {
-                              final cleanUsername = _botUsername.replaceAll('@', '');
-                              final url = Uri.parse('https://t.me/$cleanUsername');
-                              if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
-                            }),
-                          ]
+                          Expanded(child: Text(_hasWallet ? (_publicAddress ?? 'Error loading') : 'No wallet connected', style: TextStyle(color: _hasWallet ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant, fontFamily: 'monospace', fontSize: 13))),
+                          if (_hasWallet) Icon(PhosphorIcons.checkCircleFill, color: AppTheme.success(context), size: 18),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text('2. Paste the ID below.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
+                    SizedBox(width: double.infinity, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: theme.colorScheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: _showUpdateKeyModal, icon: Icon(PhosphorIcons.key, color: theme.colorScheme.onSurface), label: Text(_hasWallet ? 'Update Private Key' : 'Add Private Key', style: TextStyle(color: theme.colorScheme.onSurface)))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Preferences
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [Icon(PhosphorIcons.slidersHorizontalFill, color: AppTheme.info(context)), const SizedBox(width: 12), Text('Preferences', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+                    const SizedBox(height: 24),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: TextField(controller: _telegramCtrl, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13), decoration: InputDecoration(hintText: 'Chat ID', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)), filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
-                        const SizedBox(width: 12),
-                        ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)), onPressed: _saveTelegramId, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold))),
+                        Row(children: [Icon(PhosphorIcons.moneyFill, color: theme.colorScheme.onSurfaceVariant, size: 20), const SizedBox(width: 12), Text('Display in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600))]),
+                        Switch(value: currency.isNaira, activeColor: theme.primaryColor, onChanged: (_) => currency.toggleCurrency()),
                       ],
                     ),
-                  ]
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 40),
-          ],
-        );
+              const SizedBox(height: 24),
+
+              // Trade Limits
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [Icon(PhosphorIcons.shieldCheckFill, color: AppTheme.warning(context)), const SizedBox(width: 12), Text('Risk Limits', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+                    const SizedBox(height: 16),
+                    Text('Leave blank to use system defaults.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _maxTradeCtrl, keyboardType: TextInputType.number, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Max Per Trade (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextField(controller: _dailyCapCtrl, keyboardType: TextInputType.number, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Daily Cap (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(width: double.infinity, child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warning(context).withOpacity(0.12), foregroundColor: AppTheme.warning(context), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), onPressed: _saveTradeLimits, icon: const Icon(PhosphorIcons.floppyDisk, size: 18), label: const Text('Save Risk Limits', style: TextStyle(fontWeight: FontWeight.bold)))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Slippage
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [Icon(PhosphorIcons.activityFill, color: AppTheme.danger(context)), const SizedBox(width: 12), Text('DEX Execution Safety', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+                    const SizedBox(height: 16),
+                    Text('Slippage protects trades during high volatility. Default for meme coins is 5.0%.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, height: 1.4)),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _slippageCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold),
+                            decoration: InputDecoration(
+                              labelText: 'Max Slippage Tolerance (%)',
+                              labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              suffixText: '%',
+                              suffixStyle: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context).withOpacity(0.12), foregroundColor: AppTheme.danger(context), padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                          onPressed: _saveSlippage,
+                          icon: const Icon(PhosphorIcons.floppyDisk, size: 18),
+                          label: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 100),
+            ],
+          ),
+    );
   }
 }
