@@ -12,7 +12,7 @@ import 'admin_screen.dart';
 import 'settings_screen.dart';
 import 'terminal_screen.dart';
 import 'copy_bots_screen.dart';
-import 'login_screen.dart'; // Ensure LoginScreen is accessible
+import 'login_screen.dart'; 
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,6 +24,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String _solBalance = "0.00000";
   String _usdValue = "0.00";
   String _publicAddress = "Loading...";
@@ -57,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _isRefreshing = false;
         if (responses[0]['status'] == 'success') {
           _solBalance = responses[0]['data']['sol_balance'];
           _usdValue = responses[0]['data']['usd_value'];
@@ -69,6 +71,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _publicAddress = responses[2]['data']['public_address'] ?? 'No Wallet Connected';
         }
       });
+    }
+  }
+
+  Future<void> _manualRefresh() async {
+    setState(() => _isRefreshing = true);
+    await _fetchDashboardData(silent: true);
+  }
+
+  Future<void> _quickClosePosition(int id) async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Closing trade...'), duration: Duration(seconds: 1)));
+    final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': id});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action complete'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+      _fetchDashboardData(silent: true);
     }
   }
 
@@ -209,7 +225,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               IconButton(
                 icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), 
                 onPressed: () async {
-                  // FIX: Explicitly await logout and push the user back to the login screen
                   await context.read<ApiService>().logout();
                   if (mounted) {
                     Navigator.pushAndRemoveUntil(
@@ -255,7 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('TOTAL PORTFOLIO VALUE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
-                    if (_isLoading) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    if (_isLoading && !_isRefreshing) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -275,7 +290,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start, 
                         children: [
-                          Text('NET PNL (24H)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), 
+                          Text('DAILY PNL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), 
                           const SizedBox(height: 4), 
                           Text('${isProfit && pnl > 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
                           if (currency.isNaira)
@@ -346,7 +361,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 24),
 
           if (_openPositions.isNotEmpty) ...[
-            Text('LIVE OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('LIVE OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+                InkWell(
+                  onTap: _isRefreshing ? null : _manualRefresh,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle),
+                    child: _isRefreshing 
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
+                        : const Icon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             GlassCard(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -354,10 +385,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: _openPositions.map((p) {
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
+                  final botName = p['display_name'] ?? p['wallet_label'] ?? 'Manual';
+                  final pId = int.tryParse(p['id'].toString()) ?? 0;
+
                   return ListTile(
                     dense: true,
                     leading: Icon(PhosphorIcons.trendUp, size: 16, color: theme.primaryColor),
-                    title: Text(_formatAddress(p['token_address']), style: const TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    title: Row(
+                      children: [
+                        Text(_formatAddress(p['token_address']), style: const TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)), child: Text(botName, style: const TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.bold))),
+                      ],
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -366,19 +406,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 10, color: Colors.greenAccent.withOpacity(0.7))),
                       ],
                     ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? Colors.greenAccent : Colors.redAccent),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? Colors.greenAccent : Colors.redAccent),
+                            ),
+                            if (currency.isNaira && cpnl != null)
+                              Text(
+                                '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7)),
+                              ),
+                          ],
                         ),
-                        if (currency.isNaira && cpnl != null)
-                          Text(
-                            '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7)),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => _quickClosePosition(pId),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+                            child: const Icon(PhosphorIcons.xBold, size: 14, color: Colors.redAccent),
                           ),
+                        ),
                       ],
                     ),
                   );
