@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class BroadcastPushDialog extends StatefulWidget {
   const BroadcastPushDialog({super.key});
@@ -19,7 +20,7 @@ class _BroadcastPushDialogState extends State<BroadcastPushDialog> {
   Future<void> _sendBroadcast() async {
     if (_titleCtrl.text.trim().isEmpty || _bodyCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title and Message Body are required!'), backgroundColor: Colors.orangeAccent),
+        SnackBar(content: const Text('Title and Message Body are required!'), backgroundColor: AppTheme.warning(context)),
       );
       return;
     }
@@ -43,7 +44,7 @@ class _BroadcastPushDialogState extends State<BroadcastPushDialog> {
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(res['message'] ?? 'Notification processed.'),
-        backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+        backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
       ));
     }
   }
@@ -53,80 +54,88 @@ class _BroadcastPushDialogState extends State<BroadcastPushDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF13131A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: Row(
         children: [
-          Icon(PhosphorIcons.megaphoneFill, color: theme.primaryColor),
-          const SizedBox(width: 10),
-          const Text('Push Broadcast', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppTheme.warning(context).withOpacity(0.12), shape: BoxShape.circle),
+            child: Icon(PhosphorIcons.megaphoneFill, color: AppTheme.warning(context), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text('Push Broadcast', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
         ],
       ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Send a real-time push notification to all active mobile users.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _titleCtrl,
+              style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: 'Notification Title',
+                labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                hintText: 'e.g. 🚀 App Update Released!',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _titleCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Notification Title',
-                labelStyle: const TextStyle(color: Colors.white54),
-                hintText: 'e.g. 🚀 App Update v2.0 Released!',
-                hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
-                filled: true,
-                fillColor: Colors.black26,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
               controller: _bodyCtrl,
               maxLines: 3,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
               decoration: InputDecoration(
                 labelText: 'Message Body',
-                labelStyle: const TextStyle(color: Colors.white54),
-                hintText: 'e.g. We have added new Solana DEX pools and faster execution speeds. Update now!',
-                hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
+                labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                hintText: 'e.g. We have added new DEX pools...',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                 filled: true,
-                fillColor: Colors.black26,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
               controller: _targetUserCtrl,
               keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 labelText: 'Target User ID (Optional)',
-                labelStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                hintText: 'Leave empty to broadcast to ALL users',
-                hintStyle: const TextStyle(color: Colors.white24, fontSize: 11),
+                labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                hintText: 'Leave empty to broadcast to ALL',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                 filled: true,
-                fillColor: Colors.black26,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               ),
             ),
           ],
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
         ),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme.primaryColor,
+            backgroundColor: AppTheme.warning(context),
+            foregroundColor: Colors.white,
+            elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           onPressed: _isSending ? null : _sendBroadcast,
           icon: _isSending

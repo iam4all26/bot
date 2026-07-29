@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class MasterStrategySwitch extends StatefulWidget {
   const MasterStrategySwitch({super.key});
@@ -55,31 +56,29 @@ class _MasterStrategySwitchState extends State<MasterStrategySwitch> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isActive = !_isAllPaused;
+    final activeColor = AppTheme.success(context);
+    final inactiveColor = AppTheme.warning(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isActive 
-            ? Colors.green.withOpacity(0.05) 
-            : Colors.amber.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
+        color: isActive ? activeColor.withOpacity(0.08) : inactiveColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive 
-              ? Colors.green.withOpacity(0.3) 
-              : Colors.amber.withOpacity(0.3),
+          color: isActive ? activeColor.withOpacity(0.2) : inactiveColor.withOpacity(0.2),
         ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isActive ? Colors.green.withOpacity(0.1) : Colors.amber.withOpacity(0.1),
+              color: isActive ? activeColor.withOpacity(0.15) : inactiveColor.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(
               isActive ? PhosphorIcons.rocketLaunchFill : PhosphorIcons.pauseCircleFill,
-              color: isActive ? Colors.green : Colors.amber,
+              color: isActive ? activeColor : inactiveColor,
               size: 24,
             ),
           ),
@@ -90,8 +89,9 @@ class _MasterStrategySwitchState extends State<MasterStrategySwitch> {
               children: [
                 Text(
                   'Global Copy Trading',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   isActive ? 'Strategies are actively monitoring.' : 'All strategies currently paused.',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -100,15 +100,15 @@ class _MasterStrategySwitchState extends State<MasterStrategySwitch> {
             ),
           ),
           if (_isLoading)
-            const SizedBox(
+            SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor),
             )
           else
             Switch(
               value: isActive,
-              activeColor: Colors.green,
+              activeColor: activeColor,
               onChanged: _toggleAll,
             ),
         ],

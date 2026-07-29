@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_background.dart';
+import '../theme/app_theme.dart';
 
 class WalletHistoryScreen extends StatefulWidget {
   final int walletId;
@@ -40,7 +41,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
           _isLoading = false;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Error fetching data'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Error fetching data'), backgroundColor: AppTheme.danger(context)));
         Navigator.pop(context);
       }
     }
@@ -49,9 +50,9 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
     try {
-      await launchUrl(url, mode: LaunchMode.inAppWebView);
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load internal webview.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Failed to load DEX.'), backgroundColor: AppTheme.warning(context)));
     }
   }
 
@@ -117,7 +118,6 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
       );
     }
 
-    // Dynamic Winning Rate Calculation including Manual Profits
     int totalClosed = 0;
     int totalWins = 0;
     int totalLosses = 0;
@@ -155,14 +155,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
               children: [
                 Text('Telemetry: ', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.blueAccent.withOpacity(0.3))),
-                  child: Text(_wallet?['label'] ?? '', style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.3))),
+                  child: Text(_wallet?['label'] ?? '', style: TextStyle(color: AppTheme.info(context), fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(_maskAddress(_wallet?['address']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontFamily: 'monospace')),
+            const SizedBox(height: 4),
+            Text(_maskAddress(_wallet?['address']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontFamily: 'monospace')),
           ],
         ),
       ),
@@ -170,14 +170,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
         child: RefreshIndicator(
           onRefresh: _fetchHistory,
           color: theme.primaryColor,
+          backgroundColor: theme.colorScheme.surface,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
+            padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
             children: [
               Row(
                 children: [
                   Expanded(
                     child: GlassCard(
-                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -188,18 +188,17 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                               Icon(PhosphorIcons.hashBold, color: theme.primaryColor, size: 20),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Text('$totalClosed', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('W: $totalWins | L: $totalLosses', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
+                          Text('W: $totalWins | L: $totalLosses', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: GlassCard(
-                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -207,22 +206,21 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text('WIN RATE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              Icon(PhosphorIcons.targetFill, color: winRate >= 50 ? Colors.greenAccent : Colors.amberAccent, size: 20),
+                              Icon(PhosphorIcons.targetFill, color: winRate >= 50 ? AppTheme.success(context) : AppTheme.warning(context), size: 20),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Text('${winRate.toStringAsFixed(1)}%', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('Includes manual profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
+                          Text('Includes manual profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                         ],
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               GlassCard(
-                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Expanded(
@@ -232,41 +230,41 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                           Row(
                             children: [
                               Text('TOTAL P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              const SizedBox(width: 4),
-                              const Icon(PhosphorIcons.currencyCircleDollarFill, color: Colors.greenAccent, size: 16),
+                              const SizedBox(width: 8),
+                              Icon(PhosphorIcons.currencyCircleDollarFill, color: AppTheme.success(context), size: 18),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text('${totalPnl >= 0 ? '+' : ''}\$${totalPnl.toStringAsFixed(2)}', style: TextStyle(color: totalPnl >= 0 ? Colors.greenAccent : Colors.redAccent, fontSize: 24, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 12),
+                          Text('${totalPnl >= 0 ? '+' : ''}\$${totalPnl.toStringAsFixed(2)}', style: TextStyle(color: totalPnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontSize: 24, fontWeight: FontWeight.bold)),
                           if (currency.isNaira)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 '≈ ${totalPnl >= 0 ? '+' : ''}${currency.format(totalPnl).replaceFirst('₦-', '-₦')}',
-                                style: TextStyle(color: totalPnl >= 0 ? Colors.greenAccent.withOpacity(0.8) : Colors.redAccent.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: totalPnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ),
                         ],
                       ),
                     ),
-                    Container(height: 50, width: 1, color: theme.colorScheme.onSurface.withOpacity(0.1)),
+                    Container(height: 60, width: 1, color: theme.colorScheme.outlineVariant),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(left: 16),
+                        padding: const EdgeInsets.only(left: 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
                                 Text('DEPLOYED', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                                const SizedBox(width: 4),
-                                const Icon(PhosphorIcons.chartBarFill, color: Colors.blueAccent, size: 16),
+                                const SizedBox(width: 8),
+                                Icon(PhosphorIcons.chartBarFill, color: AppTheme.info(context), size: 18),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text('\$${totalVolume.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            Text('\$${totalVolume.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
-                            Text('Total volume', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
+                            Text('Total volume', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -274,14 +272,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Text('TRADE HISTORY', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 32),
+              Text('TRADE HISTORY', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              const SizedBox(height: 16),
               
               if (_positions.isEmpty)
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(32),
                     child: Text('No trades found for this wallet.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                   ),
                 )
@@ -295,9 +293,8 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                   final isLoss = p['close_reason'] == 'SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl < 0);
 
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
+                    padding: const EdgeInsets.only(bottom: 16.0),
                     child: GlassCard(
-                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -310,54 +307,56 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                                   children: [
                                     Text(
                                       _maskAddress(p['token_address']),
-                                      style: const TextStyle(color: Colors.blueAccent, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+                                      style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                     const SizedBox(width: 4),
-                                    const Icon(PhosphorIcons.arrowUpRightBold, color: Colors.blueAccent, size: 12),
+                                    Icon(PhosphorIcons.arrowUpRightBold, color: AppTheme.info(context), size: 14),
                                   ],
                                 ),
                               ),
                               if (isOpen)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.blueAccent.withOpacity(0.3))), child: const Text('OPEN', style: TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.bold)))
+                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.3))), child: Text('OPEN', style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
                               else if (isWin)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.greenAccent.withOpacity(0.3))), child: const Text('WIN', style: TextStyle(color: Colors.greenAccent, fontSize: 9, fontWeight: FontWeight.bold)))
+                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.success(context).withOpacity(0.3))), child: Text('WIN', style: TextStyle(color: AppTheme.success(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
                               else if (isLoss)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.redAccent.withOpacity(0.3))), child: const Text('LOSS', style: TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold)))
+                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.danger(context).withOpacity(0.3))), child: Text('LOSS', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
                               else
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.2))), child: Text('MANUAL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold))),
+                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text('MANUAL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           
                           Row(
                             children: [
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isOpen ? 'LIVE MCAP' : 'EXIT MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(isOpen ? p['current_mcap'] : p['close_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isOpen ? 'LIVE MCAP' : 'EXIT MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(isOpen ? p['current_mcap'] : p['close_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
 
                           Row(
                             children: [
                               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(isOpen ? 'UNREALIZED P&L' : 'REALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
-                                Text(isOpen ? '-' : '${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: isOpen ? theme.colorScheme.onSurfaceVariant : (pnl >= 0 ? Colors.greenAccent : Colors.redAccent), fontWeight: FontWeight.bold, fontSize: 14)),
-                                if (currency.isNaira && !isOpen) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11)),
+                                Text(isOpen ? 'UNREALIZED P&L' : 'REALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                Text(isOpen ? '-' : '${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: isOpen ? theme.colorScheme.onSurfaceVariant : (pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context)), fontWeight: FontWeight.bold, fontSize: 15)),
+                                if (currency.isNaira && !isOpen) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 12)),
                               ])),
                               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
-                                Text('\$${size.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13)),
-                                if (currency.isNaira) Text('≈ ${currency.format(size)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                Text('\$${size.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                if (currency.isNaira) Text('≈ ${currency.format(size)}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold)),
                               ])),
                             ],
                           ),
+                          const SizedBox(height: 20),
+                          Container(height: 1, color: theme.colorScheme.outlineVariant),
                           const SizedBox(height: 16),
 
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 12), const SizedBox(width: 4), Text(formatLagosTime(p['opened_at']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10))]),
-                              Row(children: [Icon(PhosphorIcons.hourglassHigh, color: Colors.amberAccent, size: 12), const SizedBox(width: 4), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11))]),
+                              Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14), const SizedBox(width: 6), Text(formatLagosTime(p['opened_at']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500))]),
+                              Row(children: [Icon(PhosphorIcons.hourglassHigh, color: AppTheme.warning(context), size: 14), const SizedBox(width: 6), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: TextStyle(color: AppTheme.warning(context), fontWeight: FontWeight.bold, fontSize: 12))]),
                             ],
                           ),
                         ],
