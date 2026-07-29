@@ -227,6 +227,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Row(
                 children: [
                   IconButton(
+                    icon: Icon(PhosphorIcons.calculatorFill, color: theme.colorScheme.onSurfaceVariant), 
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => const CurrencyCalculatorDialog(),
+                      );
+                    },
+                  ),
+                  IconButton(
                     icon: Icon(isDark ? PhosphorIcons.sunFill : PhosphorIcons.moonFill, color: theme.colorScheme.onSurfaceVariant), 
                     onPressed: () => context.read<ThemeProvider>().toggleTheme(),
                   ),
@@ -452,6 +461,158 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------------------------
+// CURRENCY CALCULATOR DIALOG WIDGET
+// ----------------------------------------------------------------------
+class CurrencyCalculatorDialog extends StatefulWidget {
+  const CurrencyCalculatorDialog({super.key});
+
+  @override
+  State<CurrencyCalculatorDialog> createState() => _CurrencyCalculatorDialogState();
+}
+
+class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
+  final TextEditingController _usdController = TextEditingController();
+  final TextEditingController _ngnController = TextEditingController();
+  
+  double _activeRate = 1500.0;
+  bool _isInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _initializeRate();
+      _isInitialized = true;
+    }
+  }
+
+  void _initializeRate() {
+    try {
+      final currency = context.read<CurrencyProvider>();
+      // Safely extract the exact numerical rate stored in the provider by passing 1.0
+      String formatted = currency.format(1.0); 
+      String numStr = formatted.replaceAll(RegExp(r'[^0-9.]'), '');
+      _activeRate = double.tryParse(numStr) ?? 1500.0;
+    } catch (_) {
+      _activeRate = 1500.0; // Failsafe
+    }
+  }
+
+  void _onUsdChanged(String value) {
+    if (value.isEmpty) {
+      _ngnController.clear();
+      return;
+    }
+    double usd = double.tryParse(value) ?? 0;
+    _ngnController.text = (usd * _activeRate).toStringAsFixed(2);
+  }
+
+  void _onNgnChanged(String value) {
+    if (value.isEmpty) {
+      _usdController.clear();
+      return;
+    }
+    double ngn = double.tryParse(value) ?? 0;
+    if (_activeRate > 0) {
+      _usdController.text = (ngn / _activeRate).toStringAsFixed(2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _usdController.dispose();
+    _ngnController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Dialog(
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(PhosphorIcons.calculatorFill, color: theme.primaryColor, size: 24),
+                    const SizedBox(width: 8),
+                    Text('Calculator', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                IconButton(
+                  icon: Icon(PhosphorIcons.xBold, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                )
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+              child: Text('Active Rate: 1 USD = ₦${_activeRate.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 24),
+            
+            Text('Amount in USD (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _usdController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18),
+              decoration: InputDecoration(
+                prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                hintText: '0.00',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+              ),
+              onChanged: _onUsdChanged,
+            ),
+            
+            const SizedBox(height: 16),
+            Center(child: Icon(PhosphorIcons.arrowsDownUp, color: theme.colorScheme.onSurfaceVariant, size: 24)),
+            const SizedBox(height: 16),
+
+            Text('Amount in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ngnController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
+              decoration: InputDecoration(
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 14, top: 11, right: 8),
+                  child: Text('₦', style: TextStyle(color: Colors.greenAccent, fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                filled: true,
+                fillColor: Colors.greenAccent.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                hintText: '0.00',
+                hintStyle: TextStyle(color: Colors.greenAccent.withOpacity(0.3)),
+              ),
+              onChanged: _onNgnChanged,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
