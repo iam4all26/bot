@@ -8,6 +8,7 @@ import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../theme/app_theme.dart';
 import 'positions_screen.dart';
 import 'admin_screen.dart';
 import 'settings_screen.dart';
@@ -87,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Closing trade...'), duration: Duration(seconds: 1)));
     final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': id});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action complete'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action complete')));
       _fetchDashboardData(silent: true);
     }
   }
@@ -103,16 +104,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       content = 'Are you sure you want to market-sell all COPY/BOT open positions?';
     }
 
+    final theme = Theme.of(context);
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-        content: Text(content, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(title, style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold)),
+        content: Text(content, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('YES, CLOSE TRADES'),
           ),
@@ -121,12 +123,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (confirm == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Executing...'), backgroundColor: Colors.amber));
       final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_all', {'type': type});
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action completed'), backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red));
-        _fetchDashboardData();
-      }
+      if (mounted) _fetchDashboardData();
     }
   }
 
@@ -180,20 +178,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() => _currentIndex = 0);
           return;
         }
-        final now = DateTime.now();
-        if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
-          _lastPressedAt = now;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Tap back again to exit', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
-              backgroundColor: theme.colorScheme.surface,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-          return;
-        }
         SystemNavigator.pop();
       },
       child: Scaffold(
@@ -202,12 +186,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: SafeArea(child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
         ),
         bottomNavigationBar: Container(
-          decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.9), border: Border(top: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.05)))),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+          ),
           child: NavigationBar(
-            backgroundColor: Colors.transparent, elevation: 0,
+            backgroundColor: Colors.transparent, 
+            elevation: 0,
             selectedIndex: _currentIndex > navItems.length - 1 ? 0 : _currentIndex,
             onDestinationSelected: (index) => setState(() => _currentIndex = index),
-            indicatorColor: theme.primaryColor.withOpacity(0.2),
+            indicatorColor: theme.primaryColor.withOpacity(0.12),
             destinations: navItems,
           ),
         ),
@@ -224,8 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     for (var p in _closedPositions) {
       try {
         DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
-        int days = now.difference(dt).inDays;
-        if (days == 0 && now.day == dt.day) {
+        if (now.difference(dt).inDays == 0 && now.day == dt.day) {
           dailyPnl += double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
         }
       } catch (_) {}
@@ -249,15 +236,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)])),
-                      child: CircleAvatar(radius: 22, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface)),
+                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFC026D3)])),
+                      child: CircleAvatar(radius: 20, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface, size: 20)),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Welcome back,', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                        Text(_stats['username'] ?? 'Loading...', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                        Text(_stats['username'] ?? 'Loading...', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface, fontSize: 15)),
                       ],
                     ),
                   ],
@@ -267,51 +254,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   IconButton(
                     icon: Icon(PhosphorIcons.calculatorFill, color: theme.colorScheme.onSurfaceVariant), 
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => const CurrencyCalculatorDialog(),
-                      );
-                    },
+                    onPressed: () => showDialog(context: context, builder: (ctx) => const CurrencyCalculatorDialog()),
                   ),
                   IconButton(
                     icon: Icon(isDark ? PhosphorIcons.sunFill : PhosphorIcons.moonFill, color: theme.colorScheme.onSurfaceVariant), 
                     onPressed: () => context.read<ThemeProvider>().toggleTheme(),
                   ),
-                  IconButton(
-                    icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurfaceVariant), 
-                    onPressed: () async {
-                      await context.read<ApiService>().logout();
-                      if (mounted) {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
-                          (route) => false,
-                        );
-                      }
-                    },
-                  ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           
           InkWell(
             onTap: () {
               if (_publicAddress != 'No Wallet Connected' && _publicAddress != 'Loading...') {
                 Clipboard.setData(ClipboardData(text: _publicAddress));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wallet address copied!'), backgroundColor: Colors.green));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wallet address copied!')));
               }
             },
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.1))),
+              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(children: [Icon(PhosphorIcons.wallet, size: 16, color: theme.primaryColor), const SizedBox(width: 8), Text(_formatAddress(_publicAddress), style: TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))]),
+                  Row(children: [Icon(PhosphorIcons.wallet, size: 18, color: theme.primaryColor), const SizedBox(width: 12), Text(_formatAddress(_publicAddress), style: TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface))]),
                   Icon(PhosphorIcons.copy, size: 16, color: theme.colorScheme.onSurfaceVariant),
                 ],
               ),
@@ -320,27 +289,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 24),
 
           GlassCard(
-            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('TOTAL PORTFOLIO VALUE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
-                    if (_isLoading && !_isRefreshing) SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor))
+                    Text('PORTFOLIO VALUE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
+                    if (_isLoading && !_isRefreshing) SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor))
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('\$$_usdValue', style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, fontSize: 40)),
+                Text('\$$_usdValue', style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface, fontSize: 40, letterSpacing: -1)),
                 if (currency.isNaira) ...[
-                  const SizedBox(height: 2),
-                  Text('≈ ${currency.format(_usdValue)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('≈ ${currency.format(_usdValue)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
                 const SizedBox(height: 4),
                 Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 24),
-                Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.1)),
+                Container(height: 1, color: theme.colorScheme.outlineVariant),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -348,17 +316,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start, 
                         children: [
-                          Text('DAILY PNL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), 
-                          const SizedBox(height: 4), 
-                          Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
-                          if (currency.isNaira)
-                            Text('≈ ${isProfit && dailyPnl > 0 ? '+' : ''}${currency.format(dailyPnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11)),
+                          Text('DAILY PNL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), 
+                          const SizedBox(height: 6), 
+                          Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 18)),
                         ]
                       )
                     ),
-                    Container(width: 1, height: 40, color: theme.colorScheme.onSurface.withOpacity(0.1)),
+                    Container(width: 1, height: 40, color: theme.colorScheme.outlineVariant),
                     const SizedBox(width: 16),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), const SizedBox(height: 4), Text('${_stats['open_count'] ?? 0}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18))])),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, 
+                        children: [
+                          Text('OPEN TRADES', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), 
+                          const SizedBox(height: 6), 
+                          Text('${_stats['open_count'] ?? 0}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18))
+                        ]
+                      )
+                    ),
                   ],
                 ),
               ],
@@ -373,13 +348,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _openPositions.isEmpty ? null : () => _panicClose('all'),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.redAccent.withOpacity(0.5)),
-                    backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.redAccent.withOpacity(0.1),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.outline : AppTheme.danger(context).withOpacity(0.5)),
+                    backgroundColor: _openPositions.isEmpty ? Colors.transparent : AppTheme.danger(context).withOpacity(0.08),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.redAccent),
-                  label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.redAccent)),
+                  icon: Icon(PhosphorIcons.warningOctagonFill, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.danger(context)),
+                  label: Text('CLOSE ALL TRADES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.danger(context))),
                 ),
               ),
               const SizedBox(height: 8),
@@ -389,13 +364,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _openPositions.isEmpty ? null : () => _panicClose('copy'),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.orangeAccent.withOpacity(0.5)),
-                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.orangeAccent.withOpacity(0.1),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.outline : AppTheme.warning(context).withOpacity(0.5)),
+                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : AppTheme.warning(context).withOpacity(0.08),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      icon: Icon(PhosphorIcons.robotFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.orangeAccent),
-                      label: Text('CLOSE COPY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.orangeAccent)),
+                      icon: Icon(PhosphorIcons.robotFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.warning(context)),
+                      label: Text('CLOSE COPY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.warning(context))),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -403,32 +378,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _openPositions.isEmpty ? null : () => _panicClose('manual'),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.onSurface.withOpacity(0.2) : Colors.blueAccent.withOpacity(0.5)),
-                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : Colors.blueAccent.withOpacity(0.1),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: BorderSide(color: _openPositions.isEmpty ? theme.colorScheme.outline : AppTheme.info(context).withOpacity(0.5)),
+                        backgroundColor: _openPositions.isEmpty ? Colors.transparent : AppTheme.info(context).withOpacity(0.08),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      icon: Icon(PhosphorIcons.handPalmFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.blueAccent),
-                      label: Text('CLOSE MANUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : Colors.blueAccent)),
+                      icon: Icon(PhosphorIcons.handPalmFill, size: 16, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.info(context)),
+                      label: Text('CLOSE MANUAL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _openPositions.isEmpty ? theme.colorScheme.onSurfaceVariant : AppTheme.info(context))),
                     ),
                   ),
                 ],
               ),
             ]
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
           if (_openPositions.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('LIVE OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+                Text('LIVE OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
                 InkWell(
                   onTap: _isRefreshing ? null : _manualRefresh,
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), shape: BoxShape.circle),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
                     child: _isRefreshing 
                         ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSurfaceVariant))
                         : Icon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: theme.colorScheme.onSurface),
@@ -438,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             GlassCard(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Column(
                 children: _openPositions.map((p) {
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
@@ -447,22 +422,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
 
                   return ListTile(
-                    dense: true,
-                    leading: Icon(PhosphorIcons.trendUp, size: 16, color: theme.primaryColor),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+                      child: Icon(PhosphorIcons.trendUp, size: 18, color: theme.primaryColor),
+                    ),
                     title: Row(
                       children: [
                         Text(_formatAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 6),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(4)), child: Text(botName, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+                        const SizedBox(width: 8),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), child: Text(botName, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
                       ],
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Size: \$${p['virtual_usd_amount']}  |  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
-                        if (currency.isNaira)
-                          Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 10, color: Colors.greenAccent.withOpacity(0.7))),
-                      ],
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4.0),
+                      child: Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -473,23 +448,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(
                               cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? Colors.greenAccent : Colors.redAccent),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
                             ),
-                            if (currency.isNaira && cpnl != null)
-                              Text(
-                                '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7)),
-                              ),
                           ],
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         InkWell(
                           onTap: () => _quickClosePosition(pId),
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
-                            child: const Icon(PhosphorIcons.xBold, size: 14, color: Colors.redAccent),
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.1), shape: BoxShape.circle),
+                            child: Icon(PhosphorIcons.xBold, size: 14, color: AppTheme.danger(context)),
                           ),
                         ),
                       ],
@@ -504,10 +474,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-
-// ----------------------------------------------------------------------
-// CURRENCY CALCULATOR FORMATTERS & DIALOG
-// ----------------------------------------------------------------------
 
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -548,61 +514,17 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   double _activeRate = 1500.0;
   bool _isInitialized = false;
 
-  String _usdWords = "";
-  String _ngnWords = "";
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
-      _initializeRate();
+      try {
+        _activeRate = context.read<CurrencyProvider>().exchangeRate; 
+      } catch (_) {
+        _activeRate = 1500.0;
+      }
       _isInitialized = true;
     }
-  }
-
-  void _initializeRate() {
-    try {
-      final currency = context.read<CurrencyProvider>();
-      _activeRate = currency.exchangeRate; 
-    } catch (_) {
-      _activeRate = 1500.0;
-    }
-  }
-
-  String _numberToWords(int number) {
-    if (number == 0) return "Zero";
-    if (number < 0) return "Minus ${_numberToWords(number.abs())}";
-    String words = "";
-    if ((number / 1000000000).floor() > 0) {
-      words += "${_numberToWords((number / 1000000000).floor())} Billion ";
-      number %= 1000000000;
-    }
-    if ((number / 1000000).floor() > 0) {
-      words += "${_numberToWords((number / 1000000).floor())} Million ";
-      number %= 1000000;
-    }
-    if ((number / 1000).floor() > 0) {
-      words += "${_numberToWords((number / 1000).floor())} Thousand ";
-      number %= 1000;
-    }
-    if ((number / 100).floor() > 0) {
-      words += "${_numberToWords((number / 100).floor())} Hundred ";
-      number %= 100;
-    }
-    if (number > 0) {
-      if (words != "") words += "and ";
-      var unitsMap = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-      var tensMap = ["Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-      if (number < 20) {
-        words += unitsMap[number];
-      } else {
-        words += tensMap[(number / 10).floor()];
-        if ((number % 10) > 0) {
-          words += "-${unitsMap[number % 10]}";
-        }
-      }
-    }
-    return words.trim();
   }
 
   String _formatWithCommas(String text) {
@@ -613,39 +535,16 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     return parts.length > 1 ? '$whole.${parts[1]}' : whole;
   }
 
-  void _updateWords() {
-    double usd = double.tryParse(_usdController.text.replaceAll(',', '')) ?? 0;
-    double ngn = double.tryParse(_ngnController.text.replaceAll(',', '')) ?? 0;
-    setState(() {
-      _usdWords = usd > 0 ? '${_numberToWords(usd.floor())} Dollars' : '';
-      _ngnWords = ngn > 0 ? '${_numberToWords(ngn.floor())} Naira' : '';
-    });
-  }
-
   void _onUsdChanged(String value) {
-    if (value.isEmpty) {
-      _ngnController.clear();
-      _updateWords();
-      return;
-    }
+    if (value.isEmpty) { _ngnController.clear(); return; }
     double usd = double.tryParse(value.replaceAll(',', '')) ?? 0;
-    String ngnRaw = (usd * _activeRate).toStringAsFixed(2);
-    _ngnController.text = _formatWithCommas(ngnRaw);
-    _updateWords();
+    _ngnController.text = _formatWithCommas((usd * _activeRate).toStringAsFixed(2));
   }
 
   void _onNgnChanged(String value) {
-    if (value.isEmpty) {
-      _usdController.clear();
-      _updateWords();
-      return;
-    }
+    if (value.isEmpty) { _usdController.clear(); return; }
     double ngn = double.tryParse(value.replaceAll(',', '')) ?? 0;
-    if (_activeRate > 0) {
-      String usdRaw = (ngn / _activeRate).toStringAsFixed(2);
-      _usdController.text = _formatWithCommas(usdRaw);
-    }
-    _updateWords();
+    if (_activeRate > 0) _usdController.text = _formatWithCommas((ngn / _activeRate).toStringAsFixed(2));
   }
 
   @override
@@ -678,23 +577,18 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
                     Text('Calculator', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                IconButton(
-                  icon: Icon(PhosphorIcons.xBold, color: theme.colorScheme.onSurfaceVariant, size: 20),
-                  onPressed: () => Navigator.pop(context),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                )
+                IconButton(icon: Icon(PhosphorIcons.xBold, color: theme.colorScheme.onSurfaceVariant, size: 20), onPressed: () => Navigator.pop(context), padding: EdgeInsets.zero, constraints: const BoxConstraints())
               ],
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-              child: Text('Active Rate: 1 USD = ₦${_formatWithCommas(_activeRate.toStringAsFixed(2))}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Text('Active Rate: 1 USD = ₦${_formatWithCommas(_activeRate.toStringAsFixed(2))}', style: TextStyle(color: AppTheme.success(context), fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 24),
             
-            Text('Amount in USD (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text('Amount in USD (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
             const SizedBox(height: 8),
             TextField(
               controller: _usdController,
@@ -704,49 +598,38 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
               decoration: InputDecoration(
                 prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
-                fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 hintText: '0.00',
                 hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
               ),
               onChanged: _onUsdChanged,
             ),
-            if (_usdWords.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 4),
-                child: Text(_usdWords, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontStyle: FontStyle.italic)),
-              ),
             
             const SizedBox(height: 16),
             Center(child: Icon(PhosphorIcons.arrowsDownUp, color: theme.colorScheme.onSurfaceVariant, size: 24)),
             const SizedBox(height: 16),
 
-            Text('Amount in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text('Amount in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
             const SizedBox(height: 8),
             TextField(
               controller: _ngnController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [ThousandsSeparatorInputFormatter()],
-              style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 18),
               decoration: InputDecoration(
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.only(left: 14, top: 11, right: 8),
-                  child: Text('₦', style: TextStyle(color: Colors.greenAccent, fontSize: 20, fontWeight: FontWeight.bold)),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 14, top: 11, right: 8),
+                  child: Text('₦', style: TextStyle(color: AppTheme.success(context), fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
                 filled: true,
-                fillColor: Colors.greenAccent.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                fillColor: AppTheme.success(context).withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 hintText: '0.00',
-                hintStyle: TextStyle(color: Colors.greenAccent.withOpacity(0.3)),
+                hintStyle: TextStyle(color: AppTheme.success(context).withOpacity(0.3)),
               ),
               onChanged: _onNgnChanged,
             ),
-            if (_ngnWords.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 4),
-                child: Text(_ngnWords, style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontStyle: FontStyle.italic)),
-              ),
-            const SizedBox(height: 8),
           ],
         ),
       ),

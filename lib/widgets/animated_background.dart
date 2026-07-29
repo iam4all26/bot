@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class AnimatedCryptoBackground extends StatefulWidget {
   final Widget child;
@@ -16,7 +15,7 @@ class _AnimatedCryptoBackgroundState extends State<AnimatedCryptoBackground> wit
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat(reverse: true);
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat(reverse: true);
   }
 
   @override
@@ -27,41 +26,44 @@ class _AnimatedCryptoBackgroundState extends State<AnimatedCryptoBackground> wit
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     return Container(
-      color: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+      color: theme.scaffoldBackgroundColor,
       child: Stack(
         children: [
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Stack(
-                children: [
-                  Positioned(
-                    top: -100 + (_controller.value * 50),
-                    left: -50,
-                    child: Container(
-                      width: 350, height: 350,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.kainuwaPurple.withOpacity(isDark ? 0.15 : 0.08)),
+          if (isDark) ...[
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: -100 + (_controller.value * 40),
+                      left: -50,
+                      child: Container(
+                        width: 350, height: 350,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: theme.primaryColor.withOpacity(0.12)),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    bottom: -150 - (_controller.value * 50),
-                    right: -100,
-                    child: Container(
-                      width: 400, height: 400,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.kainuwaGold.withOpacity(isDark ? 0.1 : 0.05)),
+                    Positioned(
+                      bottom: -150 - (_controller.value * 40),
+                      right: -100,
+                      child: Container(
+                        width: 400, height: 400,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: theme.colorScheme.secondary.withOpacity(0.08)),
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
-          ),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-            child: Container(color: Colors.transparent),
-          ),
+                  ],
+                );
+              },
+            ),
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+              child: Container(color: Colors.transparent),
+            ),
+          ],
           widget.child,
         ],
       ),

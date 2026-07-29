@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,15 +24,16 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   void _showErrorDialog(String title, String content) {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF13131A),
-        title: Text(title, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        backgroundColor: theme.colorScheme.surface,
+        title: Text(title, style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: SelectableText(
             content,
-            style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontFamily: 'monospace'),
           ),
         ),
         actions: [
@@ -40,11 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
               Clipboard.setData(ClipboardData(text: content));
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error copied to clipboard')));
             },
-            child: const Text('COPY', style: TextStyle(color: Colors.blueAccent)),
+            child: Text('COPY', style: TextStyle(color: theme.colorScheme.primary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CLOSE', style: TextStyle(color: Colors.white)),
+            child: Text('CLOSE', style: TextStyle(color: theme.colorScheme.onSurface)),
           ),
         ],
       ),
@@ -73,22 +75,18 @@ class _LoginScreenState extends State<LoginScreen> {
           if (!apiService.isAuthenticated) {
             _showErrorDialog('Storage Error', 'Login successful on server, but device failed to securely store session token.');
           } else {
-            // Success! 
             NotificationService.initialize(apiService);
-            
-            // CHECK FOR MANDATORY PASSWORD CHANGE
             final data = result['data'];
             if (data != null && data['must_change_password'] == 1) {
                Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ForcePasswordChangeScreen(
-                    currentPassword: _passwordController.text, // Pass original password for validation
+                    currentPassword: _passwordController.text,
                   ),
                 ),
               );
             } else {
-              // Navigate to Dashboard normally
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const DashboardScreen()),
@@ -126,15 +124,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.5), blurRadius: 40, spreadRadius: 5)],
-                        gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
+                        boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.3), blurRadius: 32, spreadRadius: 4)],
+                        gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFC026D3)]),
                       ),
                       child: const Icon(PhosphorIcons.rocketLaunchFill, size: 48, color: Colors.white),
                     ),
                     const SizedBox(height: 32),
                     Text('Welcome to Kainuwa', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
                     const SizedBox(height: 8),
-                    Text('Sign in to access your terminal', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
+                    Text('Sign in to access your terminal', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, letterSpacing: 0.5)),
                     const SizedBox(height: 48),
                     GlassCard(
                       child: Column(
@@ -147,8 +145,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                               prefixIcon: Icon(PhosphorIcons.user, color: theme.colorScheme.onSurfaceVariant),
                               filled: true,
-                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                              fillColor: theme.colorScheme.surfaceContainerHighest,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.primaryColor)),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -165,31 +164,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
                               filled: true,
-                              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                              fillColor: theme.colorScheme.surfaceContainerHighest,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.primaryColor)),
                             ),
                           ),
                           const SizedBox(height: 32),
                           SizedBox(
                             width: double.infinity,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
-                                boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _handleLogin,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.primaryColor,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                               ),
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  padding: const EdgeInsets.symmetric(vertical: 20),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                    : const Text('Secure Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                              ),
+                              child: _isLoading
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Text('Secure Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                             ),
                           ),
                         ],
@@ -206,9 +200,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ----------------------------------------------------------------------
-// MANDATORY PASSWORD CHANGE SCREEN
-// ----------------------------------------------------------------------
 class ForcePasswordChangeScreen extends StatefulWidget {
   final String currentPassword;
   const ForcePasswordChangeScreen({super.key, required this.currentPassword});
@@ -235,18 +226,9 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
 
-    if (newPass.isEmpty || confirmPass.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
-      return;
-    }
-    if (newPass.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 8 characters')));
-      return;
-    }
-    if (newPass != confirmPass) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
-      return;
-    }
+    if (newPass.isEmpty || confirmPass.isEmpty) return;
+    if (newPass.length < 8) return;
+    if (newPass != confirmPass) return;
 
     setState(() => _isLoading = true);
     final api = context.read<ApiService>();
@@ -260,142 +242,108 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (res['status'] == 'success') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password updated successfully!'), backgroundColor: Colors.green),
-          );
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardScreen()));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(res['message'] ?? 'Failed to update password'), backgroundColor: Colors.red),
-          );
         }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error.'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return PopScope(
-      canPop: false, 
-      onPopInvoked: (bool didPop) {
-        if (didPop) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must update your password to continue.')));
-      },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          title: Text('Update Required', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurface),
-              tooltip: 'Logout',
-              onPressed: () async {
-                await context.read<ApiService>().logout();
-                if (context.mounted) {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-                }
-              },
-            )
-          ],
-        ),
-        body: AnimatedCryptoBackground(
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), shape: BoxShape.circle),
-                    child: const Icon(PhosphorIcons.shieldWarningFill, size: 48, color: Colors.amber),
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('Update Required', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.signOut, color: theme.colorScheme.onSurface),
+            onPressed: () async {
+              await context.read<ApiService>().logout();
+              if (context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+            },
+          )
+        ],
+      ),
+      body: AnimatedCryptoBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: AppTheme.warning(context).withOpacity(0.1), shape: BoxShape.circle),
+                  child: Icon(PhosphorIcons.shieldWarningFill, size: 48, color: AppTheme.warning(context)),
+                ),
+                const SizedBox(height: 24),
+                Text('Secure Your Account', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                const SizedBox(height: 8),
+                Text('Your administrator has required you to set a new, secure password before accessing the trading terminal.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5)),
+                const SizedBox(height: 32),
+                
+                GlassCard(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _newPasswordController,
+                        obscureText: _obscureNew,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          prefixIcon: Icon(PhosphorIcons.lockKey, color: theme.primaryColor),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureNew ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
+                            onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirm,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          prefixIcon: Icon(PhosphorIcons.checkCircle, color: theme.primaryColor),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureConfirm ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
+                            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _updatePassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  Text('Secure Your Account', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 8),
-                  Text('Your administrator has required you to set a new, secure password before accessing the trading terminal.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, height: 1.5)),
-                  const SizedBox(height: 32),
-                  
-                  GlassCard(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _newPasswordController,
-                          obscureText: _obscureNew,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            labelText: 'New Password',
-                            labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                            prefixIcon: Icon(PhosphorIcons.lockKey, color: theme.primaryColor),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscureNew ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
-                              onPressed: () => setState(() => _obscureNew = !_obscureNew),
-                            ),
-                            filled: true,
-                            fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _confirmPasswordController,
-                          obscureText: _obscureConfirm,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            labelText: 'Confirm New Password',
-                            labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                            prefixIcon: Icon(PhosphorIcons.checkCircle, color: theme.primaryColor),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscureConfirm ? PhosphorIcons.eyeClosed : PhosphorIcons.eye, color: theme.colorScheme.onSurfaceVariant),
-                              onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                            ),
-                            filled: true,
-                            fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFE024CE)]),
-                              boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _updatePassword,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
