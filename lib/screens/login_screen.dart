@@ -51,28 +51,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (res['status'] == 'success') {
           final data = res['data'];
-          // Use ApiService's login function to save credentials locally
+          
+          // FIXED: Pass exactly 2 positional arguments to api.login()
           await api.login(
             data['token'],
             data['role'],
-            data['allow_manual_trade'] == 1,
           );
 
-          // CHECK THE FORCE PASSWORD CHANGE FLAG
+          // CHECK FOR MANDATORY PASSWORD CHANGE
           if (data['must_change_password'] == 1) {
-            // Block routing to dashboard, force the user to change password
             if (mounted) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ForcePasswordChangeScreen(
-                    currentPassword: password, // Pass the password they just used to log in
+                    currentPassword: password,
                   ),
                 ),
               );
             }
           } else {
-            // Normal login flow
             if (mounted) {
               Navigator.pushReplacement(
                 context,
@@ -237,7 +235,6 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Password updated successfully!'), backgroundColor: Colors.green),
           );
-          // Now they are allowed to proceed to the Dashboard
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardScreen()));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -259,7 +256,6 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Using PopScope to prevent the user from going back without changing the password
     return PopScope(
       canPop: false, 
       onPopInvoked: (bool didPop) {
@@ -271,7 +267,7 @@ class _ForcePasswordChangeScreenState extends State<ForcePasswordChangeScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          automaticallyImplyLeading: false, // Remove back button
+          automaticallyImplyLeading: false,
           title: const Text('Update Required', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           actions: [
