@@ -22,9 +22,9 @@ class AdminScreen extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3), 
+              color: theme.colorScheme.onSurface.withOpacity(0.05), 
               borderRadius: BorderRadius.circular(24), 
-              border: Border.all(color: Colors.white.withOpacity(0.05))
+              border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.08))
             ),
             child: TabBar(
               isScrollable: true,
@@ -134,78 +134,83 @@ class _UsersTabState extends State<UsersTab> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          backgroundColor: const Color(0xFF13131A),
-          title: Row(
-            children: [
-              Icon(PhosphorIcons.userPlusFill, color: Theme.of(context).primaryColor),
-              const SizedBox(width: 8),
-              const Text('Create New User', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: userCtrl,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'e.g. trader_john',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passCtrl,
-                obscureText: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Temporary Password',
-                  hintText: 'Min 8 characters',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+        builder: (context, setStateDialog) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            title: Row(
+              children: [
+                Icon(PhosphorIcons.userPlusFill, color: theme.primaryColor),
+                const SizedBox(width: 8),
+                Text('Create New User', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16)),
+              ],
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor),
-              onPressed: isSaving ? null : () async {
-                if (userCtrl.text.trim().isEmpty || passCtrl.text.length < 8) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username required & Password min 8 chars'), backgroundColor: Colors.red));
-                  return;
-                }
-                setStateDialog(() => isSaving = true);
-                final res = await this.context.read<ApiService>().postEndpoint(
-                  'admin.php?action=create_user',
-                  {'username': userCtrl.text.trim(), 'password': passCtrl.text},
-                );
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                    content: Text(res['message'] ?? ''),
-                    backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
-                  ));
-                  _fetchUsers();
-                }
-              },
-              child: isSaving 
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                : const Text('Create User', style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: userCtrl,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: 'e.g. trader_john',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Temporary Password',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: 'Min 8 characters',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white),
+                onPressed: isSaving ? null : () async {
+                  if (userCtrl.text.trim().isEmpty || passCtrl.text.length < 8) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username required & Password min 8 chars'), backgroundColor: Colors.red));
+                    return;
+                  }
+                  setStateDialog(() => isSaving = true);
+                  final res = await this.context.read<ApiService>().postEndpoint(
+                    'admin.php?action=create_user',
+                    {'username': userCtrl.text.trim(), 'password': passCtrl.text},
+                  );
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
+                      content: Text(res['message'] ?? ''),
+                      backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+                    ));
+                    _fetchUsers();
+                  }
+                },
+                child: isSaving 
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                  : const Text('Create User'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -219,96 +224,102 @@ class _UsersTabState extends State<UsersTab> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          backgroundColor: const Color(0xFF13131A),
-          title: const Row(
-            children: [
-              Icon(PhosphorIcons.ticketFill, color: Colors.amberAccent),
-              SizedBox(width: 8),
-              Text('Trading Allocation Limits', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Leave blank for unlimited allocations.', style: TextStyle(color: Colors.white54, fontSize: 11)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: dailyCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Daily Limit',
-                  hintText: '∞',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: monthlyCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Monthly Limit',
-                  hintText: '∞',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: yearlyCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Yearly Limit',
-                  hintText: '∞',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+        builder: (context, setStateDialog) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            title: Row(
+              children: [
+                const Icon(PhosphorIcons.ticketFill, color: Colors.amberAccent),
+                const SizedBox(width: 8),
+                Text('Trading Allocation Limits', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16)),
+              ],
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-              onPressed: isSaving ? null : () async {
-                setStateDialog(() => isSaving = true);
-                final res = await this.context.read<ApiService>().postEndpoint(
-                  'admin.php?action=set_quota',
-                  {
-                    'user_id': userId,
-                    'max_trades_daily': dailyCtrl.text.trim(),
-                    'max_trades_monthly': monthlyCtrl.text.trim(),
-                    'max_trades_yearly': yearlyCtrl.text.trim(),
-                  },
-                );
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                    content: Text(res['message'] ?? ''),
-                    backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
-                  ));
-                  _fetchUsers();
-                }
-              },
-              child: isSaving 
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
-                : const Text('Save Allocations', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Leave blank for unlimited allocations.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dailyCtrl,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Daily Limit',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: '∞',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: monthlyCtrl,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Monthly Limit',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: '∞',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: yearlyCtrl,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Yearly Limit',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: '∞',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
+                onPressed: isSaving ? null : () async {
+                  setStateDialog(() => isSaving = true);
+                  final res = await this.context.read<ApiService>().postEndpoint(
+                    'admin.php?action=set_quota',
+                    {
+                      'user_id': userId,
+                      'max_trades_daily': dailyCtrl.text.trim(),
+                      'max_trades_monthly': monthlyCtrl.text.trim(),
+                      'max_trades_yearly': yearlyCtrl.text.trim(),
+                    },
+                  );
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
+                      content: Text(res['message'] ?? ''),
+                      backgroundColor: res['status'] == 'success' ? Colors.green : Colors.red,
+                    ));
+                    _fetchUsers();
+                  }
+                },
+                child: isSaving 
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
+                  : const Text('Save Allocations', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -330,15 +341,15 @@ class _UsersTabState extends State<UsersTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(PhosphorIcons.currencyCircleDollarFill, color: Colors.greenAccent),
-                    SizedBox(width: 8),
-                    Text('Global Exchange Rate (₦/USD)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Icon(PhosphorIcons.currencyCircleDollarFill, color: Colors.greenAccent),
+                    const SizedBox(width: 8),
+                    Text('Global Exchange Rate (₦/USD)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text('Set to 0 to automatically fetch the live market rate.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                Text('Set to 0 to automatically fetch the live market rate.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -346,12 +357,12 @@ class _UsersTabState extends State<UsersTab> {
                       child: TextField(
                         controller: _rateCtrl,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
                         decoration: InputDecoration(
                           hintText: 'e.g. 1600 or 0',
-                          hintStyle: const TextStyle(color: Colors.white38),
+                          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                           filled: true,
-                          fillColor: Colors.black26,
+                          fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         ),
                       ),
@@ -439,7 +450,7 @@ class _UsersTabState extends State<UsersTab> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(u['username'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(u['username'] ?? '', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(height: 2),
                             Text('Role: ${u['role']}', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
@@ -447,19 +458,19 @@ class _UsersTabState extends State<UsersTab> {
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                            side: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.1)),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () => _showQuotaModal(u['id'], u['quotas']?['daily'], u['quotas']?['monthly'], u['quotas']?['yearly']),
-                          icon: const Icon(PhosphorIcons.ticket, color: Colors.white54, size: 14),
-                          label: const Text('Quotas', style: TextStyle(color: Colors.white, fontSize: 11)),
+                          icon: Icon(PhosphorIcons.ticket, color: theme.colorScheme.onSurfaceVariant, size: 14),
+                          label: Text('Quotas', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 11)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text('Limits:  $daily/day   |   $monthly/mo   |   $yearly/yr', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                    Text('Limits:  $daily/day   |   $monthly/mo   |   $yearly/yr', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                     const SizedBox(height: 12),
-                    Container(height: 1, color: Colors.white.withOpacity(0.05)),
+                    Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.05)),
                     const SizedBox(height: 8),
 
                     Row(
@@ -469,7 +480,7 @@ class _UsersTabState extends State<UsersTab> {
                           children: [
                             Icon(PhosphorIcons.shieldCheck, color: isActive ? Colors.greenAccent : Colors.redAccent, size: 16),
                             const SizedBox(width: 8),
-                            Text('Account Access', style: TextStyle(color: isActive ? Colors.white : Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text('Account Access', style: TextStyle(color: isActive ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         Switch(
@@ -487,11 +498,11 @@ class _UsersTabState extends State<UsersTab> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(PhosphorIcons.rocketLaunch, color: Colors.purpleAccent, size: 16),
-                            SizedBox(width: 8),
-                            Text('Allow Manual Snipe', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            const Icon(PhosphorIcons.rocketLaunch, color: Colors.purpleAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Text('Allow Manual Snipe', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13)),
                           ],
                         ),
                         Switch(
@@ -508,11 +519,11 @@ class _UsersTabState extends State<UsersTab> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(PhosphorIcons.paperPlaneTilt, color: Colors.blueAccent, size: 16),
-                            SizedBox(width: 8),
-                            Text('Allow Telegram Alerts', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            const Icon(PhosphorIcons.paperPlaneTilt, color: Colors.blueAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Text('Allow Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13)),
                           ],
                         ),
                         Switch(
