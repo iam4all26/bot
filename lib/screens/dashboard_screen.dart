@@ -31,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _publicAddress = "Loading...";
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
+  List<dynamic> _closedPositions = []; // ADDED: To calculate Daily PNL locally
   Timer? _pollingTimer;
   DateTime? _lastPressedAt;
 
@@ -68,6 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
           _openPositions = responses[1]['open_positions'] ?? [];
+          _closedPositions = responses[1]['closed_positions'] ?? []; // Store closed positions
         }
         if (responses[2]['status'] == 'success') {
           _publicAddress = responses[2]['data']['public_address'] ?? 'No Wallet Connected';
@@ -215,9 +217,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
     final currency = context.watch<CurrencyProvider>(); 
-    final double pnl = _stats['total_pnl'] != null ? (_stats['total_pnl'] as num).toDouble() : 0.0;
-    final bool isProfit = pnl >= 0;
     final isDark = theme.brightness == Brightness.dark;
+
+    // DYNAMIC DAILY PNL CALCULATION (Matches Positions "Today" Tab exactly)
+    double dailyPnl = 0.0;
+    final now = DateTime.now();
+    for (var p in _closedPositions) {
+      try {
+        DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
+        int days = now.difference(dt).inDays;
+        if (days == 0 && now.day == dt.day) {
+          dailyPnl += double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
+        }
+      } catch (_) {}
+    }
+    final bool isProfit = dailyPnl >= 0;
 
     return RefreshIndicator(
       onRefresh: () => _fetchDashboardData(),
@@ -337,9 +351,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Text('DAILY PNL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1)), 
                           const SizedBox(height: 4), 
-                          Text('${isProfit && pnl > 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
                           if (currency.isNaira)
-                            Text('≈ ${isProfit && pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11)),
+                            Text('≈ ${isProfit && dailyPnl > 0 ? '+' : ''}${currency.format(dailyPnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isProfit ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11)),
                         ]
                       )
                     ),
@@ -521,7 +535,6 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   void _initializeRate() {
     try {
       final currency = context.read<CurrencyProvider>();
-      // FIXED: Pulling the exact unformatted double rate directly from the provider
       _activeRate = currency.exchangeRate; 
     } catch (_) {
       _activeRate = 1500.0;
