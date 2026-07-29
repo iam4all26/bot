@@ -46,8 +46,10 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_bots.isEmpty) return const Center(child: Text('No active copy bots available.', style: TextStyle(color: Colors.white54)));
+    final theme = Theme.of(context);
+    
+    if (_isLoading) return Center(child: CircularProgressIndicator(color: theme.primaryColor));
+    if (_bots.isEmpty) return Center(child: Text('No active copy bots available.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
 
     return ListView.builder(
       padding: const EdgeInsets.all(20),
@@ -65,7 +67,6 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
   }
 }
 
-// FIXED: Isolated Stateful Widget ensures calculators work perfectly without ListView recycling bugs
 class BotConfigCard extends StatefulWidget {
   final dynamic bot;
   final Function(Map<String, dynamic>) onSave;
@@ -160,11 +161,11 @@ class _BotConfigCardState extends State<BotConfigCard> {
     });
   }
 
-  Widget _buildInput(String label, String hint, TextEditingController ctrl, IconData icon, Color iconColor) {
+  Widget _buildInput(String label, String hint, TextEditingController ctrl, IconData icon, Color iconColor, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1)),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
         const SizedBox(height: 6),
         SizedBox(
           height: 48,
@@ -175,9 +176,9 @@ class _BotConfigCardState extends State<BotConfigCard> {
             decoration: InputDecoration(
               prefixIcon: Icon(icon, color: iconColor, size: 16),
               filled: true,
-              fillColor: Colors.black26,
+              fillColor: theme.colorScheme.onSurface.withOpacity(0.05),
               hintText: hint,
-              hintStyle: const TextStyle(color: Colors.white24),
+              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
@@ -197,23 +198,23 @@ class _BotConfigCardState extends State<BotConfigCard> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          collapsedIconColor: Colors.white54,
+          collapsedIconColor: theme.colorScheme.onSurfaceVariant,
           iconColor: theme.primaryColor,
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isEnabled ? theme.primaryColor.withOpacity(0.2) : Colors.white10,
+                  color: isEnabled ? theme.primaryColor.withOpacity(0.2) : theme.colorScheme.onSurface.withOpacity(0.05),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : Colors.white54),
+                child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.bot['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(widget.bot['name'], style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
                   Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                 ],
@@ -226,28 +227,28 @@ class _BotConfigCardState extends State<BotConfigCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(height: 1, color: Colors.white.withOpacity(0.05)),
+                  Container(height: 1, color: theme.colorScheme.onSurface.withOpacity(0.05)),
                   const SizedBox(height: 16),
                   
                   Row(
                     children: [
-                      Expanded(child: _buildInput('TRADE \$', '5.00', tradeCtrl, PhosphorIcons.currencyDollar, Colors.white)),
+                      Expanded(child: _buildInput('TRADE \$', '5.00', tradeCtrl, PhosphorIcons.currencyDollar, theme.colorScheme.onSurface, theme)),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildInput('TP %', '100.00', tpCtrl, PhosphorIcons.trendUp, Colors.greenAccent)),
+                      Expanded(child: _buildInput('TP %', '100.00', tpCtrl, PhosphorIcons.trendUp, Colors.greenAccent, theme)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildInput('TARGET XS', '2.00', xCtrl, PhosphorIcons.x, theme.primaryColor)),
+                      Expanded(child: _buildInput('TARGET XS', '2.00', xCtrl, PhosphorIcons.x, theme.primaryColor, theme)),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildInput('SL %', '90.00', slCtrl, PhosphorIcons.trendDown, Colors.redAccent)),
+                      Expanded(child: _buildInput('SL %', '90.00', slCtrl, PhosphorIcons.trendDown, Colors.redAccent, theme)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildInput('MAX OPEN', '∞', concCtrl, PhosphorIcons.infinity, Colors.white54)),
+                      Expanded(child: _buildInput('MAX OPEN', '∞', concCtrl, PhosphorIcons.infinity, theme.colorScheme.onSurfaceVariant, theme)),
                       const SizedBox(width: 12),
                       const Spacer(),
                     ],
@@ -265,11 +266,11 @@ class _BotConfigCardState extends State<BotConfigCard> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(PhosphorIcons.calculatorFill, size: 16, color: Colors.white54),
-                            SizedBox(width: 8),
-                            Text('EXPECTED PROFIT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1)),
+                            Icon(PhosphorIcons.calculatorFill, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 8),
+                            Text('EXPECTED PROFIT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, letterSpacing: 1)),
                           ],
                         ),
                         Container(
@@ -296,7 +297,7 @@ class _BotConfigCardState extends State<BotConfigCard> {
                               _handleSave();
                             },
                           ),
-                          const Text('Strategy Active', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                          Text('Strategy Active', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       ElevatedButton.icon(

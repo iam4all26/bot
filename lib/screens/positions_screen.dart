@@ -161,15 +161,16 @@ class _PositionsScreenState extends State<PositionsScreen> {
   Future<void> _executeBatchClose(List<int> ids, String description) async {
     if (ids.isEmpty) return;
 
+    final theme = Theme.of(context);
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF13131A),
-        title: Row(children: [const Icon(PhosphorIcons.warningCircleFill, color: Colors.redAccent), const SizedBox(width: 8), Text('Close $description?', style: const TextStyle(color: Colors.white, fontSize: 16))]),
-        content: Text('Are you sure you want to close ${ids.length} open position(s)?', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        backgroundColor: theme.colorScheme.surface,
+        title: Row(children: [const Icon(PhosphorIcons.warningCircleFill, color: Colors.redAccent), const SizedBox(width: 8), Text('Close $description?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
+        content: Text('Are you sure you want to close ${ids.length} open position(s)?', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${ids.length} Trade(s)', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${ids.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -194,6 +195,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
   }
 
   void _showBatchCloseSheet(CurrencyProvider currency) {
+    final theme = Theme.of(context);
     List<int> allIds = [], manualIds = [], copyIds = [], profitIds = [], lossIds = [], liveIds = [], paperIds = [];
     double totalProfitUsd = 0.0, totalLossUsd = 0.0;
     Map<String, List<int>> botToIdsMap = {};
@@ -215,7 +217,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF13131A),
+      backgroundColor: theme.colorScheme.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
@@ -229,23 +231,23 @@ class _PositionsScreenState extends State<PositionsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(children: [Icon(PhosphorIcons.handPalmFill, color: Colors.redAccent), SizedBox(width: 8), Text('Batch Close Manager', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))]),
-                    IconButton(icon: const Icon(PhosphorIcons.xBold, color: Colors.white54, size: 18), onPressed: () => Navigator.pop(ctx))
+                    Row(children: [const Icon(PhosphorIcons.handPalmFill, color: Colors.redAccent), const SizedBox(width: 8), Text('Batch Close Manager', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18))]),
+                    IconButton(icon: Icon(PhosphorIcons.xBold, color: theme.colorScheme.onSurfaceVariant, size: 18), onPressed: () => Navigator.pop(ctx))
                   ],
                 ),
                 const SizedBox(height: 20),
 
-                _buildBatchTile(title: 'Close All Open Trades', subtitle: '${allIds.length} trade(s) active', icon: PhosphorIcons.trashFill, color: Colors.redAccent, count: allIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(allIds, 'All Open Trades'); }),
-                if (liveIds.isNotEmpty) _buildBatchTile(title: 'Close All Live Trades', subtitle: 'Exits real money trades', icon: PhosphorIcons.lightningFill, color: Colors.amberAccent, count: liveIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(liveIds, 'Live Trades'); }),
-                if (paperIds.isNotEmpty) _buildBatchTile(title: 'Close All Paper Trades', subtitle: 'Exits paper simulation trades', icon: PhosphorIcons.newspaperFill, color: Colors.orangeAccent, count: paperIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(paperIds, 'Paper Trades'); }),
-                _buildBatchTile(title: 'Close All Profits Only', subtitle: profitIds.isEmpty ? 'No profit trades' : '+\$${totalProfitUsd.toStringAsFixed(2)}', icon: PhosphorIcons.trendUpFill, color: Colors.greenAccent, count: profitIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(profitIds, 'Profitable Trades'); }),
-                _buildBatchTile(title: 'Close All Losses Only', subtitle: lossIds.isEmpty ? 'No loss trades' : '-\$${totalLossUsd.abs().toStringAsFixed(2)}', icon: PhosphorIcons.trendDownFill, color: Colors.pinkAccent, count: lossIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(lossIds, 'Loss Trades'); }),
-                _buildBatchTile(title: 'Close All Manual Trades', subtitle: 'Trades placed by you', icon: PhosphorIcons.userFill, color: Colors.purpleAccent, count: manualIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(manualIds, 'Manual Trades'); }),
-                _buildBatchTile(title: 'Close All Copy Trades', subtitle: 'Automated mirror trades', icon: PhosphorIcons.robotFill, color: Colors.blueAccent, count: copyIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(copyIds, 'Copy Trades'); }),
+                _buildBatchTile(theme: theme, title: 'Close All Open Trades', subtitle: '${allIds.length} trade(s) active', icon: PhosphorIcons.trashFill, color: Colors.redAccent, count: allIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(allIds, 'All Open Trades'); }),
+                if (liveIds.isNotEmpty) _buildBatchTile(theme: theme, title: 'Close All Live Trades', subtitle: 'Exits real money trades', icon: PhosphorIcons.lightningFill, color: Colors.amberAccent, count: liveIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(liveIds, 'Live Trades'); }),
+                if (paperIds.isNotEmpty) _buildBatchTile(theme: theme, title: 'Close All Paper Trades', subtitle: 'Exits paper simulation trades', icon: PhosphorIcons.newspaperFill, color: Colors.orangeAccent, count: paperIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(paperIds, 'Paper Trades'); }),
+                _buildBatchTile(theme: theme, title: 'Close All Profits Only', subtitle: profitIds.isEmpty ? 'No profit trades' : '+\$${totalProfitUsd.toStringAsFixed(2)}', icon: PhosphorIcons.trendUpFill, color: Colors.greenAccent, count: profitIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(profitIds, 'Profitable Trades'); }),
+                _buildBatchTile(theme: theme, title: 'Close All Losses Only', subtitle: lossIds.isEmpty ? 'No loss trades' : '-\$${totalLossUsd.abs().toStringAsFixed(2)}', icon: PhosphorIcons.trendDownFill, color: Colors.pinkAccent, count: lossIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(lossIds, 'Loss Trades'); }),
+                _buildBatchTile(theme: theme, title: 'Close All Manual Trades', subtitle: 'Trades placed by you', icon: PhosphorIcons.userFill, color: Colors.purpleAccent, count: manualIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(manualIds, 'Manual Trades'); }),
+                _buildBatchTile(theme: theme, title: 'Close All Copy Trades', subtitle: 'Automated mirror trades', icon: PhosphorIcons.robotFill, color: Colors.blueAccent, count: copyIds.length, onTap: () { Navigator.pop(ctx); _executeBatchClose(copyIds, 'Copy Trades'); }),
 
                 if (botToIdsMap.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text('CLOSE BY BOT / SHARK', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text('CLOSE BY BOT / SHARK', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   const SizedBox(height: 8),
                   ...botToIdsMap.entries.map((entry) => Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
@@ -253,9 +255,9 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       onTap: () { Navigator.pop(ctx); _executeBatchClose(entry.value, 'Bot ${entry.key}'); },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.05))),
+                        decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.05))),
                         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Row(children: [const Icon(PhosphorIcons.robot, color: Colors.blueAccent, size: 16), const SizedBox(width: 8), Text(entry.key, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))]),
+                          Row(children: [const Icon(PhosphorIcons.robot, color: Colors.blueAccent, size: 16), const SizedBox(width: 8), Text(entry.key, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))]),
                           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: Text('Close ${entry.value.length}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)))
                         ]),
                       ),
@@ -271,20 +273,20 @@ class _PositionsScreenState extends State<PositionsScreen> {
     );
   }
 
-  Widget _buildBatchTile({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap, required int count}) {
+  Widget _buildBatchTile({required ThemeData theme, required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap, required int count}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: InkWell(
         onTap: count > 0 ? onTap : null,
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: count > 0 ? Colors.black38 : Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(14), border: Border.all(color: count > 0 ? color.withOpacity(0.2) : Colors.transparent)),
+          decoration: BoxDecoration(color: count > 0 ? theme.colorScheme.onSurface.withOpacity(0.05) : theme.colorScheme.onSurface.withOpacity(0.02), borderRadius: BorderRadius.circular(14), border: Border.all(color: count > 0 ? color.withOpacity(0.2) : Colors.transparent)),
           child: Row(
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(count > 0 ? 0.15 : 0.05), shape: BoxShape.circle), child: Icon(icon, color: count > 0 ? color : Colors.white24, size: 18)),
+              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withOpacity(count > 0 ? 0.15 : 0.05), shape: BoxShape.circle), child: Icon(icon, color: count > 0 ? color : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 18)),
               const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: count > 0 ? Colors.white : Colors.white38, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 2), Text(subtitle, style: TextStyle(color: count > 0 ? color : Colors.white24, fontSize: 11, fontWeight: FontWeight.bold))])),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)), child: Text('$count', style: TextStyle(color: count > 0 ? Colors.white : Colors.white38, fontWeight: FontWeight.bold, fontSize: 11))),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: count > 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 2), Text(subtitle, style: TextStyle(color: count > 0 ? color : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.bold))])),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text('$count', style: TextStyle(color: count > 0 ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), fontWeight: FontWeight.bold, fontSize: 11))),
             ],
           ),
         ),
@@ -335,7 +337,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }).toList();
   }
 
-  Widget _buildEnvChip(String label, TradeEnvironment env) {
+  Widget _buildEnvChip(String label, TradeEnvironment env, ThemeData theme) {
     final isSelected = _selectedEnv == env;
     return Expanded(
       child: GestureDetector(
@@ -343,12 +345,12 @@ class _PositionsScreenState extends State<PositionsScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? Theme.of(context).primaryColor : Colors.black26,
+            color: isSelected ? theme.primaryColor : theme.colorScheme.onSurface.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.5) : Colors.white10),
+            border: Border.all(color: isSelected ? theme.primaryColor.withOpacity(0.5) : theme.colorScheme.onSurface.withOpacity(0.1)),
           ),
           alignment: Alignment.center,
-          child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white54, fontWeight: FontWeight.bold, fontSize: 13)),
+          child: Text(label, style: TextStyle(color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13)),
         ),
       ),
     );
@@ -417,11 +419,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(children: [
-              _buildEnvChip('All Positions', TradeEnvironment.all),
+              _buildEnvChip('All Positions', TradeEnvironment.all, theme),
               const SizedBox(width: 8),
-              _buildEnvChip('Real Only', TradeEnvironment.real),
+              _buildEnvChip('Real Only', TradeEnvironment.real, theme),
               const SizedBox(width: 8),
-              _buildEnvChip('Paper Only', TradeEnvironment.paper),
+              _buildEnvChip('Paper Only', TradeEnvironment.paper, theme),
             ]),
           ),
 
@@ -432,7 +434,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                 child: Container(
                   margin: const EdgeInsets.only(left: 16, right: 8),
                   height: 48,
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white.withOpacity(0.05))),
+                  decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.05))),
                   child: TabBar(
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
@@ -445,8 +447,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
               ),
               Container(
                 margin: const EdgeInsets.only(right: 16),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.05))),
-                child: IconButton(icon: const Icon(PhosphorIcons.arrowsClockwiseBold, color: Colors.white, size: 20), onPressed: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Refreshing...'), duration: Duration(seconds: 1))); _fetchPositions(); }),
+                decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.05))),
+                child: IconButton(icon: Icon(PhosphorIcons.arrowsClockwiseBold, color: theme.colorScheme.onSurface, size: 20), onPressed: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Refreshing...'), duration: Duration(seconds: 1))); _fetchPositions(); }),
               ),
             ],
           ),
@@ -476,7 +478,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                             ),
                           Expanded(
                             child: finalOpenList.isEmpty 
-                              ? const Center(child: Text('No active open positions for selected filter.', style: TextStyle(color: Colors.white54)))
+                              ? Center(child: Text('No active open positions for selected filter.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
                               : ListView.builder(
                                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                                   itemCount: finalOpenList.length,
@@ -494,7 +496,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             // Top Level: Bot Name & Win Rate (Full Width to avoid cutting)
-                                            Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            Text(_getBotDisplayName(p), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
                                             const SizedBox(height: 8),
 
                                             Row(
@@ -516,8 +518,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             // RESTORED METRICS: Entry / Exit Mcap
                                             Row(
                                               children: [
-                                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('ENTRY MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
-                                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('LIVE MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['current_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIVE MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['current_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
                                               ],
                                             ),
                                             const SizedBox(height: 16),
@@ -525,13 +527,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             Row(
                                               children: [
                                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                                  const Text('UNREALIZED P&L', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
+                                                  Text('UNREALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
                                                   Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                                                   if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 10)),
                                                 ])),
                                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                                  const Text('TRADE SIZE', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
-                                                  Text('\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4),
+                                                  Text('\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13)),
                                                   if (currency.isNaira) Text('≈ ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold)),
                                                 ])),
                                               ],
@@ -541,9 +543,9 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             // RESTORED METRICS: Time and Date
                                             Row(
                                               children: [
-                                                const Icon(PhosphorIcons.clock, color: Colors.purpleAccent, size: 12),
+                                                Icon(PhosphorIcons.clock, color: theme.primaryColor, size: 12),
                                                 const SizedBox(width: 4),
-                                                Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                                Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                                               ],
                                             ),
                                             const SizedBox(height: 12),
@@ -579,10 +581,10 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
                                       children: [
-                                        _buildPnLBox('Today', statsToday, profToday, lossToday, currency), const SizedBox(width: 12),
-                                        _buildPnLBox('This Week', statsWeek, profWeek, lossWeek, currency), const SizedBox(width: 12),
-                                        _buildPnLBox('This Month', statsMonth, profMonth, lossMonth, currency), const SizedBox(width: 12),
-                                        _buildPnLBox('All Time', finalClosedList.length, profAll, lossAll, currency),
+                                        _buildPnLBox('Today', statsToday, profToday, lossToday, currency, theme), const SizedBox(width: 12),
+                                        _buildPnLBox('This Week', statsWeek, profWeek, lossWeek, currency, theme), const SizedBox(width: 12),
+                                        _buildPnLBox('This Month', statsMonth, profMonth, lossMonth, currency, theme), const SizedBox(width: 12),
+                                        _buildPnLBox('All Time', finalClosedList.length, profAll, lossAll, currency, theme),
                                       ],
                                     ),
                                   ),
@@ -592,11 +594,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                   SizedBox(
                                     height: 44,
                                     child: TextField(
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13),
                                       decoration: InputDecoration(
-                                        hintText: 'Search closed trades...', hintStyle: const TextStyle(color: Colors.white38),
-                                        prefixIcon: const Icon(PhosphorIcons.magnifyingGlass, color: Colors.white54, size: 18),
-                                        filled: true, fillColor: Colors.black.withOpacity(0.3), contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                                        hintText: 'Search closed trades...', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                                        prefixIcon: Icon(PhosphorIcons.magnifyingGlass, color: theme.colorScheme.onSurfaceVariant, size: 18),
+                                        filled: true, fillColor: theme.colorScheme.onSurface.withOpacity(0.05), contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                                       ),
                                       onChanged: (val) => setState(() => _closedSearchQuery = val),
@@ -609,17 +611,17 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                     scrollDirection: Axis.horizontal,
                                     child: Row(
                                       children: [
-                                        _buildFilterChip('All', _selectedClosedType == ClosedFilterType.all, () => setState(() => _selectedClosedType = ClosedFilterType.all)), const SizedBox(width: 6),
-                                        _buildFilterChip('Profits', _selectedClosedType == ClosedFilterType.profit, () => setState(() => _selectedClosedType = ClosedFilterType.profit), color: Colors.greenAccent), const SizedBox(width: 6),
-                                        _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () => setState(() => _selectedClosedType = ClosedFilterType.loss), color: Colors.redAccent), const SizedBox(width: 6),
-                                        _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () => setState(() => _selectedClosedType = ClosedFilterType.copy), color: Colors.blueAccent), const SizedBox(width: 6),
-                                        _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () => setState(() => _selectedClosedType = ClosedFilterType.manual), color: Colors.purpleAccent),
+                                        _buildFilterChip('All', _selectedClosedType == ClosedFilterType.all, () => setState(() => _selectedClosedType = ClosedFilterType.all), theme: theme), const SizedBox(width: 6),
+                                        _buildFilterChip('Profits', _selectedClosedType == ClosedFilterType.profit, () => setState(() => _selectedClosedType = ClosedFilterType.profit), color: Colors.greenAccent, theme: theme), const SizedBox(width: 6),
+                                        _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () => setState(() => _selectedClosedType = ClosedFilterType.loss), color: Colors.redAccent, theme: theme), const SizedBox(width: 6),
+                                        _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () => setState(() => _selectedClosedType = ClosedFilterType.copy), color: Colors.blueAccent, theme: theme), const SizedBox(width: 6),
+                                        _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () => setState(() => _selectedClosedType = ClosedFilterType.manual), color: Colors.purpleAccent, theme: theme),
                                         
-                                        const SizedBox(width: 12), Container(height: 20, width: 1, color: Colors.white24), const SizedBox(width: 12),
+                                        const SizedBox(width: 12), Container(height: 20, width: 1, color: theme.colorScheme.onSurface.withOpacity(0.1)), const SizedBox(width: 12),
                                         
                                         DropdownButton<String>(
-                                          value: _selectedClosedBot ?? 'All Bots', dropdownColor: const Color(0xFF13131A), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold), underline: const SizedBox(),
-                                          icon: const Icon(PhosphorIcons.caretDownBold, color: Colors.white54, size: 12),
+                                          value: _selectedClosedBot ?? 'All Bots', dropdownColor: theme.colorScheme.surface, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 11, fontWeight: FontWeight.bold), underline: const SizedBox(),
+                                          icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 12),
                                           items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Row(children: [const Icon(PhosphorIcons.robot, color: Colors.blueAccent, size: 14), const SizedBox(width: 6), Text(bot == 'All Bots' ? bot : _getBotDisplayName({'display_name': bot}))]))).toList(),
                                           onChanged: (val) => setState(() => _selectedClosedBot = (val == 'All Bots') ? null : val),
                                         ),
@@ -633,7 +635,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
                           // Monthly Grouped ListView
                           if (monthlyGroupedTrades.isEmpty)
-                            const SliverFillRemaining(child: Center(child: Text('No closed trades match your filter.', style: TextStyle(color: Colors.white54))))
+                            SliverFillRemaining(child: Center(child: Text('No closed trades match your filter.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))))
                           else
                             SliverList(
                               delegate: SliverChildBuilderDelegate(
@@ -644,12 +646,12 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                                     child: ExpansionTile(
                                       initiallyExpanded: index == 0,
-                                      iconColor: theme.primaryColor, collapsedIconColor: Colors.white54,
+                                      iconColor: theme.primaryColor, collapsedIconColor: theme.colorScheme.onSurfaceVariant,
                                       title: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(monthKey, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                          Container(margin: const EdgeInsets.only(top: 8), height: 1, width: double.infinity, color: Colors.white.withOpacity(0.1)),
+                                          Text(monthKey, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                                          Container(margin: const EdgeInsets.only(top: 8), height: 1, width: double.infinity, color: theme.colorScheme.onSurface.withOpacity(0.1)),
                                         ],
                                       ),
                                       children: trades.map((p) {
@@ -668,7 +670,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 // Top Level: Bot Name & Win Rate
-                                                Text(_getBotDisplayName(p), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                                Text(_getBotDisplayName(p), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
                                                 const SizedBox(height: 8),
 
                                                 Row(
@@ -688,16 +690,16 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 // RESTORED METRICS: Entry / Exit Mcap
                                                 Row(
                                                   children: [
-                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('ENTRY MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
-                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('EXIT MCAP', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['close_mcap']), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('EXIT MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['close_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
                                                   ],
                                                 ),
                                                 const SizedBox(height: 16),
 
                                                 Row(
                                                   children: [
-                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('REALIZED P&L', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)), if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11))])),
-                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('TRADE SIZE', style: TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)), if (currency.isNaira) Text('≈ ${currency.format(size)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('REALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)), if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? Colors.greenAccent.withOpacity(0.7) : Colors.redAccent.withOpacity(0.7), fontWeight: FontWeight.bold, fontSize: 11))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text('\$${size.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13)), if (currency.isNaira) Text('≈ ${currency.format(size)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold))])),
                                                   ],
                                                 ),
                                                 const SizedBox(height: 16),
@@ -706,7 +708,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                   children: [
-                                                    Row(children: [const Icon(PhosphorIcons.clock, color: Colors.white54, size: 12), const SizedBox(width: 4), Text(formatLagosTime(p['closed_at']), style: const TextStyle(color: Colors.white54, fontSize: 10))]),
+                                                    Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 12), const SizedBox(width: 4), Text(formatLagosTime(p['closed_at']), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10))]),
                                                     Row(children: [const Icon(PhosphorIcons.hourglassHigh, color: Colors.amberAccent, size: 12), const SizedBox(width: 4), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11))]),
                                                   ],
                                                 ),
@@ -732,27 +734,27 @@ class _PositionsScreenState extends State<PositionsScreen> {
     );
   }
 
-  Widget _buildPnLBox(String label, int totalTrades, double profitUsd, double lossUsd, CurrencyProvider currency) {
+  Widget _buildPnLBox(String label, int totalTrades, double profitUsd, double lossUsd, CurrencyProvider currency, ThemeData theme) {
     return Container(
       width: 260,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.05))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)), child: Text('$totalTrades Trades', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
+              Text(label.toUpperCase(), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.onSurface.withOpacity(0.1), borderRadius: BorderRadius.circular(6)), child: Text('$totalTrades Trades', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 9, fontWeight: FontWeight.bold))),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Total Profit', style: TextStyle(color: Colors.white38, fontSize: 10)), const SizedBox(height: 2), Text('+\$${profitUsd.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ +${currency.format(profitUsd)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
-              Container(width: 1, height: 30, color: Colors.white10, margin: const EdgeInsets.symmetric(horizontal: 12)),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Total Loss', style: TextStyle(color: Colors.white38, fontSize: 10)), const SizedBox(height: 2), Text('-\$${lossUsd.abs().toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ -${currency.format(lossUsd.abs())}', style: TextStyle(color: Colors.redAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Profit', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10)), const SizedBox(height: 2), Text('+\$${profitUsd.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ +${currency.format(profitUsd)}', style: TextStyle(color: Colors.greenAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
+              Container(width: 1, height: 30, color: theme.colorScheme.onSurface.withOpacity(0.1), margin: const EdgeInsets.symmetric(horizontal: 12)),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Total Loss', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10)), const SizedBox(height: 2), Text('-\$${lossUsd.abs().toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 15)), if (currency.isNaira) Text('≈ -${currency.format(lossUsd.abs())}', style: TextStyle(color: Colors.redAccent.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold))])),
             ],
           ),
         ],
@@ -760,14 +762,14 @@ class _PositionsScreenState extends State<PositionsScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap, {Color? color}) {
-    final activeColor = color ?? Theme.of(context).primaryColor;
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap, {Color? color, required ThemeData theme}) {
+    final activeColor = color ?? theme.primaryColor;
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: isSelected ? activeColor.withOpacity(0.2) : Colors.black26, border: Border.all(color: isSelected ? activeColor : Colors.white10), borderRadius: BorderRadius.circular(10)),
-        child: Text(label, style: TextStyle(color: isSelected ? activeColor : Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(color: isSelected ? activeColor.withOpacity(0.2) : theme.colorScheme.onSurface.withOpacity(0.05), border: Border.all(color: isSelected ? activeColor : theme.colorScheme.onSurface.withOpacity(0.1)), borderRadius: BorderRadius.circular(10)),
+        child: Text(label, style: TextStyle(color: isSelected ? activeColor : theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
       ),
     );
   }
