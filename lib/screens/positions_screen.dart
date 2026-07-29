@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
-import 'history_screen.dart'; // Import the new screen
+import 'history_screen.dart'; 
 
 enum TradeEnvironment { all, real, paper }
 
@@ -19,6 +19,7 @@ class PositionsScreen extends StatefulWidget {
 
 class _PositionsScreenState extends State<PositionsScreen> {
   bool _isLoading = true;
+  bool _isManualRefreshing = false;
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
 
@@ -274,6 +275,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
+    final isAdmin = context.read<ApiService>().role == 'admin';
+
     final finalOpenList = _openPositions.where(_passesEnvFilter).toList();
 
     return Scaffold(
@@ -284,6 +287,17 @@ class _PositionsScreenState extends State<PositionsScreen> {
         title: Text('OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
         centerTitle: false,
         actions: [
+          // The new small inline refresh button (no page pull-to-refresh)
+          IconButton(
+            icon: _isManualRefreshing 
+                ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor))
+                : Icon(PhosphorIcons.arrowsClockwiseBold, color: theme.colorScheme.onSurface, size: 20),
+            onPressed: _isManualRefreshing ? null : () async {
+              setState(() => _isManualRefreshing = true);
+              await _fetchPositions(silent: true);
+              if (mounted) setState(() => _isManualRefreshing = false);
+            },
+          ),
           Container(
             margin: const EdgeInsets.only(right: 16),
             child: ElevatedButton.icon(
@@ -344,15 +358,30 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
 
                       // SHARK NAME & BOT BADGE LOGIC
-                      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
-                      final sharkName = isCopy ? p['wallet_label'].toString() : 'Manual Trade';
+                      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
-                      final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                      String botBadgeText = 'System Bot';
-                      if (botIdRaw != null && botIdRaw.isNotEmpty) {
-                         botBadgeText = 'System Bot ${botIdRaw.padLeft(2, '0')}';
-                      } else if (p['display_name'] != null && p['display_name'].toString().isNotEmpty) {
-                         botBadgeText = p['display_name'].toString();
+                      String mainTitle = 'Manual Trade';
+                      String? adminBadge;
+
+                      if (isCopy) {
+                         String display = p['display_name']?.toString() ?? '';
+                         String label = p['wallet_label']?.toString() ?? '';
+                         
+                         if (display.isEmpty) {
+                            final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                            if (botIdRaw != null && botIdRaw.isNotEmpty) {
+                               display = 'System Bot ${botIdRaw.padLeft(2, '0')}';
+                            } else {
+                               display = 'System Bot';
+                            }
+                         }
+
+                         if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                            mainTitle = label;
+                            adminBadge = '🤖 $display';
+                         } else {
+                            mainTitle = display; // Users only see "System Bot 02"
+                         }
                       }
 
                       return Padding(
@@ -362,18 +391,18 @@ class _PositionsScreenState extends State<PositionsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Shark Name + System Bot Badge
+                              // Identity & Badges
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Text(sharkName, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
-                                  if (isCopy)
+                                  Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  if (adminBadge != null)
                                     Padding(
                                       padding: const EdgeInsets.only(left: 8.0),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.blueAccent.withOpacity(0.2))),
-                                        child: Text('🤖 $botBadgeText', style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        child: Text(adminBadge, style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
                                 ],

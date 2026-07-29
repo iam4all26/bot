@@ -61,11 +61,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // --- Helpers & Logic --- //
 
   Map<String, double> get _botWinRates {
+    final isAdmin = context.read<ApiService>().role == 'admin';
     Map<String, int> totals = {};
     Map<String, int> wins = {};
 
     for (var p in _closedPositions) {
-      final name = p['wallet_label'] ?? 'Manual';
+      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
+      String name = 'Manual Trade';
+      
+      if (isCopy) {
+        if (isAdmin) {
+          name = p['wallet_label']?.toString() ?? 'Unknown';
+        } else {
+          name = p['display_name']?.toString() ?? '';
+          if (name.isEmpty) {
+             final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+             name = botIdRaw != null && botIdRaw.isNotEmpty ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+          }
+        }
+      }
+
       final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
       final isWin = pnl > 0 || p['close_reason'] == 'TP_HIT';
 
@@ -156,7 +171,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final query = _closedSearchQuery.toLowerCase();
         final addr = (p['token_address'] ?? '').toString().toLowerCase();
         final label = (p['wallet_label'] ?? '').toString().toLowerCase();
-        if (!addr.contains(query) && !label.contains(query)) return false;
+        final display = (p['display_name'] ?? '').toString().toLowerCase();
+        if (!addr.contains(query) && !label.contains(query) && !display.contains(query)) return false;
       }
 
       final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
@@ -168,7 +184,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (_selectedClosedType == ClosedFilterType.manual && isCopy) return false;
 
       if (_selectedClosedBot != null && _selectedClosedBot != 'All Bots') {
-        final rawDisplay = p['wallet_label'] ?? 'Manual';
+        final isAdmin = context.read<ApiService>().role == 'admin';
+        String rawDisplay = 'Manual Trade';
+        if (isCopy) {
+           rawDisplay = isAdmin 
+              ? (p['wallet_label']?.toString() ?? 'Unknown') 
+              : (p['display_name']?.toString() ?? '');
+           if (rawDisplay.isEmpty && !isAdmin) {
+             final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+             rawDisplay = botIdRaw != null && botIdRaw.isNotEmpty ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+           }
+        }
         if (rawDisplay != _selectedClosedBot) return false;
       }
 
@@ -251,6 +277,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
+    final isAdmin = context.read<ApiService>().role == 'admin';
 
     final finalClosedList = _filteredClosedPositions;
 
@@ -295,8 +322,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final Set<String> uniqueBots = {'All Bots'};
     for (var p in _closedPositions) {
-      final name = p['wallet_label'] ?? 'Manual';
-      if (name.toString().isNotEmpty) uniqueBots.add(name);
+      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
+      if (isCopy) {
+         if (isAdmin) {
+             uniqueBots.add(p['wallet_label'].toString());
+         } else {
+             String display = p['display_name']?.toString() ?? '';
+             if (display.isEmpty) {
+                 final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                 display = botIdRaw != null && botIdRaw.isNotEmpty ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+             }
+             uniqueBots.add(display);
+         }
+      }
     }
 
     return Scaffold(
@@ -413,20 +451,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     Color badgeColor = p['close_reason'] == 'TP_HIT' ? Colors.greenAccent : (p['close_reason'] == 'SL_HIT' ? Colors.redAccent : Colors.blueAccent);
 
                                     // SHARK NAME & BOT BADGE LOGIC
-                                    final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
-                                    final sharkName = isCopy ? p['wallet_label'].toString() : 'Manual Trade';
+                                    final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                                     
+                                    String mainTitle = 'Manual Trade';
+                                    String? adminBadge;
                                     String winRateText = '';
-                                    if (isCopy && _botWinRates.containsKey(sharkName)) {
-                                      winRateText = ' • ${_botWinRates[sharkName]!.toStringAsFixed(1)}% Win Rate';
-                                    }
 
-                                    final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                                    String botBadgeText = 'System Bot';
-                                    if (botIdRaw != null && botIdRaw.isNotEmpty) {
-                                       botBadgeText = 'System Bot ${botIdRaw.padLeft(2, '0')}';
-                                    } else if (p['display_name'] != null && p['display_name'].toString().isNotEmpty) {
-                                       botBadgeText = p['display_name'].toString();
+                                    if (isCopy) {
+                                       String display = p['display_name']?.toString() ?? '';
+                                       String label = p['wallet_label']?.toString() ?? '';
+                                       
+                                       if (display.isEmpty) {
+                                          final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                                          if (botIdRaw != null && botIdRaw.isNotEmpty) {
+                                             display = 'System Bot ${botIdRaw.padLeft(2, '0')}';
+                                          } else {
+                                             display = 'System Bot';
+                                          }
+                                       }
+
+                                       if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                                          mainTitle = label;
+                                          adminBadge = '🤖 $display';
+                                          if (_botWinRates.containsKey(label)) {
+                                             winRateText = ' • ${_botWinRates[label]!.toStringAsFixed(1)}% Win Rate';
+                                          }
+                                       } else {
+                                          mainTitle = display; // Users only see "System Bot 02"
+                                          if (_botWinRates.containsKey(display)) {
+                                             winRateText = ' • ${_botWinRates[display]!.toStringAsFixed(1)}% Win Rate';
+                                          }
+                                       }
                                     }
 
                                     return Padding(
@@ -436,18 +491,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            // Shark Name + Win Rate
+                                            // Shark Name + System Bot Badge
                                             Row(
                                               crossAxisAlignment: CrossAxisAlignment.center,
                                               children: [
-                                                Text('$sharkName$winRateText', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
-                                                if (isCopy)
+                                                Text('$mainTitle$winRateText', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                                if (adminBadge != null)
                                                   Padding(
                                                     padding: const EdgeInsets.only(left: 8.0),
                                                     child: Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                       decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.blueAccent.withOpacity(0.2))),
-                                                      child: Text('🤖 $botBadgeText', style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                      child: Text(adminBadge, style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                                     ),
                                                   ),
                                               ],
@@ -468,6 +523,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             ),
                                             const SizedBox(height: 16),
                                             
+                                            // RESTORED METRICS: Entry / Exit Mcap
                                             Row(
                                               children: [
                                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 1)), const SizedBox(height: 4), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13))])),
@@ -484,6 +540,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             ),
                                             const SizedBox(height: 16),
 
+                                            // RESTORED METRICS: Time and Date
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
