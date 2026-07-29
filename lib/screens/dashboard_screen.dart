@@ -303,7 +303,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme),
                 _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Positions', 1, theme),
-                const SizedBox(width: 48), // The "hole" for the FAB
+                const SizedBox(width: 48), // The notch space
                 if (isAdmin) _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 2, theme),
                 _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', isAdmin ? 3 : 2, theme),
               ],
@@ -436,6 +436,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 18)),
+                      // RESTORED NAIRA PNL IN DASHBOARD
+                      if (currency.isNaira)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('≈ ${isProfit && dailyPnl > 0 ? '+' : ''}${currency.format(dailyPnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: isProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
                     ]
                   ),
                 )
@@ -560,7 +566,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 4.0),
-                      child: Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                          if (currency.isNaira)
+                            Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 11, color: AppTheme.success(context).withOpacity(0.8))),
+                        ],
+                      ),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -573,6 +586,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
                             ),
+                            if (currency.isNaira && cpnl != null)
+                              Text(
+                                '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8)),
+                              ),
                           ],
                         ),
                         const SizedBox(width: 12),
@@ -592,7 +610,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 80), // Extra Padding for FAB and Nav
+          const SizedBox(height: 80), 
         ],
       ),
     );
@@ -638,6 +656,9 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   double _activeRate = 1500.0;
   bool _isInitialized = false;
 
+  String _usdWords = "";
+  String _ngnWords = "";
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -651,6 +672,43 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     }
   }
 
+  // RESTORED WORD CONVERTER FOR CALCULATOR
+  String _numberToWords(int number) {
+    if (number == 0) return "Zero";
+    if (number < 0) return "Minus ${_numberToWords(number.abs())}";
+    String words = "";
+    if ((number / 1000000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000000).floor())} Billion ";
+      number %= 1000000000;
+    }
+    if ((number / 1000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000).floor())} Million ";
+      number %= 1000000;
+    }
+    if ((number / 1000).floor() > 0) {
+      words += "${_numberToWords((number / 1000).floor())} Thousand ";
+      number %= 1000;
+    }
+    if ((number / 100).floor() > 0) {
+      words += "${_numberToWords((number / 100).floor())} Hundred ";
+      number %= 100;
+    }
+    if (number > 0) {
+      if (words != "") words += "and ";
+      var unitsMap = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      var tensMap = ["Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+      if (number < 20) {
+        words += unitsMap[number];
+      } else {
+        words += tensMap[(number / 10).floor()];
+        if ((number % 10) > 0) {
+          words += "-${unitsMap[number % 10]}";
+        }
+      }
+    }
+    return words.trim();
+  }
+
   String _formatWithCommas(String text) {
     List<String> parts = text.split('.');
     RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
@@ -659,16 +717,35 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     return parts.length > 1 ? '$whole.${parts[1]}' : whole;
   }
 
+  void _updateWords() {
+    double usd = double.tryParse(_usdController.text.replaceAll(',', '')) ?? 0;
+    double ngn = double.tryParse(_ngnController.text.replaceAll(',', '')) ?? 0;
+    setState(() {
+      _usdWords = usd > 0 ? '${_numberToWords(usd.floor())} Dollars' : '';
+      _ngnWords = ngn > 0 ? '${_numberToWords(ngn.floor())} Naira' : '';
+    });
+  }
+
   void _onUsdChanged(String value) {
-    if (value.isEmpty) { _ngnController.clear(); return; }
+    if (value.isEmpty) { 
+      _ngnController.clear(); 
+      _updateWords();
+      return; 
+    }
     double usd = double.tryParse(value.replaceAll(',', '')) ?? 0;
     _ngnController.text = _formatWithCommas((usd * _activeRate).toStringAsFixed(2));
+    _updateWords();
   }
 
   void _onNgnChanged(String value) {
-    if (value.isEmpty) { _usdController.clear(); return; }
+    if (value.isEmpty) { 
+      _usdController.clear(); 
+      _updateWords();
+      return; 
+    }
     double ngn = double.tryParse(value.replaceAll(',', '')) ?? 0;
     if (_activeRate > 0) _usdController.text = _formatWithCommas((ngn / _activeRate).toStringAsFixed(2));
+    _updateWords();
   }
 
   @override
@@ -729,6 +806,11 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
               ),
               onChanged: _onUsdChanged,
             ),
+            if (_usdWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Text(_usdWords, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontStyle: FontStyle.italic)),
+              ),
             
             const SizedBox(height: 16),
             Center(child: Icon(PhosphorIcons.arrowsDownUp, color: theme.colorScheme.onSurfaceVariant, size: 24)),
@@ -754,6 +836,11 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
               ),
               onChanged: _onNgnChanged,
             ),
+            if (_ngnWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Text(_ngnWords, style: TextStyle(color: AppTheme.success(context), fontSize: 11, fontStyle: FontStyle.italic)),
+              ),
           ],
         ),
       ),
