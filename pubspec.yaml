@@ -19,6 +19,8 @@ dependencies:
   firebase_messaging: any
   flutter_local_notifications: any
   shared_preferences: any
+  share_plus: ^10.0.0
+  path_provider: ^2.1.3
 
 dev_dependencies:
   flutter_test:
