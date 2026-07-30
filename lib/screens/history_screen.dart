@@ -74,10 +74,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       
       if (isCopy) {
         if (isAdmin) {
-          name = p['wallet_label']?.toString() ?? 'Unknown';
+          name = p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN';
         } else {
           final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-          name = botIdRaw != null && botIdRaw.isNotEmpty ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+          name = botIdRaw != null && botIdRaw.isNotEmpty ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
         }
       }
 
@@ -132,8 +132,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         String rawDisplay = 'Manual Trade';
         if (isCopy) {
            rawDisplay = isAdmin 
-              ? (p['wallet_label']?.toString() ?? 'Unknown') 
-              : ((p['tracked_wallet_id']?.toString() != null) ? 'System Bot ${p['tracked_wallet_id'].toString().padLeft(2, '0')}' : 'System Bot');
+              ? (p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN') 
+              : ((p['tracked_wallet_id']?.toString() != null) ? 'Bot ${p['tracked_wallet_id'].toString().padLeft(2, '0')}' : 'Bot');
         }
         if (rawDisplay != _selectedClosedBot) passBot = false;
       }
@@ -324,10 +324,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
       if (isCopy) {
          if (isAdmin) {
-             uniqueBots.add(p['wallet_label'].toString());
+             uniqueBots.add(p['wallet_label'].toString().toUpperCase()); // FIX: Admin sees ALL CAPS
          } else {
              final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-             String display = botIdRaw != null && botIdRaw.isNotEmpty ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+             String display = botIdRaw != null && botIdRaw.isNotEmpty ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot'; // FIX: Bot 01
              uniqueBots.add(display);
          }
       }
@@ -376,7 +376,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               const SizedBox(height: 24),
                               
-                              // FIXED OVERLAP: Using explicit height containment
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: SizedBox(
@@ -399,7 +398,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               const SizedBox(height: 16),
                               
-                              // PROMINENT BOT FILTER DISPLAY
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: Container(
@@ -489,20 +487,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               String winRateText = '';
 
                               if (isCopy) {
-                                 String label = p['wallet_label']?.toString() ?? ''; 
+                                 String label = p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN'; 
                                  final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                                 final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
+                                 final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
 
-                                 if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                                 if (isAdmin && label.isNotEmpty && label != 'MANUAL') {
                                     mainTitle = label; 
                                     adminBadge = '🤖 $sysBotName'; 
                                     if (_winRates.containsKey(label)) {
-                                       winRateText = ' • ${_winRates[label]!.toStringAsFixed(1)}% Win';
+                                       winRateText = ' • ${_winRates[label]!.toStringAsFixed(1)}%'; // FIX: NO "WIN"
                                     }
                                  } else {
                                     mainTitle = sysBotName; 
                                     if (_winRates.containsKey(sysBotName)) {
-                                       winRateText = ' • ${_winRates[sysBotName]!.toStringAsFixed(1)}% Win';
+                                       winRateText = ' • ${_winRates[sysBotName]!.toStringAsFixed(1)}%'; // FIX: NO "WIN"
                                     }
                                  }
                               }
@@ -517,7 +515,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          Text('$mainTitle$winRateText', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                          Text('$mainTitle', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                          if (winRateText.isNotEmpty)
+                                            Text(winRateText, style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
                                           if (adminBadge != null)
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8.0),

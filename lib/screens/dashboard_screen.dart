@@ -8,6 +8,7 @@ import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/solana_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';
 import 'admin_screen.dart';
@@ -90,7 +91,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: isError ? AppTheme.danger(context) : theme.primaryColor,
         behavior: SnackBarBehavior.floating,
-        // Explicitly hovering ABOVE the Action Hub
         margin: const EdgeInsets.only(bottom: 100, left: 24, right: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
@@ -288,7 +288,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBody: true, // Prevents FAB jumping
+        extendBody: true, 
         resizeToAvoidBottomInset: false,
         body: AnimatedCryptoBackground(
           child: SafeArea(bottom: false, child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
@@ -302,9 +302,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              // Natural blended gradient (no harsh stops)
               gradient: const LinearGradient(
                 colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
+                stops: [0.75, 1.0], 
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -373,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle, 
-                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold])
+                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold], stops: [0.75, 1.0])
                       ),
                       child: CircleAvatar(radius: 20, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface, size: 20)),
                     ),
@@ -424,6 +424,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           GlassCard(
             hasBubbles: true,
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -447,10 +448,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: 24, height: 24,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      child: const Padding(
-                        padding: EdgeInsets.only(bottom: 2.0),
-                        child: Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 14, height: 1.0, fontWeight: FontWeight.bold)),
-                      ),
+                      // PROPER SOLANA ICON RESTORED
+                      child: const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple),
                     ),
                     const SizedBox(width: 8),
                     Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -479,6 +478,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 18)),
+                      // RESTORED NAIRA PNL STRING
                       if (currency.isNaira)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -714,6 +714,7 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     }
   }
 
+  // RESTORED WORD CONVERTER FOR CALCULATOR
   String _numberToWords(int number) {
     if (number == 0) return "Zero";
     if (number < 0) return "Minus ${_numberToWords(number.abs())}";
