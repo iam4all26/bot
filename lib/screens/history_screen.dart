@@ -8,6 +8,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_background.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pnl_share_dialog.dart'; // NEW SHARE MODULE
 
 enum ClosedFilterType { all, profit, loss, copy, manual }
 enum DateRangeFilter { allTime, today, last7Days, last30Days }
@@ -70,9 +71,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     Map<String, int> wins = {};
     for (var p in _closedPositions) {
       String name = p['display_name'] ?? 'Manual';
-      if (isAdmin && name != 'Manual') {
-         name = name.toUpperCase();
-      }
+      if (isAdmin && name != 'Manual') name = name.toUpperCase();
 
       final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
       final isWin = pnl > 0 || p['close_reason'] == 'TP_HIT';
@@ -470,7 +469,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               
                               String winRateText = '';
                               if (_winRates.containsKey(mainTitle)) {
-                                  winRateText = ' • ${_winRates[mainTitle]!.toStringAsFixed(1)}%'; // JUST PERCENTAGE
+                                  winRateText = ' • ${_winRates[mainTitle]!.toStringAsFixed(1)}%';
                               }
 
                               return Padding(
@@ -493,9 +492,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          InkWell(
-                                            onTap: () => _launchDexScreener(p['token_address'] ?? ''), 
-                                            child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
+                                          Row(
+                                            children: [
+                                              InkWell(
+                                                onTap: () => _launchDexScreener(p['token_address'] ?? ''), 
+                                                child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
+                                              ),
+                                              const SizedBox(width: 16),
+                                              // NEW SHARE BUTTON INJECTED HERE
+                                              InkWell(
+                                                onTap: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (_) => PnlShareDialog(tradeData: p, isAdmin: isAdmin),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(PhosphorIcons.shareNetwork, color: theme.colorScheme.onSurfaceVariant, size: 14), 
+                                                      const SizedBox(width: 6), 
+                                                      Text('Share', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold))
+                                                    ]
+                                                  ),
+                                                ),
+                                              ),
+                                            ]
                                           ),
                                           Row(
                                             children: [
