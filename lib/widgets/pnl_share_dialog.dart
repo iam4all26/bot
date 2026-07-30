@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
@@ -275,36 +276,33 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   }
 }
 
-// Draws the sharp diagonal background split similar to Trojan
-class _ReceiptBackgroundPainter extends CustomPainter {
-  final Color accentColor;
-  _ReceiptBackgroundPainter({required this.accentColor});
+class _DiagonalPainter extends CustomPainter {
+  final Color color;
+  _DiagonalPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw subtle diagonal light fill on the left
-    final paintAccent = Paint()
-      ..color = accentColor.withOpacity(0.08)
+    final paint = Paint()
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width * 0.55, 0)
-      ..lineTo(size.width * 0.40, size.height)
-      ..lineTo(0, size.height)
+      ..moveTo(size.width * 0.45, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(size.width * 0.35, size.height)
       ..close();
 
-    canvas.drawPath(path, paintAccent);
+    canvas.drawPath(path, paint);
 
-    // 2. Draw the sharp division line
     final paintLine = Paint()
       ..color = Colors.white.withOpacity(0.15)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
     
     final linePath = Path()
-      ..moveTo(size.width * 0.55, 0)
-      ..lineTo(size.width * 0.40, size.height);
+      ..moveTo(size.width * 0.45, 0)
+      ..lineTo(size.width * 0.35, size.height);
 
     canvas.drawPath(linePath, paintLine);
   }
