@@ -29,7 +29,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     setState(() => _isSharing = true);
     try {
       RenderRepaintBoundary boundary = _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      // Capture at 2.0 ratio for crisp 1200x630 equivalent output
       ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       
@@ -95,10 +94,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
     final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / SOL';
 
-    // Cinematic Receipt Canvas Dimensions
-    const double canvasWidth = 600;
-    const double canvasHeight = 315;
-
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -106,166 +101,177 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. The Hidden High-Res Canvas
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: InteractiveViewer(
-              panEnabled: false,
-              boundaryMargin: EdgeInsets.zero,
-              minScale: 1.0,
-              maxScale: 1.0,
-              child: RepaintBoundary(
-                key: _globalKey,
-                child: Container(
-                  width: canvasWidth,
-                  height: canvasHeight,
-                  color: const Color(0xFF09090E), // Deep Void Background
-                  child: Stack(
-                    children: [
-                      // Diagonal Background Accent
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _ReceiptBackgroundPainter(
-                            accentColor: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          // FittedBox ensures the 600x315 canvas scales down onto phone screens without distortion
+          FittedBox(
+            fit: BoxFit.contain,
+            child: RepaintBoundary(
+              key: _globalKey,
+              child: Container(
+                width: 580,
+                height: 310,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0B18), // Deep Void Background
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isProfit ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFEF4444).withOpacity(0.4), width: 2),
+                ),
+                child: Stack(
+                  children: [
+                    // Diagonal Background Accent
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _ReceiptBackgroundPainter(
+                          accentColor: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+
+                    // Character Graphic (Chad / Wojak)
+                    // Offset further left (-50) and bounded width so PNG padding doesn't overlap text
+                    Positioned(
+                      left: -50,
+                      bottom: -20,
+                      child: Image.asset(
+                        isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
+                        width: 320,
+                        height: 320,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+
+                    // Metrics Panel (Right Side)
+                    Positioned(
+                      right: 28,
+                      top: 24,
+                      bottom: 24,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // Header Branding
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(color: AppTheme.kainuwaPurple.withOpacity(0.2), shape: BoxShape.circle),
+                                child: const SolanaIcon(size: 16, color: AppTheme.kainuwaPurple),
+                              ),
+                              const SizedBox(width: 10),
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('KAINUWA', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
+                                  Text('ON SOLANA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                ],
+                              )
+                            ],
                           ),
-                        ),
-                      ),
+                          
+                          const Spacer(),
 
-                      // Character Graphic (Chad / Wojak)
-                      Positioned(
-                        left: -10,
-                        bottom: -10,
-                        child: Image.asset(
-                          isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                          width: 320,
-                          height: 320,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                          // Pair Name
+                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                          
+                          const SizedBox(height: 4),
 
-                      // Metrics Panel (Right Side)
-                      Positioned(
-                        right: 32,
-                        top: 32,
-                        bottom: 32,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // Header Branding
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(color: AppTheme.kainuwaPurple.withOpacity(0.2), shape: BoxShape.circle),
-                                  child: const SolanaIcon(size: 16, color: AppTheme.kainuwaPurple),
-                                ),
-                                const SizedBox(width: 8),
-                                const Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('KAINUWA', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
-                                    Text('ON SOLANA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                                  ],
-                                )
-                              ],
-                            ),
-                            
-                            const Spacer(),
-
-                            // Main PNL Metrics
-                            Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                            Text('${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 64, fontWeight: FontWeight.w900, height: 1.1)),
-                            
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
-                                const SizedBox(width: 6),
-                                Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
-                              ]
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // Investment Data
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                                    const SizedBox(height: 2),
-                                    Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                                    if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                                  ]
-                                ),
-                                const SizedBox(width: 32),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text('Current Gain', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.8) : const Color(0xFFEF4444).withOpacity(0.8), fontSize: 12)),
-                                    const SizedBox(height: 2),
-                                    Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.bold)),
-                                    if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.6) : const Color(0xFFEF4444).withOpacity(0.6), fontSize: 11)),
-                                  ]
-                                ),
-                              ]
-                            ),
-
-                            const Spacer(),
-
-                            // Footer Branding
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                    Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                const SizedBox(width: 12),
-                                // QR Code Placeholder Graphic
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  color: Colors.white,
-                                  child: const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 28),
-                                )
-                              ],
+                          // Percentage Gain/Loss (Balanced to 38px to avoid collisions)
+                          Text(
+                            '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
+                            style: TextStyle(
+                              color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
+                              fontSize: 38, 
+                              fontWeight: FontWeight.w900, 
+                              height: 1.1
                             )
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
+                          ),
+                          
+                          const SizedBox(height: 4),
+
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
+                              const SizedBox(width: 6),
+                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
+                            ]
+                          ),
+
+                          const Spacer(),
+
+                          // Invested vs Current Gain metrics
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                  const SizedBox(height: 2),
+                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                ]
+                              ),
+                              const SizedBox(width: 28),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 2),
+                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 15, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
+                                ]
+                              ),
+                            ]
+                          ),
+
+                          const Spacer(),
+
+                          // Footer
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+                                child: const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 24),
+                              )
+                            ],
+                          )
+                        ],
+                      ),
+                    )
+                  ],
                 ),
               ),
             ),
           ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           
-          // 2. The User Interaction Buttons
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.kainuwaPurple,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: _isSharing ? null : _captureAndShare,
               icon: _isSharing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
-              label: Text(_isSharing ? 'GENERATING RECEIPT...' : 'SHARE RECEIPT', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+              label: Text(_isSharing ? 'GENERATING...' : 'SHARE RECEIPT', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
@@ -276,14 +282,12 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   }
 }
 
-// Draws the sharp diagonal background split similar to Trojan
 class _ReceiptBackgroundPainter extends CustomPainter {
   final Color accentColor;
   _ReceiptBackgroundPainter({required this.accentColor});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw subtle diagonal light fill on the left
     final paintAccent = Paint()
       ..color = accentColor.withOpacity(0.08)
       ..style = PaintingStyle.fill;
@@ -297,9 +301,8 @@ class _ReceiptBackgroundPainter extends CustomPainter {
 
     canvas.drawPath(path, paintAccent);
 
-    // 2. Draw the sharp division line
     final paintLine = Paint()
-      ..color = Colors.white.withOpacity(0.15)
+      ..color = Colors.white.withOpacity(0.12)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
     

@@ -8,7 +8,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_background.dart';
 import '../theme/app_theme.dart';
-import '../widgets/pnl_share_dialog.dart'; // NEW SHARE MODULE
+import '../widgets/pnl_share_dialog.dart';
 
 enum ClosedFilterType { all, profit, loss, copy, manual }
 enum DateRangeFilter { allTime, today, last7Days, last30Days }
@@ -479,47 +479,55 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      // ROW 1: TITLE + WIN % ON LEFT, SHARE BUTTON ON FAR RIGHT
                                       Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          Text('$mainTitle', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
-                                          if (winRateText.isNotEmpty)
-                                            Text(winRateText, style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
+                                          Row(
+                                            children: [
+                                              Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                                              if (winRateText.isNotEmpty)
+                                                Text(winRateText, style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
+                                            ],
+                                          ),
+                                          // TOP-RIGHT SHARE BUTTON
+                                          InkWell(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => PnlShareDialog(tradeData: p, isAdmin: isAdmin),
+                                              );
+                                            },
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: theme.primaryColor.withOpacity(0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
+                                                  const SizedBox(width: 4), 
+                                                  Text('Share', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 12),
 
+                                      // ROW 2: ADDRESS ON LEFT, BADGES ON RIGHT
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            children: [
-                                              InkWell(
-                                                onTap: () => _launchDexScreener(p['token_address'] ?? ''), 
-                                                child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
-                                              ),
-                                              const SizedBox(width: 16),
-                                              // NEW SHARE BUTTON INJECTED HERE
-                                              InkWell(
-                                                onTap: () {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder: (_) => PnlShareDialog(tradeData: p, isAdmin: isAdmin),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)),
-                                                  child: Row(
-                                                    children: [
-                                                      Icon(PhosphorIcons.shareNetwork, color: theme.colorScheme.onSurfaceVariant, size: 14), 
-                                                      const SizedBox(width: 6), 
-                                                      Text('Share', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold))
-                                                    ]
-                                                  ),
-                                                ),
-                                              ),
-                                            ]
+                                          InkWell(
+                                            onTap: () => _launchDexScreener(p['token_address'] ?? ''), 
+                                            child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
                                           ),
                                           Row(
                                             children: [
