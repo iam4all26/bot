@@ -83,11 +83,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _fetchDashboardData(silent: true);
   }
 
+  void _showFloatingSnackbar(String message, {bool isError = false}) {
+    final theme = Theme.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: isError ? AppTheme.danger(context) : theme.colorScheme.onSurface,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 100, left: 24, right: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _quickClosePosition(int id) async {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Closing trade...'), duration: Duration(seconds: 1)));
+    _showFloatingSnackbar('Closing trade...');
     final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': id});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action complete')));
+      _showFloatingSnackbar(res['message'] ?? 'Action complete', isError: res['status'] != 'success');
       _fetchDashboardData(silent: true);
     }
   }
@@ -108,14 +122,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(title, style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold)),
         content: Text(content, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CLOSE TRADES'),
+            child: const Text('YES, CLOSE', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -272,7 +287,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBody: true, // Prevents FAB jumping and lets background flow under Notch
+        extendBody: true, // Crucial for floating FAB over BottomAppBar
+        resizeToAvoidBottomInset: false, // Prevents keyboard/snackbar shifting
         body: AnimatedCryptoBackground(
           child: SafeArea(bottom: false, child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
         ),
@@ -287,7 +303,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               shape: BoxShape.circle,
               gradient: const LinearGradient(
                 colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
-                stops: [0.0, 0.9], // Tuned balance
+                stops: [0.75, 1.0], // Properly weighted to purple
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
               boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 4))],
             ),
@@ -299,8 +317,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: theme.colorScheme.surface,
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
-          elevation: isDark ? 10 : 4, // Softened Light Mode Shadow
-          shadowColor: Colors.black.withOpacity(isDark ? 0.5 : 0.05), // Removed muddy black rings
+          elevation: isDark ? 10 : 0, 
+          shadowColor: Colors.black.withOpacity(isDark ? 0.5 : 0.0),
           child: SizedBox(
             height: 64,
             child: Row(
@@ -340,7 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: theme.primaryColor,
       backgroundColor: theme.colorScheme.surface,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120), // Extra padding for Notch
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -354,7 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle, 
-                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold], stops: [0.0, 0.9])
+                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold], stops: [0.75, 1.0])
                       ),
                       child: CircleAvatar(radius: 20, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface, size: 20)),
                     ),
@@ -385,7 +403,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () {
               if (_publicAddress != 'No Wallet Connected' && _publicAddress != 'Loading...') {
                 Clipboard.setData(ClipboardData(text: _publicAddress));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Wallet address copied!')));
+                _showFloatingSnackbar('Wallet address copied!');
               }
             },
             borderRadius: BorderRadius.circular(16),
@@ -405,6 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           GlassCard(
             hasBubbles: true,
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -425,11 +444,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(4),
+                      width: 24, height: 24,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      child: const Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 10, fontWeight: FontWeight.bold)),
+                      child: const Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 14, height: 1.0, fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
