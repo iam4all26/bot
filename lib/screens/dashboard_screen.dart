@@ -87,12 +87,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final theme = Theme.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: isError ? AppTheme.danger(context) : theme.colorScheme.onSurface,
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: isError ? AppTheme.danger(context) : theme.primaryColor,
         behavior: SnackBarBehavior.floating,
+        // Explicitly hovering ABOVE the Action Hub
         margin: const EdgeInsets.only(bottom: 100, left: 24, right: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -287,8 +288,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBody: true, // Crucial for floating FAB over BottomAppBar
-        resizeToAvoidBottomInset: false, // Prevents keyboard/snackbar shifting
+        extendBody: true, // Prevents FAB jumping
+        resizeToAvoidBottomInset: false,
         body: AnimatedCryptoBackground(
           child: SafeArea(bottom: false, child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
         ),
@@ -301,9 +302,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              // Natural blended gradient (no harsh stops)
               gradient: const LinearGradient(
                 colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
-                stops: [0.75, 1.0], // Properly weighted to purple
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -372,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle, 
-                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold], stops: [0.75, 1.0])
+                        gradient: LinearGradient(colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold])
                       ),
                       child: CircleAvatar(radius: 20, backgroundColor: theme.colorScheme.surface, child: Icon(PhosphorIcons.userFill, color: theme.colorScheme.onSurface, size: 20)),
                     ),
@@ -423,7 +424,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           GlassCard(
             hasBubbles: true,
-            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -447,7 +447,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       width: 24, height: 24,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      child: const Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 14, height: 1.0, fontWeight: FontWeight.bold)),
+                      child: const Padding(
+                        padding: EdgeInsets.only(bottom: 2.0),
+                        child: Text('◎', style: TextStyle(color: AppTheme.kainuwaPurple, fontSize: 14, height: 1.0, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),

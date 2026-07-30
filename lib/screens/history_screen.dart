@@ -376,21 +376,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               const SizedBox(height: 24),
                               
+                              // FIXED OVERLAP: Using explicit height containment
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                                child: TextField(
-                                  style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: 'Search closed trades...', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                                    prefixIcon: Icon(PhosphorIcons.magnifyingGlass, color: theme.colorScheme.onSurfaceVariant, size: 20),
-                                    filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                                child: SizedBox(
+                                  height: 56, // Guaranteed height
+                                  child: TextField(
+                                    style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
+                                    decoration: InputDecoration(
+                                      hintText: 'Search closed trades...', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                                      prefixIcon: Icon(PhosphorIcons.magnifyingGlass, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                                      filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                                    ),
+                                    onChanged: (val) {
+                                      _closedSearchQuery = val;
+                                      _processData();
+                                    },
                                   ),
-                                  onChanged: (val) {
-                                    _closedSearchQuery = val;
-                                    _processData();
-                                  },
                                 ),
                               ),
                               const SizedBox(height: 16),

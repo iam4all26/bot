@@ -21,34 +21,33 @@ class GlassCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    Widget cardContent = child;
+    Widget cardContent;
 
-    // Premium blurred internal glows
     if (hasBubbles) {
       cardContent = Stack(
         clipBehavior: Clip.hardEdge,
         children: [
           Positioned(
-            top: -30,
-            right: -30,
+            top: -40,
+            right: -40,
             child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: Container(
-                width: 100, height: 100,
+                width: 120, height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.kainuwaPurple.withOpacity(isDark ? 0.3 : 0.15),
+                  color: AppTheme.kainuwaPurple.withOpacity(isDark ? 0.3 : 0.12),
                 ),
               ),
             ),
           ),
           Positioned(
-            bottom: -30,
-            left: -20,
+            bottom: -40,
+            left: -40,
             child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: Container(
-                width: 100, height: 100,
+                width: 120, height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppTheme.kainuwaGold.withOpacity(isDark ? 0.2 : 0.1),
@@ -56,12 +55,10 @@ class GlassCard extends StatelessWidget {
               ),
             ),
           ),
-          // Ensure child content sits on top of the bubbles
-          Positioned.fill(
-            child: Padding(
-              padding: padding,
-              child: child,
-            ),
+          // FIX: Removing Positioned.fill so the Stack takes the height of the child!
+          Padding(
+            padding: padding,
+            child: child,
           ),
         ],
       );
@@ -73,7 +70,7 @@ class GlassCard extends StatelessWidget {
     }
 
     if (!isDark) {
-      // Light Mode: Solid card with balanced Gradient Border
+      // Light Mode: Solid card with beautiful, natural Gradient Border
       return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(borderRadius),
@@ -86,7 +83,6 @@ class GlassCard extends StatelessWidget {
           ],
           gradient: const LinearGradient(
             colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
-            stops: [0.6, 1.0], // Dominantly Purple
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
