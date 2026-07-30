@@ -24,7 +24,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
 
-  // Global Filter
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
 
   @override
@@ -62,7 +61,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
-    try { await launchUrl(url, mode: LaunchMode.externalApplication); } catch (_) {}
+    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
   String formatLagosTime(String? utcString) {
@@ -168,7 +167,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
       final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
-      final botName = p['wallet_label'] ?? 'Manual';
+      final botName = p['display_name'] ?? 'Manual';
 
       if (isReal) liveIds.add(id); else paperIds.add(id);
       if (pnl > 0) { totalProfitUsd += pnl; profitIds.add(id); } else if (pnl < 0) { totalLossUsd += pnl; lossIds.add(id); }
@@ -386,23 +385,10 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                       final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
-
-                      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
-                      String mainTitle = 'Manual Trade';
-                      String? adminBadge;
-
-                      if (isCopy) {
-                         String label = p['wallet_label']?.toString() ?? '';
-                         final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                         final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'System Bot ${botIdRaw.padLeft(2, '0')}' : 'System Bot';
-
-                         if (isAdmin && label.isNotEmpty && label != 'Manual') {
-                            mainTitle = label; 
-                            adminBadge = '🤖 $sysBotName';
-                         } else {
-                            mainTitle = sysBotName;
-                         }
+                      String mainTitle = p['display_name'] ?? 'Manual Trade';
+                      if (isAdmin && mainTitle != 'Manual') {
+                         mainTitle = mainTitle.toUpperCase();
                       }
 
                       return Padding(
@@ -412,21 +398,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
-                                  if (adminBadge != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8.0),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
-                                        child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
                               const SizedBox(height: 12),
 
                               Row(

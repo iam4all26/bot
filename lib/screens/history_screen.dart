@@ -69,16 +69,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     Map<String, int> totals = {};
     Map<String, int> wins = {};
     for (var p in _closedPositions) {
-      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
-      String name = 'Manual Trade';
-      
-      if (isCopy) {
-        if (isAdmin) {
-          name = p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN';
-        } else {
-          final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-          name = botIdRaw != null && botIdRaw.isNotEmpty ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
-        }
+      String name = p['display_name'] ?? 'Manual';
+      if (isAdmin && name != 'Manual') {
+         name = name.toUpperCase();
       }
 
       final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
@@ -129,12 +122,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       bool passBot = true;
       if (_selectedClosedBot != null && _selectedClosedBot != 'All Bots') {
-        String rawDisplay = 'Manual Trade';
-        if (isCopy) {
-           rawDisplay = isAdmin 
-              ? (p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN') 
-              : ((p['tracked_wallet_id']?.toString() != null) ? 'Bot ${p['tracked_wallet_id'].toString().padLeft(2, '0')}' : 'Bot');
-        }
+        String rawDisplay = p['display_name'] ?? 'Manual';
+        if (isAdmin && rawDisplay != 'Manual') rawDisplay = rawDisplay.toUpperCase();
         if (rawDisplay != _selectedClosedBot) passBot = false;
       }
 
@@ -181,7 +170,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _launchDexScreener(String address) async {
     final url = Uri.parse('https://dexscreener.com/solana/$address');
-    try { await launchUrl(url, mode: LaunchMode.externalApplication); } catch (_) {}
+    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
   String formatLagosTime(String? utcString) {
@@ -323,13 +312,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     for (var p in _closedPositions) {
       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
       if (isCopy) {
-         if (isAdmin) {
-             uniqueBots.add(p['wallet_label'].toString().toUpperCase()); // FIX: Admin sees ALL CAPS
-         } else {
-             final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-             String display = botIdRaw != null && botIdRaw.isNotEmpty ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot'; // FIX: Bot 01
-             uniqueBots.add(display);
-         }
+         String name = p['display_name'] ?? 'Bot';
+         if (isAdmin && name != 'Manual') name = name.toUpperCase();
+         uniqueBots.add(name);
       }
     }
 
@@ -379,7 +364,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: SizedBox(
-                                  height: 56, // Guaranteed height
+                                  height: 56,
                                   child: TextField(
                                     style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14),
                                     decoration: InputDecoration(
@@ -480,29 +465,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               String badgeText = p['close_reason'] == 'TP_HIT' ? 'TP Hit' : (p['close_reason'] == 'SL_HIT' ? 'SL Hit' : 'Manual');
                               Color badgeColor = p['close_reason'] == 'TP_HIT' ? AppTheme.success(context) : (p['close_reason'] == 'SL_HIT' ? AppTheme.danger(context) : AppTheme.info(context));
 
-                              final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
+                              String mainTitle = p['display_name'] ?? 'Manual';
+                              if (isAdmin && mainTitle != 'Manual') mainTitle = mainTitle.toUpperCase();
                               
-                              String mainTitle = 'Manual Trade';
-                              String? adminBadge;
                               String winRateText = '';
-
-                              if (isCopy) {
-                                 String label = p['wallet_label']?.toString().toUpperCase() ?? 'UNKNOWN'; 
-                                 final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                                 final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
-
-                                 if (isAdmin && label.isNotEmpty && label != 'MANUAL') {
-                                    mainTitle = label; 
-                                    adminBadge = '🤖 $sysBotName'; 
-                                    if (_winRates.containsKey(label)) {
-                                       winRateText = ' • ${_winRates[label]!.toStringAsFixed(1)}%'; // FIX: NO "WIN"
-                                    }
-                                 } else {
-                                    mainTitle = sysBotName; 
-                                    if (_winRates.containsKey(sysBotName)) {
-                                       winRateText = ' • ${_winRates[sysBotName]!.toStringAsFixed(1)}%'; // FIX: NO "WIN"
-                                    }
-                                 }
+                              if (_winRates.containsKey(mainTitle)) {
+                                  winRateText = ' • ${_winRates[mainTitle]!.toStringAsFixed(1)}%'; // JUST PERCENTAGE
                               }
 
                               return Padding(
@@ -515,18 +483,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
-                                          Text('$mainTitle', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                          Text('$mainTitle', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
                                           if (winRateText.isNotEmpty)
                                             Text(winRateText, style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
-                                          if (adminBadge != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(left: 8.0),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
-                                                child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ),
-                                            ),
                                         ],
                                       ),
                                       const SizedBox(height: 12),

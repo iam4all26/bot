@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
@@ -82,6 +83,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _manualRefresh() async {
     setState(() => _isRefreshing = true);
     await _fetchDashboardData(silent: true);
+  }
+
+  Future<void> _launchDexScreener(String address) async {
+    final url = Uri.parse('https://dexscreener.com/solana/$address');
+    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
   void _showFloatingSnackbar(String message, {bool isError = false}) {
@@ -341,6 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
+    final isAdmin = context.read<ApiService>().role == 'admin';
 
     double dailyPnl = 0.0;
     final now = DateTime.now();
@@ -424,7 +431,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           GlassCard(
             hasBubbles: true,
-            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -445,11 +451,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 24, height: 24,
+                      width: 28, height: 28,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      // PROPER SOLANA ICON RESTORED
-                      child: const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple),
+                      child: const SolanaIcon(size: 16, color: AppTheme.kainuwaPurple),
                     ),
                     const SizedBox(width: 8),
                     Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -478,7 +483,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text('${isProfit && dailyPnl > 0 ? '+' : ''}\$${dailyPnl.toStringAsFixed(2)}', style: TextStyle(color: isProfit ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 18)),
-                      // RESTORED NAIRA PNL STRING
                       if (currency.isNaira)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -590,8 +594,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: _openPositions.map((p) {
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
-                  final botName = p['display_name'] ?? p['wallet_label'] ?? 'Manual';
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
+                  
+                  // EXACT BOT NAMING FROM API
+                  String botName = p['display_name'] ?? 'Manual';
+                  if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
 
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -714,7 +721,6 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
     }
   }
 
-  // RESTORED WORD CONVERTER FOR CALCULATOR
   String _numberToWords(int number) {
     if (number == 0) return "Zero";
     if (number < 0) return "Minus ${_numberToWords(number.abs())}";

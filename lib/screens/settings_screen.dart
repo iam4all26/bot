@@ -60,7 +60,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // RESTORED PUSH TOGGLE
   Future<void> _togglePushAlerts(bool value) async {
     setState(() => _allowPush = value);
     final res = await context.read<ApiService>().postEndpoint(
@@ -75,7 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // RESTORED TELEGRAM SAVE
   Future<void> _saveTelegramId() async {
     if (_telegramCtrl.text.trim().isEmpty) return;
     FocusScope.of(context).unfocus();
@@ -112,7 +110,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // RESTORED CHANGE PASSWORD
   Future<void> _showChangePasswordModal() async {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
@@ -198,7 +195,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // RESTORED DELETE KEY
   Future<void> _showDeleteKeyModal() async {
     final theme = Theme.of(context);
     final bool? confirm = await showDialog<bool>(
@@ -247,9 +243,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: _isLoading 
         ? Center(child: CircularProgressIndicator(color: theme.primaryColor)) 
         : ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
             children: [
-              // 1. Account Credentials & Security
               GlassCard(
                 child: Column(
                   children: [
@@ -287,7 +282,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 2. Push Notifications
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,7 +300,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 3. Execution Wallet
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,7 +332,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 4. Slippage
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,7 +372,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 5. Trade Limits
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,7 +394,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 6. Telegram Alerts (RESTORED)
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,7 +442,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 100),
             ],
           ),
     );
