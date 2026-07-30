@@ -276,14 +276,16 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   }
 }
 
-class _DiagonalPainter extends CustomPainter {
-  final Color color;
-  _DiagonalPainter({required this.color});
+// Draws the sharp diagonal background split similar to Trojan
+class _ReceiptBackgroundPainter extends CustomPainter {
+  final Color accentColor;
+  _ReceiptBackgroundPainter({required this.accentColor});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
+    // 1. Draw subtle diagonal light fill on the left
+    final paintAccent = Paint()
+      ..color = accentColor.withOpacity(0.08)
       ..style = PaintingStyle.fill;
 
     final path = Path()
@@ -293,8 +295,9 @@ class _DiagonalPainter extends CustomPainter {
       ..lineTo(size.width * 0.35, size.height)
       ..close();
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, paintAccent);
 
+    // 2. Draw the sharp division line
     final paintLine = Paint()
       ..color = Colors.white.withOpacity(0.15)
       ..strokeWidth = 2
