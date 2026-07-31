@@ -304,7 +304,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final finalOpenList = _openPositions.where(_passesEnvFilter).toList();
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // Background handled by Dashboard
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -340,7 +340,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
       ),
       body: Column(
         children: [
-          // Filter Row
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
             child: Row(children: [
@@ -378,17 +377,31 @@ class _PositionsScreenState extends State<PositionsScreen> {
               : finalOpenList.isEmpty 
                 ? Center(child: Text('No active open positions.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 100), // Extra padding for FAB
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
                     itemCount: finalOpenList.length,
                     itemBuilder: (context, index) {
                       final p = finalOpenList[index];
                       final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                       final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
+
+                      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
-                      String mainTitle = p['display_name'] ?? 'Manual Trade';
-                      if (isAdmin && mainTitle != 'Manual') {
-                         mainTitle = mainTitle.toUpperCase();
+                      String mainTitle = 'Manual Trade';
+                      String? adminBadge;
+
+                      // ADMIN DUAL IDENTITY FIX
+                      if (isCopy) {
+                         String label = p['wallet_label']?.toString() ?? '';
+                         final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                         final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
+
+                         if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                            mainTitle = label.toUpperCase(); 
+                            adminBadge = sysBotName; // Admin sees BOTH
+                         } else {
+                            mainTitle = sysBotName; // Normal user just sees "Bot 01"
+                         }
                       }
 
                       return Padding(
@@ -398,7 +411,21 @@ class _PositionsScreenState extends State<PositionsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                                  if (adminBadge != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 8.0),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
+                                        child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                ],
+                              ),
                               const SizedBox(height: 12),
 
                               Row(

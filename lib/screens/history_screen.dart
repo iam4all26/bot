@@ -464,12 +464,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               String badgeText = p['close_reason'] == 'TP_HIT' ? 'TP Hit' : (p['close_reason'] == 'SL_HIT' ? 'SL Hit' : 'Manual');
                               Color badgeColor = p['close_reason'] == 'TP_HIT' ? AppTheme.success(context) : (p['close_reason'] == 'SL_HIT' ? AppTheme.danger(context) : AppTheme.info(context));
 
-                              String mainTitle = p['display_name'] ?? 'Manual';
-                              if (isAdmin && mainTitle != 'Manual') mainTitle = mainTitle.toUpperCase();
+                              final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                               
+                              String mainTitle = 'Manual Trade';
+                              String? adminBadge;
                               String winRateText = '';
-                              if (_winRates.containsKey(mainTitle)) {
-                                  winRateText = ' • ${_winRates[mainTitle]!.toStringAsFixed(1)}%';
+
+                              // ADMIN DUAL IDENTITY FIX
+                              if (isCopy) {
+                                 String label = p['wallet_label']?.toString() ?? '';
+                                 final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
+                                 final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
+
+                                 if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                                    mainTitle = label.toUpperCase(); 
+                                    adminBadge = sysBotName; // Admin sees BOTH
+                                    if (_winRates.containsKey(label)) winRateText = ' • ${_winRates[label]!.toStringAsFixed(1)}%';
+                                 } else {
+                                    mainTitle = sysBotName; // User sees ONLY Bot 01
+                                    if (_winRates.containsKey(sysBotName)) winRateText = ' • ${_winRates[sysBotName]!.toStringAsFixed(1)}%';
+                                 }
                               }
 
                               return Padding(
@@ -479,7 +493,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // FIXED: Share Button moved to top row
+                                      // FIXED ROW 1: SHARE BUTTON IS TOP RIGHT
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -520,7 +534,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ),
                                       const SizedBox(height: 12),
 
-                                      // Row 2 is now clean
+                                      // FIXED ROW 2: Address and Badges only
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -530,6 +544,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           ),
                                           Row(
                                             children: [
+                                              if (adminBadge != null)
+                                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.3))), child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))), child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? AppTheme.danger(context) : AppTheme.warning(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: badgeColor.withOpacity(0.15), border: Border.all(color: badgeColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(6)), child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                             ],
