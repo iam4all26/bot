@@ -94,6 +94,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
     final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / SOL';
 
+    const double canvasWidth = 600;
+    const double canvasHeight = 315;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -106,9 +109,8 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
             child: RepaintBoundary(
               key: _globalKey,
               child: Container(
-                width: 600,
-                height: 315,
-                clipBehavior: Clip.hardEdge, // Prevents images from spilling out of the rounded corners
+                width: canvasWidth,
+                height: canvasHeight,
                 decoration: BoxDecoration(
                   color: const Color(0xFF0D0B18),
                   borderRadius: BorderRadius.circular(20),
@@ -116,7 +118,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                 ),
                 child: Stack(
                   children: [
-                    // Diagonal Background Accent
                     Positioned.fill(
                       child: CustomPaint(
                         painter: _ReceiptBackgroundPainter(
@@ -125,30 +126,25 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // STRICTLY ANCHORED CHARACTER
-                    // Dragged left (-40) and locked to the bottom (0). Scaled up massively.
+                    // PERFECT ANCHORING: Since the image is tightly cropped, 
+                    // bottom: 0 perfectly grounds the character.
                     Positioned(
-                      left: -40,
-                      bottom: 0, 
-                      child: Transform.scale(
-                        scale: isProfit ? 1.0 : 1.15, // Wojak is drawn smaller, so we boost him 15%
+                      left: -10, // Slight bleed off the left edge
+                      bottom: 0, // Hard anchored to the floor
+                      child: Image.asset(
+                        isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
+                        height: 290, // Nearly full height of the 315px canvas
+                        fit: BoxFit.fitHeight,
                         alignment: Alignment.bottomLeft,
-                        child: Image.asset(
-                          isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                          height: 290, // Nearly full height of the card
-                          fit: BoxFit.contain,
-                          alignment: Alignment.bottomLeft,
-                        ),
                       ),
                     ),
 
-                    // STRICTLY BOUNDED METRICS PANEL
-                    // The 330px fixed width prevents the text from ever wrapping unexpectedly
+                    // Metrics Panel
                     Positioned(
-                      right: 24,
+                      left: 240, // Safely clears the newly scaled, unpadded character
+                      right: 32,
                       top: 24,
-                      bottom: 20,
-                      width: 330, 
+                      bottom: 24,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -158,14 +154,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(color: AppTheme.kainuwaPurple.withOpacity(0.2), shape: BoxShape.circle),
-                                child: const SolanaIcon(size: 16, color: AppTheme.kainuwaPurple),
+                                child: const SolanaIcon(size: 18, color: AppTheme.kainuwaPurple),
                               ),
                               const SizedBox(width: 10),
                               const Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('KAINUWA', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
-                                  Text('ON SOLANA', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                  Text('KAINUWA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
+                                  Text('ON SOLANA', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                                 ],
                               )
                             ],
@@ -173,36 +169,28 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           
                           const Spacer(),
 
-                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 2),
+                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                           
-                          // THE WRAP FIX: FittedBox forces the text to shrink rather than wrap to a new line
-                          SizedBox(
-                            height: 60,
-                            width: double.infinity,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
-                                style: TextStyle(
-                                  color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
-                                  fontSize: 60, 
-                                  fontWeight: FontWeight.w900, 
-                                  height: 1.0
-                                )
-                              ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
+                              style: TextStyle(
+                                color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
+                                fontSize: 64, 
+                                fontWeight: FontWeight.w900, 
+                                height: 1.1
+                              )
                             ),
                           ),
                           
-                          const SizedBox(height: 4),
-
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
                               const SizedBox(width: 6),
-                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
+                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
                             ]
                           ),
 
@@ -243,7 +231,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               const Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 12)),
                                   Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                 ],
                               ),
@@ -251,7 +239,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-                                child: const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 26),
+                                child: const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 28),
                               )
                             ],
                           )
@@ -305,7 +293,7 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       ..moveTo(size.width * 0.40, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width, size.height)
-      ..lineTo(size.width * 0.30, size.height)
+      ..lineTo(size.width * 0.25, size.height)
       ..close();
 
     canvas.drawPath(path, paintAccent);
@@ -317,7 +305,7 @@ class _ReceiptBackgroundPainter extends CustomPainter {
     
     final linePath = Path()
       ..moveTo(size.width * 0.40, 0)
-      ..lineTo(size.width * 0.30, size.height);
+      ..lineTo(size.width * 0.25, size.height);
 
     canvas.drawPath(linePath, paintLine);
   }
