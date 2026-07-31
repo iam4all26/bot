@@ -101,22 +101,21 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // FittedBox ensures the 600x315 canvas scales down onto phone screens without distortion
           FittedBox(
             fit: BoxFit.contain,
             child: RepaintBoundary(
               key: _globalKey,
               child: Container(
-                width: 580,
-                height: 310,
+                width: 600,
+                height: 315,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D0B18), // Deep Void Background
+                  color: const Color(0xFF0D0B18),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: isProfit ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFEF4444).withOpacity(0.4), width: 2),
                 ),
                 child: Stack(
                   children: [
-                    // Diagonal Background Accent
+                    // Diagonal Background Accent (Shifted left to give text more space)
                     Positioned.fill(
                       child: CustomPaint(
                         painter: _ReceiptBackgroundPainter(
@@ -125,28 +124,26 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // Character Graphic (Chad / Wojak)
-                    // Offset further left (-50) and bounded width so PNG padding doesn't overlap text
+                    // Character Graphic (Pulled left to hide empty image padding)
                     Positioned(
-                      left: -50,
-                      bottom: -20,
+                      left: -60,
+                      top: 0,
+                      bottom: -10,
                       child: Image.asset(
                         isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                        width: 320,
-                        height: 320,
+                        width: 300,
                         fit: BoxFit.contain,
                       ),
                     ),
 
                     // Metrics Panel (Right Side)
                     Positioned(
-                      right: 28,
+                      right: 32,
                       top: 24,
                       bottom: 24,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // Header Branding
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -168,17 +165,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           
                           const Spacer(),
 
-                          // Pair Name
-                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          
+                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-
-                          // Percentage Gain/Loss (Balanced to 38px to avoid collisions)
+                          
+                          // Reduced Font Size to stop collision
                           Text(
                             '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
                             style: TextStyle(
                               color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
-                              fontSize: 38, 
+                              fontSize: 42, 
                               fontWeight: FontWeight.w900, 
                               height: 1.1
                             )
@@ -197,7 +192,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
                           const Spacer(),
 
-                          // Invested vs Current Gain metrics
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -226,7 +220,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
                           const Spacer(),
 
-                          // Footer
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -247,7 +240,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                             ],
                           )
                         ],
-                      ),
+                      )
                     )
                   ],
                 ),
@@ -292,11 +285,12 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       ..color = accentColor.withOpacity(0.08)
       ..style = PaintingStyle.fill;
 
+    // Shifted diagonal to give text more space on the right
     final path = Path()
-      ..moveTo(size.width * 0.45, 0)
+      ..moveTo(size.width * 0.35, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width, size.height)
-      ..lineTo(size.width * 0.35, size.height)
+      ..lineTo(size.width * 0.25, size.height)
       ..close();
 
     canvas.drawPath(path, paintAccent);
@@ -307,8 +301,8 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     
     final linePath = Path()
-      ..moveTo(size.width * 0.45, 0)
-      ..lineTo(size.width * 0.35, size.height);
+      ..moveTo(size.width * 0.35, 0)
+      ..lineTo(size.width * 0.25, size.height);
 
     canvas.drawPath(linePath, paintLine);
   }

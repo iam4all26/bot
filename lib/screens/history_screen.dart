@@ -479,19 +479,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // ROW 1: TITLE + WIN % ON LEFT, SHARE BUTTON ON FAR RIGHT
+                                      // FIXED: Share Button moved to top row
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         crossAxisAlignment: CrossAxisAlignment.center,
                                         children: [
                                           Row(
                                             children: [
-                                              Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                                              Text('$mainTitle', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
                                               if (winRateText.isNotEmpty)
                                                 Text(winRateText, style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
                                             ],
                                           ),
-                                          // TOP-RIGHT SHARE BUTTON
                                           InkWell(
                                             onTap: () {
                                               showDialog(
@@ -521,7 +520,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ),
                                       const SizedBox(height: 12),
 
-                                      // ROW 2: ADDRESS ON LEFT, BADGES ON RIGHT
+                                      // Row 2 is now clean
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
