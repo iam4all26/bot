@@ -126,22 +126,19 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // PERFECT ANCHORING: Since the image is tightly cropped, 
-                    // bottom: 0 perfectly grounds the character.
                     Positioned(
-                      left: -10, // Slight bleed off the left edge
-                      bottom: 0, // Hard anchored to the floor
+                      left: -10,
+                      bottom: 0,
                       child: Image.asset(
                         isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                        height: 290, // Nearly full height of the 315px canvas
+                        height: 290, 
                         fit: BoxFit.fitHeight,
                         alignment: Alignment.bottomLeft,
                       ),
                     ),
 
-                    // Metrics Panel
                     Positioned(
-                      left: 240, // Safely clears the newly scaled, unpadded character
+                      left: 240, 
                       right: 32,
                       top: 24,
                       bottom: 24,
@@ -169,7 +166,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           
                           const Spacer(),
 
-                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                           
                           FittedBox(
                             fit: BoxFit.scaleDown,
@@ -188,14 +185,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
+                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 16),
                               const SizedBox(width: 6),
-                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
+                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.bold)),
                             ]
                           ),
 
                           const Spacer(),
 
+                          // MASSIVELY INCREASED INVESTMENT / GAIN METRICS
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -203,20 +201,20 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 15)),
                                   const SizedBox(height: 2),
-                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 14)),
                                 ]
                               ),
-                              const SizedBox(width: 28),
+                              const SizedBox(width: 32),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
+                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 15, fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 2),
-                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 16, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
+                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 22, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 14)),
                                 ]
                               ),
                             ]
@@ -231,15 +229,22 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               const Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 ],
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 14),
+                              // INJECTED KAINUWA QR CODE
                               Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-                                child: const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 28),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+                                child: Image.network(
+                                  'https://img.kainuwa.africa/serve?id=gzjMD9JmkjKt',
+                                  width: 42,
+                                  height: 42,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 42),
+                                ),
                               )
                             ],
                           )
