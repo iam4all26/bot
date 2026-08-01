@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
@@ -23,19 +25,28 @@ class PnlShareDialog extends StatefulWidget {
 
 class _PnlShareDialogState extends State<PnlShareDialog> {
   final GlobalKey _globalKey = GlobalKey();
-  bool _isSharing = false;
+  bool _isProcessing = false;
 
-  Future<void> _captureAndShare() async {
-    setState(() => _isSharing = true);
+  Future<Uint8List?> _getReceiptBytes() async {
     try {
       RenderRepaintBoundary boundary = _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0); // High-res capture
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      
-      if (byteData != null) {
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _captureAndShare() async {
+    setState(() => _isProcessing = true);
+    final bytes = await _getReceiptBytes();
+    
+    if (bytes != null) {
+      try {
         final tempDir = await getTemporaryDirectory();
         final file = await File('${tempDir.path}/kainuwa_receipt_${DateTime.now().millisecondsSinceEpoch}.png').create();
-        await file.writeAsBytes(byteData.buffer.asUint8List());
+        await file.writeAsBytes(bytes);
         
         final List<String> flexMessages = [
           'Just printed a solid gain on Kainuwa! 🚀 #Solana',
@@ -46,12 +57,51 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         final randomMessage = flexMessages[DateTime.now().millisecondsSinceEpoch % flexMessages.length];
         
         await Share.shareXFiles([XFile(file.path)], text: randomMessage);
+      } catch (e) {
+         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to share: $e'), backgroundColor: AppTheme.danger(context)));
       }
-    } catch (e) {
-       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to generate receipt: $e'), backgroundColor: AppTheme.danger(context)));
     }
     if (mounted) {
-      setState(() => _isSharing = false);
+      setState(() => _isProcessing = false);
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _saveToGallery() async {
+    setState(() => _isProcessing = true);
+    
+    try {
+      // Safely request permissions
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        final photosStatus = await Permission.photos.request();
+        if (!status.isGranted && !photosStatus.isGranted) {
+           throw Exception('Storage permission denied.');
+        }
+      }
+
+      final bytes = await _getReceiptBytes();
+      if (bytes != null) {
+        final result = await ImageGallerySaver.saveImage(
+          bytes,
+          quality: 100,
+          name: "KainuwaBot_${DateTime.now().millisecondsSinceEpoch}"
+        );
+        
+        if (mounted) {
+          if (result['isSuccess'] == true) {
+             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved to Gallery successfully! 📸'), backgroundColor: AppTheme.success(context)));
+          } else {
+             throw Exception('Failed to save to device.');
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger(context)));
+    }
+
+    if (mounted) {
+      setState(() => _isProcessing = false);
       Navigator.pop(context);
     }
   }
@@ -77,6 +127,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     } catch (_) { return '-'; }
   }
 
+  String _formatMcap(dynamic v) {
+    if (v == null) return '-';
+    double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
+    if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
+    return '\$${val.round()}';
+  }
+
   String _formatAddress(String addr) => addr.length > 8 ? '${addr.substring(0, 4)}...${addr.substring(addr.length - 4)}' : addr;
 
   @override
@@ -93,6 +151,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     if (widget.isAdmin && mainTitle != 'Manual') mainTitle = mainTitle.toUpperCase();
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
     final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / SOL';
+    
+    final String entryMcap = _formatMcap(p['entry_mcap']);
+    final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
 
     const double canvasWidth = 600;
     const double canvasHeight = 315;
@@ -126,12 +187,13 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
+                    // MASSIVELY INCREASED HEIGHT & GROUNDED
                     Positioned(
-                      left: -10,
+                      left: -20,
                       bottom: 0,
                       child: Image.asset(
                         isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                        height: 290, 
+                        height: 340, // Increased size to aggressively fill the left space
                         fit: BoxFit.fitHeight,
                         alignment: Alignment.bottomLeft,
                       ),
@@ -175,7 +237,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
                               style: TextStyle(
                                 color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
-                                fontSize: 64, 
+                                fontSize: 60, 
                                 fontWeight: FontWeight.w900, 
                                 height: 1.1
                               )
@@ -185,15 +247,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 16),
+                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
                               const SizedBox(width: 6),
-                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
                             ]
                           ),
 
                           const Spacer(),
 
-                          // MASSIVELY INCREASED INVESTMENT / GAIN METRICS
+                          // 2X2 GRID: MCAP & INVESTED/GAIN METRICS
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -201,20 +263,24 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 15)),
-                                  const SizedBox(height: 2),
-                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 14)),
+                                  const Text('Entry MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  Text(entryMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 12)),
                                 ]
                               ),
-                              const SizedBox(width: 32),
+                              const SizedBox(width: 24),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 15, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 2),
-                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 22, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 14)),
+                                  const Text('Exit MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                  Text(exitMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.w600)),
+                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 18, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 12)),
                                 ]
                               ),
                             ]
@@ -229,21 +295,21 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               const Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                 ],
                               ),
-                              const SizedBox(width: 14),
-                              // INJECTED KAINUWA QR CODE
+                              const SizedBox(width: 12),
+                              // USING DOWNLOADED LOCAL QR CODE
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                                child: Image.network(
-                                  'https://img.kainuwa.africa/serve?id=gzjMD9JmkjKt',
-                                  width: 42,
-                                  height: 42,
+                                child: Image.asset(
+                                  'assets/icon/qr_code.png',
+                                  width: 44,
+                                  height: 44,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 42),
+                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 44),
                                 ),
                               )
                             ],
@@ -257,23 +323,41 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
             ),
           ),
           
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.kainuwaPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          // DUAL ACTION BUTTONS (SAVE & SHARE)
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    foregroundColor: theme.colorScheme.onSurface,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _isProcessing ? null : _saveToGallery,
+                  icon: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(PhosphorIcons.downloadSimpleBold, size: 20),
+                  label: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                ),
               ),
-              onPressed: _isSharing ? null : _captureAndShare,
-              icon: _isSharing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
-              label: Text(_isSharing ? 'GENERATING...' : 'SHARE RECEIPT', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.kainuwaPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _isProcessing ? null : _captureAndShare,
+                  icon: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
+                  label: const Text('SHARE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
