@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
@@ -30,7 +29,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   Future<Uint8List?> _getReceiptBytes() async {
     try {
       RenderRepaintBoundary boundary = _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0); // High-res capture
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
@@ -71,33 +70,21 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     setState(() => _isProcessing = true);
     
     try {
-      // Safely request permissions
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        final photosStatus = await Permission.photos.request();
-        if (!status.isGranted && !photosStatus.isGranted) {
-           throw Exception('Storage permission denied.');
-        }
-      }
-
       final bytes = await _getReceiptBytes();
       if (bytes != null) {
-        final result = await ImageGallerySaver.saveImage(
-          bytes,
-          quality: 100,
-          name: "KainuwaBot_${DateTime.now().millisecondsSinceEpoch}"
-        );
+        final tempDir = await getTemporaryDirectory();
+        final file = await File('${tempDir.path}/kainuwa_saved_receipt_${DateTime.now().millisecondsSinceEpoch}.png').create();
+        await file.writeAsBytes(bytes);
+        
+        // Gal natively handles scoped storage and gallery insertion securely
+        await Gal.putImage(file.path);
         
         if (mounted) {
-          if (result['isSuccess'] == true) {
-             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved to Gallery successfully! 📸'), backgroundColor: AppTheme.success(context)));
-          } else {
-             throw Exception('Failed to save to device.');
-          }
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved to Gallery successfully! 📸'), backgroundColor: AppTheme.success(context)));
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppTheme.danger(context)));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save: $e'), backgroundColor: AppTheme.danger(context)));
     }
 
     if (mounted) {
@@ -187,13 +174,12 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // MASSIVELY INCREASED HEIGHT & GROUNDED
                     Positioned(
                       left: -20,
                       bottom: 0,
                       child: Image.asset(
                         isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                        height: 340, // Increased size to aggressively fill the left space
+                        height: 340,
                         fit: BoxFit.fitHeight,
                         alignment: Alignment.bottomLeft,
                       ),
@@ -255,7 +241,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
                           const Spacer(),
 
-                          // 2X2 GRID: MCAP & INVESTED/GAIN METRICS
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -300,7 +285,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                 ],
                               ),
                               const SizedBox(width: 12),
-                              // USING DOWNLOADED LOCAL QR CODE
                               Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
@@ -325,14 +309,13 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
           
           const SizedBox(height: 24),
           
-          // DUAL ACTION BUTTONS (SAVE & SHARE)
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    foregroundColor: theme.colorScheme.onSurface,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
