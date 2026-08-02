@@ -27,7 +27,8 @@ class AppTheme {
         outline: Color(0xFFE5E7EB), // Borders
         outlineVariant: Color(0xFFECEFF3), // Dividers
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+      // Restored Space Grotesk globally for Light Mode
+      textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.light().textTheme),
       useMaterial3: true,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -53,7 +54,8 @@ class AppTheme {
         outline: Color(0xFF2A2D38), // Borders
         outlineVariant: Color(0xFF313340), // Dividers
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+      // Restored Space Grotesk globally for Dark Mode
+      textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme),
       useMaterial3: true,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
