@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
@@ -25,7 +26,6 @@ class PnlShareDialog extends StatefulWidget {
 class _PnlShareDialogState extends State<PnlShareDialog> {
   final GlobalKey _globalKey = GlobalKey();
   
-  // Independent flags so only the active button spins
   bool _isSaving = false;
   bool _isSharing = false;
 
@@ -82,11 +82,11 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         await Gal.putImage(file.path);
         
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Saved to Gallery successfully! 📸'), backgroundColor: AppTheme.success(context)));
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved to Gallery successfully! 📸', style: GoogleFonts.spaceGrotesk()), backgroundColor: AppTheme.success(context)));
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save: $e'), backgroundColor: AppTheme.danger(context)));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save: $e', style: GoogleFonts.spaceGrotesk()), backgroundColor: AppTheme.danger(context)));
     }
 
     if (mounted) {
@@ -144,7 +144,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String entryMcap = _formatMcap(p['entry_mcap']);
     final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
 
-    // EXPANDED CANVAS HEIGHT: 360px guarantees the entire footer and QR code fit without bottom clipping
     const double canvasWidth = 600;
     const double canvasHeight = 360;
 
@@ -179,7 +178,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // Character Graphic anchored cleanly to bottom left
                     Positioned(
                       left: -15,
                       bottom: 0,
@@ -191,7 +189,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
-                    // Metrics Panel with ample vertical space
                     Positioned(
                       left: 230, 
                       right: 28,
@@ -209,11 +206,11 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                 child: const SolanaIcon(size: 18, color: AppTheme.kainuwaPurple),
                               ),
                               const SizedBox(width: 10),
-                              const Column(
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('KAINUWA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
-                                  Text('ON SOLANA', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                  Text('KAINUWA', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
+                                  Text('ON SOLANA', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                                 ],
                               )
                             ],
@@ -221,14 +218,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           
                           const Spacer(),
 
-                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                          Text(tokenPair, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                           
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerRight,
                             child: Text(
                               '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
-                              style: TextStyle(
+                              style: GoogleFonts.spaceGrotesk(
                                 color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
                                 fontSize: 60, 
                                 fontWeight: FontWeight.w900, 
@@ -242,7 +239,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                             children: [
                               const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
                               const SizedBox(width: 6),
-                              Text(timeInTrade, style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
+                              Text(timeInTrade, style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
                             ]
                           ),
 
@@ -255,24 +252,24 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('Entry MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                  Text(entryMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text('Entry MCAP', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
+                                  Text(entryMcap, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 6),
-                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  Text('Invested', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 13)),
+                                  Text('\$${size.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text(currency.format(size), style: GoogleFonts.spaceGrotesk(color: Colors.white38, fontSize: 11)),
                                 ]
                               ),
                               const SizedBox(width: 24),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  const Text('Exit MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                  Text(exitMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text('Exit MCAP', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
+                                  Text(exitMcap, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 6),
-                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
-                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 17, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
+                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
+                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 17, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
                                 ]
                               ),
                             ]
@@ -280,16 +277,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
                           const Spacer(),
 
-                          // Footer with full QR code visibility
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              const Column(
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                  Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  Text('Trade natively on', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
+                                  Text('@kainuwaafrica', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                               const SizedBox(width: 12),
@@ -317,7 +313,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
           
           const SizedBox(height: 24),
           
-          // Action Buttons with Isolated Loading Indicators
           Row(
             children: [
               Expanded(
@@ -332,7 +327,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                   icon: _isSaving 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
                       : const Icon(PhosphorIcons.downloadSimpleBold, size: 20),
-                  label: Text(_isSaving ? 'SAVING...' : 'SAVE', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                  label: Text(_isSaving ? 'SAVING...' : 'SAVE', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -348,7 +343,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                   icon: _isSharing 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
                       : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
-                  label: Text(_isSharing ? 'SHARING...' : 'SHARE', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                  label: Text(_isSharing ? 'SHARING...' : 'SHARE', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
                 ),
               ),
             ],
@@ -356,7 +351,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+            child: Text('Close', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontWeight: FontWeight.bold)),
           )
         ],
       ),
