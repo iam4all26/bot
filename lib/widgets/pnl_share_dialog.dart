@@ -24,7 +24,10 @@ class PnlShareDialog extends StatefulWidget {
 
 class _PnlShareDialogState extends State<PnlShareDialog> {
   final GlobalKey _globalKey = GlobalKey();
-  bool _isProcessing = false;
+  
+  // Independent flags so only the active button spins
+  bool _isSaving = false;
+  bool _isSharing = false;
 
   Future<Uint8List?> _getReceiptBytes() async {
     try {
@@ -38,7 +41,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   }
 
   Future<void> _captureAndShare() async {
-    setState(() => _isProcessing = true);
+    setState(() => _isSharing = true);
     final bytes = await _getReceiptBytes();
     
     if (bytes != null) {
@@ -61,13 +64,13 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       }
     }
     if (mounted) {
-      setState(() => _isProcessing = false);
+      setState(() => _isSharing = false);
       Navigator.pop(context);
     }
   }
 
   Future<void> _saveToGallery() async {
-    setState(() => _isProcessing = true);
+    setState(() => _isSaving = true);
     
     try {
       final bytes = await _getReceiptBytes();
@@ -76,7 +79,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         final file = await File('${tempDir.path}/kainuwa_saved_receipt_${DateTime.now().millisecondsSinceEpoch}.png').create();
         await file.writeAsBytes(bytes);
         
-        // Gal natively handles scoped storage and gallery insertion securely
         await Gal.putImage(file.path);
         
         if (mounted) {
@@ -88,7 +90,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     }
 
     if (mounted) {
-      setState(() => _isProcessing = false);
+      setState(() => _isSaving = false);
       Navigator.pop(context);
     }
   }
@@ -142,8 +144,11 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String entryMcap = _formatMcap(p['entry_mcap']);
     final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
 
+    // EXPANDED CANVAS HEIGHT: 360px guarantees the entire footer and QR code fit without bottom clipping
     const double canvasWidth = 600;
-    const double canvasHeight = 315;
+    const double canvasHeight = 360;
+
+    final isBusy = _isSaving || _isSharing;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -174,8 +179,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
+                    // Character Graphic anchored cleanly to bottom left
                     Positioned(
-                      left: -20,
+                      left: -15,
                       bottom: 0,
                       child: Image.asset(
                         isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
@@ -185,11 +191,12 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                       ),
                     ),
 
+                    // Metrics Panel with ample vertical space
                     Positioned(
-                      left: 240, 
-                      right: 32,
-                      top: 24,
-                      bottom: 24,
+                      left: 230, 
+                      right: 28,
+                      top: 20,
+                      bottom: 20,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -214,7 +221,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                           
                           const Spacer(),
 
-                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                          Text(tokenPair, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                           
                           FittedBox(
                             fit: BoxFit.scaleDown,
@@ -251,9 +258,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                   const Text('Entry MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
                                   Text(entryMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 6),
-                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 14)),
-                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                                  const Text('Invested', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                                  Text('\$${size.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text(currency.format(size), style: const TextStyle(color: Colors.white38, fontSize: 11)),
                                 ]
                               ),
                               const SizedBox(width: 24),
@@ -263,9 +270,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                   const Text('Exit MCAP', style: TextStyle(color: Colors.white54, fontSize: 11)),
                                   Text(exitMcap, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 6),
-                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 14, fontWeight: FontWeight.w600)),
-                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 18, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 12)),
+                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
+                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: TextStyle(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 17, fontWeight: FontWeight.bold)),
+                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: TextStyle(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
                                 ]
                               ),
                             ]
@@ -273,6 +280,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
                           const Spacer(),
 
+                          // Footer with full QR code visibility
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -280,7 +288,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               const Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                  Text('Trade natively on', style: TextStyle(color: Colors.white54, fontSize: 11)),
                                   Text('@kainuwaafrica', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                                 ],
                               ),
@@ -290,10 +298,10 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
                                 child: Image.asset(
                                   'assets/icon/qr_code.png',
-                                  width: 44,
-                                  height: 44,
+                                  width: 48,
+                                  height: 48,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 44),
+                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 48),
                                 ),
                               )
                             ],
@@ -309,6 +317,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
           
           const SizedBox(height: 24),
           
+          // Action Buttons with Isolated Loading Indicators
           Row(
             children: [
               Expanded(
@@ -319,9 +328,11 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: _isProcessing ? null : _saveToGallery,
-                  icon: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(PhosphorIcons.downloadSimpleBold, size: 20),
-                  label: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                  onPressed: isBusy ? null : _saveToGallery,
+                  icon: _isSaving 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                      : const Icon(PhosphorIcons.downloadSimpleBold, size: 20),
+                  label: Text(_isSaving ? 'SAVING...' : 'SAVE', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -333,9 +344,11 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: _isProcessing ? null : _captureAndShare,
-                  icon: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
-                  label: const Text('SHARE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
+                  onPressed: isBusy ? null : _captureAndShare,
+                  icon: _isSharing 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                      : const Icon(PhosphorIcons.shareNetworkFill, size: 20),
+                  label: Text(_isSharing ? 'SHARING...' : 'SHARE', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1)),
                 ),
               ),
             ],
