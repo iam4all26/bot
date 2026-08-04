@@ -50,8 +50,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         final file = await File('${tempDir.path}/kainuwa_receipt_${DateTime.now().millisecondsSinceEpoch}.png').create();
         await file.writeAsBytes(bytes);
         
+        final chainTag = {'solana': '#Solana', 'bsc': '#BSC', 'robinhood': '#RobinhoodChain'}[(widget.tradeData['chain'] ?? 'solana').toString()] ?? '#Crypto';
         final List<String> flexMessages = [
-          'Just printed a solid gain on Kainuwa! 🚀 #Solana',
+          'Just printed a solid gain on Kainuwa! 🚀 $chainTag',
           'Another win on the timeline! 🤑 Powered by @kainuwaafrica',
           'Snipe, profit, repeat. 🎯 @kainuwaafrica',
           'Secured the bag. 💰 Built different. @kainuwaafrica'
@@ -136,10 +137,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final pct = size > 0 ? (pnl / size) * 100 : 0.0;
     final isProfit = pnl >= 0;
 
+    final String tradeChain = (p['chain'] ?? 'solana').toString();
+    const Map<String, String> chainNativeSymbols = {'solana': 'SOL', 'bsc': 'BNB', 'robinhood': 'ETH'};
+    final String nativeSymbol = chainNativeSymbols[tradeChain] ?? 'SOL';
+    final String chainDisplayName = {'solana': 'SOLANA', 'bsc': 'BSC', 'robinhood': 'ROBINHOOD'}[tradeChain] ?? tradeChain.toUpperCase();
+
     String mainTitle = p['display_name'] ?? 'Manual';
     if (widget.isAdmin && mainTitle != 'Manual') mainTitle = mainTitle.toUpperCase();
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
-    final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / SOL';
+    final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / $nativeSymbol';
     
     final String entryMcap = _formatMcap(p['entry_mcap']);
     final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
@@ -203,14 +209,24 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(color: AppTheme.kainuwaPurple.withOpacity(0.2), shape: BoxShape.circle),
-                                child: const SolanaIcon(size: 18, color: AppTheme.kainuwaPurple),
+                                child: tradeChain == 'solana'
+                                    ? const SolanaIcon(size: 18, color: AppTheme.kainuwaPurple)
+                                    : SizedBox(
+                                        width: 18, height: 18,
+                                        child: Center(
+                                          child: Text(
+                                            tradeChain == 'bsc' ? 'B' : 'R',
+                                            style: GoogleFonts.spaceGrotesk(color: AppTheme.kainuwaPurple, fontWeight: FontWeight.w900, fontSize: 13),
+                                          ),
+                                        ),
+                                      ),
                               ),
                               const SizedBox(width: 10),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('KAINUWA', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
-                                  Text('ON SOLANA', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                  Text('ON $chainDisplayName', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                                 ],
                               )
                             ],
