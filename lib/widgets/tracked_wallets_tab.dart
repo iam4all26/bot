@@ -17,6 +17,20 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   List<dynamic> _wallets = [];
   bool _isLoading = false;
 
+  // Static chain list matching the chains seeded server-side.
+  static const List<Map<String, String>> _chains = [
+    {'id': 'solana', 'name': 'Solana'},
+    {'id': 'bsc', 'name': 'BSC'},
+    {'id': 'robinhood', 'name': 'Robinhood'},
+  ];
+  String _addChain = 'solana';
+
+  static const Map<String, Color> _chainColors = {
+    'solana': Color(0xFF9945FF),
+    'bsc': Color(0xFFF0B90B),
+    'robinhood': Color(0xFF00C805),
+  };
+
   @override void initState() { super.initState(); _fetchWallets(); }
 
   Future<void> _fetchWallets() async {
@@ -30,7 +44,8 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
     setState(() => _isLoading = true);
     final res = await context.read<ApiService>().postEndpoint('admin_wallets.php?action=add', {
       'address': _walletController.text.trim(),
-      'label': _labelController.text.trim()
+      'label': _labelController.text.trim(),
+      'chain': _addChain
     });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
@@ -55,8 +70,8 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   }
 
   void _showBulkImportModal() {
-    List<Map<String, TextEditingController>> rows = [
-      {'label': TextEditingController(), 'address': TextEditingController()}
+    List<Map<String, dynamic>> rows = [
+      {'label': TextEditingController(), 'address': TextEditingController(), 'chain': 'solana'}
     ];
     bool isSaving = false;
 
@@ -109,7 +124,29 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                                 TextField(
                                   controller: rows[index]['address'],
                                   style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontFamily: 'monospace'),
-                                  decoration: InputDecoration(hintText: 'Solana Address', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), isDense: true, border: InputBorder.none),
+                                  decoration: InputDecoration(hintText: 'Token Address', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), isDense: true, border: InputBorder.none),
+                                ),
+                                Divider(height: 16, color: theme.colorScheme.outlineVariant),
+                                Row(
+                                  children: _chains.map((c) {
+                                    final selected = c['id'] == rows[index]['chain'];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: InkWell(
+                                        onTap: () => setStateDialog(() => rows[index]['chain'] = c['id']!),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: selected ? theme.primaryColor.withOpacity(0.15) : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: selected ? theme.primaryColor : theme.colorScheme.outlineVariant),
+                                          ),
+                                          child: Text(c['name']!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                               ],
                             ),
@@ -119,7 +156,7 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () => setStateDialog(() => rows.add({'label': TextEditingController(), 'address': TextEditingController()})),
+                    onPressed: () => setStateDialog(() => rows.add({'label': TextEditingController(), 'address': TextEditingController(), 'chain': 'solana'})),
                     icon: Icon(PhosphorIcons.plusCircleFill, color: theme.primaryColor, size: 18),
                     label: Text('Add Row', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
                   )
@@ -135,8 +172,10 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                   setStateDialog(() => isSaving = true);
                   List<Map<String, String>> payload = [];
                   for (var row in rows) {
-                    if (row['label']!.text.isNotEmpty && row['address']!.text.isNotEmpty) {
-                      payload.add({'label': row['label']!.text.trim(), 'address': row['address']!.text.trim()});
+                    final TextEditingController labelCtrl = row['label'];
+                    final TextEditingController addressCtrl = row['address'];
+                    if (labelCtrl.text.isNotEmpty && addressCtrl.text.isNotEmpty) {
+                      payload.add({'label': labelCtrl.text.trim(), 'address': addressCtrl.text.trim(), 'chain': row['chain'] ?? 'solana'});
                     }
                   }
                   
@@ -159,6 +198,7 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   Future<void> _showEditModal(dynamic w) async {
     final lblCtrl = TextEditingController(text: w['label']);
     final addrCtrl = TextEditingController(text: w['address']);
+    String editChain = w['chain'] ?? 'solana';
     bool isSaving = false;
 
     await showDialog(
@@ -173,6 +213,28 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  children: _chains.map((c) {
+                    final selected = c['id'] == editChain;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        onTap: () => setStateDialog(() => editChain = c['id']!),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3)),
+                          ),
+                          child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
                 TextField(controller: lblCtrl, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Label', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
                 const SizedBox(height: 16),
                 TextField(controller: addrCtrl, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontFamily: 'monospace'), decoration: InputDecoration(labelText: 'Address', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
@@ -185,7 +247,7 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                 style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
                 onPressed: isSaving ? null : () async {
                   setStateDialog(() => isSaving = true);
-                  final res = await this.context.read<ApiService>().postEndpoint('admin_wallets.php?action=edit', {'id': w['id'], 'label': lblCtrl.text.trim(), 'address': addrCtrl.text.trim()});
+                  final res = await this.context.read<ApiService>().postEndpoint('admin_wallets.php?action=edit', {'id': w['id'], 'label': lblCtrl.text.trim(), 'address': addrCtrl.text.trim(), 'chain': editChain});
                   if (mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
@@ -260,10 +322,32 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                   decoration: InputDecoration(labelText: 'Wallet Label', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                 ),
                 const SizedBox(height: 16),
+                Row(
+                  children: _chains.map((c) {
+                    final selected = c['id'] == _addChain;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        onTap: () => setState(() => _addChain = c['id']!),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3)),
+                          ),
+                          child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _walletController,
                   style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 13),
-                  decoration: InputDecoration(labelText: 'Solana Address', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                  decoration: InputDecoration(labelText: '${_chains.firstWhere((c) => c['id'] == _addChain)['name']} Address', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0), onPressed: _isLoading ? null : _addWallet, child: const Text('Deploy Tracker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)))),
@@ -302,7 +386,17 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                           child: Row(
                             children: [
                               Flexible(child: Text(w['label'] ?? 'Unknown', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis)),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: (_chainColors[w['chain']] ?? theme.colorScheme.onSurfaceVariant).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: (_chainColors[w['chain']] ?? theme.colorScheme.onSurfaceVariant).withOpacity(0.3)),
+                                ),
+                                child: Text((w['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(color: _chainColors[w['chain']] ?? theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 9)),
+                              ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
