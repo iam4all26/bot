@@ -31,6 +31,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _dailyCapCtrl = TextEditingController();
   final _slippageCtrl = TextEditingController();
 
+  // Static chain list matching the chains seeded server-side. Each chain
+  // has its own wallet row now — switching tabs re-fetches that chain's key.
+  static const List<Map<String, String>> _chains = [
+    {'id': 'solana', 'name': 'Solana', 'placeholder': 'Paste Solana Base58 Private Key'},
+    {'id': 'bsc', 'name': 'BSC', 'placeholder': 'Paste EVM Private Key (0x...)'},
+    {'id': 'robinhood', 'name': 'Robinhood', 'placeholder': 'Paste EVM Private Key (0x...)'},
+  ];
+  String _selectedChain = 'solana';
+
   @override
   void initState() {
     super.initState();
@@ -39,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _fetchProfileData() async {
     setState(() => _isLoading = true);
-    final res = await context.read<ApiService>().getEndpoint('wallet.php?action=get');
+    final res = await context.read<ApiService>().getEndpoint('wallet.php?action=get&chain=$_selectedChain');
     if (mounted) {
       setState(() {
         if (res['status'] == 'success' && res['data'] != null) {
@@ -58,6 +67,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _onChainChanged(String chainId) {
+    setState(() => _selectedChain = chainId);
+    _fetchProfileData();
   }
 
   Future<void> _togglePushAlerts(bool value) async {
@@ -167,8 +181,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return AlertDialog(
             backgroundColor: theme.colorScheme.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            title: Row(children: [Icon(PhosphorIcons.keyFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Update Private Key', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]),
-            content: TextField(controller: ctrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12), decoration: InputDecoration(hintText: 'Paste Solana Base58 Private Key', hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
+            title: Row(children: [Icon(PhosphorIcons.keyFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Update ${_selectedChain.toUpperCase()} Private Key', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]),
+            content: TextField(controller: ctrl, obscureText: true, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12), decoration: InputDecoration(hintText: _chains.firstWhere((c) => c['id'] == _selectedChain)['placeholder'], hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))),
             actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
@@ -177,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: isSubmitting ? null : () async {
                   if (ctrl.text.trim().isEmpty) return;
                   setStateDialog(() => isSubmitting = true);
-                  final res = await this.context.read<ApiService>().postEndpoint('wallet.php?action=set_key', {'private_key': ctrl.text.trim()});
+                  final res = await this.context.read<ApiService>().postEndpoint('wallet.php?action=set_key', {'private_key': ctrl.text.trim(), 'chain': _selectedChain});
                   if (mounted) {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
@@ -203,8 +217,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           backgroundColor: theme.colorScheme.surface, 
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Remove Wallet?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]), 
-          content: Text('This will permanently delete your encrypted private key from the server. You will not be able to execute trades until you add a new one.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)), 
+          title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Remove ${_selectedChain.toUpperCase()} Wallet?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]), 
+          content: Text('This will permanently delete your encrypted $_selectedChain private key from the server. You will not be able to execute trades on this chain until you add a new one.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)), 
           actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))), 
@@ -215,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     
     if (confirm == true && mounted) {
-      final res = await context.read<ApiService>().postEndpoint('wallet.php?action=delete_key', {});
+      final res = await context.read<ApiService>().postEndpoint('wallet.php?action=delete_key', {'chain': _selectedChain});
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
       if (res['status'] == 'success') setState(() { _hasWallet = false; _publicAddress = null; });
     }
@@ -311,6 +325,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (_hasWallet) IconButton(icon: Icon(PhosphorIcons.trash, color: AppTheme.danger(context), size: 20), onPressed: _showDeleteKeyModal, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: _chains.map((c) {
+                        final selected = c['id'] == _selectedChain;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => _onChainChanged(c['id']!),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3)),
+                              ),
+                              child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                     const SizedBox(height: 24),
                     Text('PUBLIC ADDRESS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     const SizedBox(height: 8),
@@ -326,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(width: double.infinity, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: theme.colorScheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: _showUpdateKeyModal, icon: Icon(PhosphorIcons.key, color: theme.colorScheme.onSurface), label: Text(_hasWallet ? 'Update Private Key' : 'Add Private Key', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)))),
+                    SizedBox(width: double.infinity, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), side: BorderSide(color: theme.colorScheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: _showUpdateKeyModal, icon: Icon(PhosphorIcons.key, color: theme.colorScheme.onSurface), label: Text(_hasWallet ? 'Update ${_selectedChain.toUpperCase()} Private Key' : 'Add ${_selectedChain.toUpperCase()} Private Key', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)))),
                   ],
                 ),
               ),
