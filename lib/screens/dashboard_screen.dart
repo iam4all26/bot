@@ -55,9 +55,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final api = context.read<ApiService>();
     
     final responses = await Future.wait([
-      api.getEndpoint('balance.php'),
+      // Dashboard hero card shows the Solana wallet specifically (primary
+      // wallet, matching the web dashboard's design) — other chains are
+      // managed via Settings.
+      api.getEndpoint('balance.php?chain=solana'),
       api.getEndpoint('positions.php?action=fetch'),
-      api.getEndpoint('wallet.php?action=get')
+      api.getEndpoint('wallet.php?action=get&chain=solana')
     ]);
 
     if (mounted) {
@@ -65,8 +68,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
         _isRefreshing = false;
         if (responses[0]['status'] == 'success') {
-          _solBalance = responses[0]['data']['sol_balance'];
-          _usdValue = responses[0]['data']['usd_value'];
+          // FIXED: backend field renamed from 'sol_balance' to
+          // 'native_balance' when the API became chain-aware.
+          _solBalance = responses[0]['data']['native_balance'] ?? responses[0]['data']['sol_balance'] ?? '0.00000';
+          _usdValue = responses[0]['data']['usd_value'] ?? '0.00';
         }
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
@@ -85,8 +90,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _fetchDashboardData(silent: true);
   }
 
-  Future<void> _launchDexScreener(String address) async {
-    final url = Uri.parse('https://dexscreener.com/solana/$address');
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
     try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
@@ -610,6 +615,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: Row(
                       children: [
                         Text(_formatAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 6),
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(5), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
                         const SizedBox(width: 8),
                         Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), child: Text(botName, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
                       ],
