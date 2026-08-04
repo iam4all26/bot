@@ -47,8 +47,8 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
     }
   }
 
-  Future<void> _launchDexScreener(String address) async {
-    final url = Uri.parse('https://dexscreener.com/solana/$address');
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
     try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -126,7 +126,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
       if (p['status'] == 'closed') {
         totalClosed++;
         double pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0;
-        if (p['close_reason'] == 'TP_HIT' || (p['close_reason'] == 'MANUAL' && pnl > 0)) {
+        if (p['close_reason'] == 'TP_HIT' || p['close_reason'] == 'TRAILING_SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl > 0)) {
           totalWins++;
         } else if (pnl < 0 || p['close_reason'] == 'SL_HIT') {
           totalLosses++;
@@ -289,7 +289,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                   final size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0;
                   final pct = size > 0 ? (pnl / size) * 100 : 0.0;
                   final isOpen = p['status'] == 'open';
-                  final isWin = p['close_reason'] == 'TP_HIT' || (p['close_reason'] == 'MANUAL' && pnl > 0);
+                  final isWin = p['close_reason'] == 'TP_HIT' || p['close_reason'] == 'TRAILING_SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl > 0);
                   final isLoss = p['close_reason'] == 'SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl < 0);
 
                   return Padding(
@@ -302,7 +302,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               InkWell(
-                                onTap: () => _launchDexScreener(p['token_address']),
+                                onTap: () => _launchDexScreener(p['token_address'], chain: p['chain'] ?? 'solana'),
                                 child: Row(
                                   children: [
                                     Text(
