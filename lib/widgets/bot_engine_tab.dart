@@ -19,6 +19,8 @@ class _BotEngineTabState extends State<BotEngineTab> {
 
   // Toggles
   bool _liveMode = false;
+  bool _bscLiveMode = false;
+  bool _robinhoodLiveMode = false;
   bool _paperMode = true;
   bool _telegramAlerts = true;
 
@@ -30,6 +32,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
   final _tpCtrl = TextEditingController();
   final _slCtrl = TextEditingController();
   final _realBaseSizeCtrl = TextEditingController();
+  final _realMinTradeCtrl = TextEditingController();
   final _realMaxTradeCtrl = TextEditingController();
   final _realDailyCapCtrl = TextEditingController();
   final _stablecoinsCtrl = TextEditingController();
@@ -50,6 +53,8 @@ class _BotEngineTabState extends State<BotEngineTab> {
       final data = res['data'] ?? {};
       setState(() {
         _liveMode = data['live_trading_enabled'] == '1';
+        _bscLiveMode = data['bsc_live_trading_enabled'] == '1';
+        _robinhoodLiveMode = data['robinhood_live_trading_enabled'] == '1';
         _paperMode = data['paper_trading_enabled'] == '1';
         _telegramAlerts = data['telegram_enabled'] == '1';
 
@@ -62,6 +67,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
         _tpCtrl.text = data['default_tp_percent'] ?? '50';
         _slCtrl.text = data['default_sl_percent'] ?? '20';
         _realBaseSizeCtrl.text = data['real_trade_usd_amount'] ?? '5';
+        _realMinTradeCtrl.text = data['min_real_trade_usd'] ?? '20';
         _realMaxTradeCtrl.text = data['max_real_trade_usd'] ?? '25';
         _realDailyCapCtrl.text = data['max_daily_real_spend_usd'] ?? '100';
         _stablecoinsCtrl.text = data['stablecoin_mints'] ?? '';
@@ -89,6 +95,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
       'default_tp_percent': _tpCtrl.text,
       'default_sl_percent': _slCtrl.text,
       'real_trade_usd_amount': _realBaseSizeCtrl.text,
+      'min_real_trade_usd': _realMinTradeCtrl.text,
       'max_real_trade_usd': _realMaxTradeCtrl.text,
       'max_daily_real_spend_usd': _realDailyCapCtrl.text,
       'stablecoin_mints': _stablecoinsCtrl.text,
@@ -96,6 +103,8 @@ class _BotEngineTabState extends State<BotEngineTab> {
       'telegram_enabled': _telegramAlerts ? '1' : '0',
       'paper_trading_enabled': _paperMode ? '1' : '0',
       'live_trading_enabled': _liveMode ? '1' : '0',
+      'bsc_live_trading_enabled': _bscLiveMode ? '1' : '0',
+      'robinhood_live_trading_enabled': _robinhoodLiveMode ? '1' : '0',
     };
 
     final api = context.read<ApiService>();
@@ -164,7 +173,11 @@ class _BotEngineTabState extends State<BotEngineTab> {
               const SizedBox(height: 24),
               SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.warning(context), title: Text('Paper Trading (Simulated)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), subtitle: Text('Open virtual positions automatically', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _paperMode, onChanged: (val) => setState(() => _paperMode = val)),
               Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.danger(context), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context), size: 16), const SizedBox(width: 6), Text('Live REAL Trading', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds on Jupiter', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _liveMode, onChanged: (val) => setState(() => _liveMode = val)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.danger(context), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — Solana', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via Jupiter', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _liveMode, onChanged: (val) => setState(() => _liveMode = val)),
+              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: const Color(0xFFF0B90B), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — BSC', style: TextStyle(color: const Color(0xFFF0B90B), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via PancakeSwap', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _bscLiveMode, onChanged: (val) => setState(() => _bscLiveMode = val)),
+              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: const Color(0xFF00C805), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — Robinhood', style: TextStyle(color: const Color(0xFF00C805), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via Uniswap — verify router address first', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _robinhoodLiveMode, onChanged: (val) => setState(() => _robinhoodLiveMode = val)),
               Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
               SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.info(context), title: Text('Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), subtitle: Text('Broadcast updates to designated channel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _telegramAlerts, onChanged: (val) => setState(() => _telegramAlerts = val)),
               const SizedBox(height: 24),
@@ -180,6 +193,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
               Row(children: [Icon(PhosphorIcons.shieldWarningFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Real Trading Risk Limits', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 16))]),
               const SizedBox(height: 24),
               _buildTextField('REAL BASE SIZE (\$)', _realBaseSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+              _buildTextField('MIN PER TRADE (\$)', _realMinTradeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
               _buildTextField('MAX PER TRADE (\$)', _realMaxTradeCtrl, PhosphorIcons.prohibit, isUsd: true),
               _buildTextField('DAILY SPEND CAP (\$)', _realDailyCapCtrl, PhosphorIcons.calendarX, isUsd: true),
             ],
