@@ -467,15 +467,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               Color closeReasonColor = AppTheme.info(context);
                               switch (p['close_reason']) {
                                 case 'TP_HIT':
-                                  closeReasonBadge = 'TP Hit';
+                                  closeReasonBadge = 'TP';
                                   closeReasonColor = AppTheme.success(context);
                                   break;
                                 case 'SL_HIT':
-                                  closeReasonBadge = 'SL Hit';
+                                  closeReasonBadge = 'SL';
                                   closeReasonColor = AppTheme.danger(context);
                                   break;
                                 case 'TRAILING_SL_HIT':
-                                  closeReasonBadge = 'Trailing SL';
+                                  closeReasonBadge = 'T-SL';
                                   closeReasonColor = Colors.purple;
                                   break;
                                 case 'MANUAL':
@@ -483,7 +483,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   closeReasonColor = AppTheme.info(context);
                                   break;
                                 case 'ZERO_BALANCE':
-                                  closeReasonBadge = 'Zero Balance';
+                                  closeReasonBadge = '0-Bal';
                                   closeReasonColor = theme.colorScheme.onSurfaceVariant;
                                   break;
                                 default:
@@ -498,16 +498,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                               if (isCopy) {
                                   String label = p['wallet_label']?.toString() ?? 'Unknown';
-                                  final botIdRaw = p['tracked_wallet_id']?.toString() ?? p['bot_id']?.toString();
-                                  final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty) ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
+                                  final botIdRaw = p['bot_id']?.toString();
+                                  final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty && botIdRaw != 'null') ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
 
                                   if (isAdmin && label.toUpperCase() != 'MANUAL') {
                                       mainTitle = label.toUpperCase();
-                                      subTitle = 'System $sysBotName'; 
+                                      subTitle = sysBotName; 
                                   } else {
                                       mainTitle = sysBotName; 
                                   }
                               }
+
+                              // Abbreviated chain label — SOL / BSC / RBH instead of full names
+                              const chainAbbrev = {'solana': 'SOL', 'bsc': 'BSC', 'robinhood': 'RBH'};
+                              final chainLabel = chainAbbrev[(p['chain'] ?? 'solana').toString()] ?? (p['chain'] ?? 'SOL').toString().toUpperCase();
                               
                               String winRateText = '';
                               if (_winRates.containsKey(mainTitle)) {
@@ -556,21 +560,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                               );
                                             },
                                             borderRadius: BorderRadius.circular(8),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: theme.primaryColor.withOpacity(0.12),
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
-                                                  const SizedBox(width: 4), 
-                                                  Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                ],
-                                              ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                                  margin: const EdgeInsets.only(right: 8),
+                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                                                  child: Text(chainLabel, style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                  decoration: BoxDecoration(
+                                                    color: theme.primaryColor.withOpacity(0.12),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
+                                                      const SizedBox(width: 4), 
+                                                      Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
@@ -586,8 +600,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           ),
                                           Row(
                                             children: [
-                                              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4), margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5))),
-                                              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))), child: Text(isReal ? 'LIVE' : 'PAPER', style: GoogleFonts.spaceGrotesk(color: isReal ? AppTheme.danger(context) : AppTheme.warning(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                margin: const EdgeInsets.only(right: 8),
+                                                decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))),
+                                                child: isReal
+                                                    ? Text('LIVE', style: GoogleFonts.spaceGrotesk(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
+                                                    : const Text('📄', style: TextStyle(fontSize: 12)),
+                                              ),
                                               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: closeReasonColor.withOpacity(0.15), border: Border.all(color: closeReasonColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(6)), child: Text(closeReasonBadge, style: GoogleFonts.spaceGrotesk(color: closeReasonColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                             ],
                                           )
