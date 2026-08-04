@@ -164,6 +164,7 @@ class _BotConfigCardState extends State<BotConfigCard> {
     FocusScope.of(context).unfocus();
     widget.onSave({
       'bot_id': widget.bot['bot_id'],
+      'chain': widget.bot['chain'] ?? 'solana',
       'enabled': isEnabled,
       'trade_usd_amount': tradeCtrl.text.trim(),
       'tp_percent': tpCtrl.text.trim(),
@@ -222,13 +223,25 @@ class _BotConfigCardState extends State<BotConfigCard> {
                 child: Icon(PhosphorIcons.robotFill, color: isEnabled ? theme.primaryColor : theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.bot['name'], style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(child: Text(widget.bot['name'], style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                          child: Text((widget.bot['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(isEnabled ? 'ACTIVE' : 'INACTIVE', style: TextStyle(color: isEnabled ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -240,6 +253,19 @@ class _BotConfigCardState extends State<BotConfigCard> {
                 children: [
                   Container(height: 1, color: theme.colorScheme.outlineVariant),
                   const SizedBox(height: 24),
+                  if (widget.bot['has_wallet_on_chain'] == false)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.danger(context).withOpacity(0.3))),
+                      child: Row(
+                        children: [
+                          Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context), size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text('No ${(widget.bot['chain'] ?? 'solana').toString().toUpperCase()} wallet connected — add one in Settings before enabling this bot.', style: TextStyle(color: AppTheme.danger(context), fontSize: 11, fontWeight: FontWeight.w600))),
+                        ],
+                      ),
+                    ),
                   
                   Row(
                     children: [
