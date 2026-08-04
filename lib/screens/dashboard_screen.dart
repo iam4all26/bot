@@ -31,6 +31,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isRefreshing = false;
   String _solBalance = "0.00000";
   String _usdValue = "0.00";
+  // Per-chain balances for the multi-chain portfolio breakdown
+  Map<String, Map<String, dynamic>> _chainBalances = {
+    'solana': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'SOL'},
+    'bsc': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'BNB'},
+    'robinhood': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'ETH'},
+  };
+  static final Map<String, Color> _chainColors = {
+    'solana': AppTheme.kainuwaPurple,
+    'bsc': const Color(0xFFF0B90B),
+    'robinhood': const Color(0xFF00C805),
+  };
   String _publicAddress = "Loading...";
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
@@ -55,24 +66,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final api = context.read<ApiService>();
     
     final responses = await Future.wait([
-      // Dashboard hero card shows the Solana wallet specifically (primary
-      // wallet, matching the web dashboard's design) — other chains are
-      // managed via Settings.
       api.getEndpoint('balance.php?chain=solana'),
       api.getEndpoint('positions.php?action=fetch'),
-      api.getEndpoint('wallet.php?action=get&chain=solana')
+      api.getEndpoint('wallet.php?action=get&chain=solana'),
+      api.getEndpoint('balance.php?chain=bsc'),
+      api.getEndpoint('balance.php?chain=robinhood'),
     ]);
 
     if (mounted) {
       setState(() {
         _isLoading = false;
         _isRefreshing = false;
+        double totalUsd = 0.0;
+
         if (responses[0]['status'] == 'success') {
           // FIXED: backend field renamed from 'sol_balance' to
           // 'native_balance' when the API became chain-aware.
           _solBalance = responses[0]['data']['native_balance'] ?? responses[0]['data']['sol_balance'] ?? '0.00000';
           _usdValue = responses[0]['data']['usd_value'] ?? '0.00';
+          final solUsd = double.tryParse(_usdValue) ?? 0.0;
+          totalUsd += solUsd;
+          _chainBalances['solana'] = {'balance': _solBalance, 'usd': solUsd, 'symbol': responses[0]['data']['native_symbol'] ?? 'SOL'};
         }
+
+        // BSC and Robinhood are additive to the portfolio total — errors on
+        // these (e.g. no wallet connected yet) don't block the Solana figure.
+        if (responses[3]['status'] == 'success') {
+          final bal = responses[3]['data']['native_balance'] ?? '0.00000';
+          final usd = double.tryParse(responses[3]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
+          totalUsd += usd;
+          _chainBalances['bsc'] = {'balance': bal, 'usd': usd, 'symbol': responses[3]['data']['native_symbol'] ?? 'BNB'};
+        }
+        if (responses[4]['status'] == 'success') {
+          final bal = responses[4]['data']['native_balance'] ?? '0.00000';
+          final usd = double.tryParse(responses[4]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
+          totalUsd += usd;
+          _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': responses[4]['data']['native_symbol'] ?? 'ETH'};
+        }
+
+        // Portfolio total now reflects all connected chains combined, not
+        // just Solana — this is the figure shown in the big USD number.
+        _usdValue = totalUsd.toStringAsFixed(2);
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
           _openPositions = responses[1]['open_positions'] ?? [];
@@ -452,18 +486,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 4),
                   Text('≈ ${currency.format(_usdValue)}', style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15)),
                 ],
+                const SizedBox(height: 8),
+                Text('COMBINED ACROSS SOLANA, BSC & ROBINHOOD', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 0.8, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 12),
                 Row(
-                  children: [
-                    Container(
-                      width: 28, height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      child: const SolanaIcon(size: 16, color: AppTheme.kainuwaPurple),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('$_solBalance SOL', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
+                  children: ['solana', 'bsc', 'robinhood'].map((chainId) {
+                    final cb = _chainBalances[chainId]!;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22, height: 22,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
+                            child: chainId == 'solana'
+                                ? const SolanaIcon(size: 12, color: AppTheme.kainuwaPurple)
+                                : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                          ),
+                          const SizedBox(width: 6),
+                          Text('${cb['balance']} ${cb['symbol']}', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
