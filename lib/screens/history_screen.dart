@@ -168,8 +168,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } catch (_) { return 'Unknown Date'; }
   }
 
-  Future<void> _launchDexScreener(String address) async {
-    final url = Uri.parse('https://dexscreener.com/solana/$address');
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
     try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
@@ -465,14 +465,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               
                               String closeReasonBadge = '';
                               Color closeReasonColor = AppTheme.info(context);
-                              if (p['close_reason'] == 'TP_HIT') {
+                              switch (p['close_reason']) {
+                                case 'TP_HIT':
                                   closeReasonBadge = 'TP Hit';
                                   closeReasonColor = AppTheme.success(context);
-                              } else if (p['close_reason'] == 'SL_HIT') {
+                                  break;
+                                case 'SL_HIT':
                                   closeReasonBadge = 'SL Hit';
                                   closeReasonColor = AppTheme.danger(context);
-                              } else {
-                                  closeReasonBadge = 'Closed'; 
+                                  break;
+                                case 'TRAILING_SL_HIT':
+                                  closeReasonBadge = 'Trailing SL';
+                                  closeReasonColor = Colors.purple;
+                                  break;
+                                case 'MANUAL':
+                                  closeReasonBadge = 'Manual';
+                                  closeReasonColor = AppTheme.info(context);
+                                  break;
+                                case 'ZERO_BALANCE':
+                                  closeReasonBadge = 'Zero Balance';
+                                  closeReasonColor = theme.colorScheme.onSurfaceVariant;
+                                  break;
+                                default:
+                                  closeReasonBadge = p['close_reason']?.toString() ?? 'Closed';
                                   closeReasonColor = theme.colorScheme.onSurfaceVariant;
                               }
 
@@ -566,11 +581,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           InkWell(
-                                            onTap: () => _launchDexScreener(p['token_address'] ?? ''), 
+                                            onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'), 
                                             child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
                                           ),
                                           Row(
                                             children: [
+                                              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4), margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5))),
                                               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))), child: Text(isReal ? 'LIVE' : 'PAPER', style: GoogleFonts.spaceGrotesk(color: isReal ? AppTheme.danger(context) : AppTheme.warning(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: closeReasonColor.withOpacity(0.15), border: Border.all(color: closeReasonColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(6)), child: Text(closeReasonBadge, style: GoogleFonts.spaceGrotesk(color: closeReasonColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
                                             ],
