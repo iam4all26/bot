@@ -59,8 +59,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
     return true;
   }
 
-  Future<void> _launchDexScreener(String address) async {
-    final url = Uri.parse('https://dexscreener.com/solana/$address');
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
     try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
@@ -432,17 +432,27 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   InkWell(
-                                    onTap: () => _launchDexScreener(p['token_address'] ?? ''),
+                                    onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
                                     child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)]),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isReal ? AppTheme.danger(context).withOpacity(0.12) : AppTheme.warning(context).withOpacity(0.12), 
-                                      borderRadius: BorderRadius.circular(8), 
-                                      border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))
-                                    ),
-                                    child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? AppTheme.danger(context) : AppTheme.warning(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                                        child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: isReal ? AppTheme.danger(context).withOpacity(0.12) : AppTheme.warning(context).withOpacity(0.12), 
+                                          borderRadius: BorderRadius.circular(8), 
+                                          border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))
+                                        ),
+                                        child: Text(isReal ? 'LIVE' : 'PAPER', style: TextStyle(color: isReal ? AppTheme.danger(context) : AppTheme.warning(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
