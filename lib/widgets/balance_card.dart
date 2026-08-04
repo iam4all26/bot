@@ -15,7 +15,18 @@ class _BalanceCardState extends State<BalanceCard> {
   bool _isLoading = true;
   String _solBalance = "0.00000";
   String _usdValue = "0.00";
+  String _nativeSymbol = "SOL";
   String _errorMessage = "";
+
+  // Static chain list matching the chains seeded server-side (chains table).
+  // There's no mobile endpoint yet that returns this dynamically — if a 4th
+  // chain gets added later, add it here too or wire up a chains.php endpoint.
+  static const List<Map<String, String>> _chains = [
+    {'id': 'solana', 'name': 'Solana', 'symbol': 'SOL'},
+    {'id': 'bsc', 'name': 'BSC', 'symbol': 'BNB'},
+    {'id': 'robinhood', 'name': 'Robinhood', 'symbol': 'ETH'},
+  ];
+  String _selectedChain = 'solana';
 
   @override
   void initState() {
@@ -25,19 +36,33 @@ class _BalanceCardState extends State<BalanceCard> {
 
   Future<void> _fetchBalance() async {
     final api = context.read<ApiService>();
-    final res = await api.getEndpoint('balance.php');
+    final res = await api.getEndpoint('balance.php?chain=$_selectedChain');
     
     if (mounted) {
       setState(() {
         _isLoading = false;
         if (res['status'] == 'success') {
-          _solBalance = res['data']['sol_balance'];
-          _usdValue = res['data']['usd_value'];
+          // FIXED: backend field renamed from 'sol_balance' to
+          // 'native_balance' when the API became chain-aware; kept
+          // 'sol_balance' too server-side for compatibility, reading the
+          // new key here since it's always present now.
+          _solBalance = res['data']['native_balance'] ?? res['data']['sol_balance'] ?? '0.00000';
+          _usdValue = res['data']['usd_value'] ?? '0.00';
+          _nativeSymbol = res['data']['native_symbol'] ?? 'SOL';
         } else {
           _errorMessage = res['message'] ?? 'Failed to load balance';
         }
       });
     }
+  }
+
+  void _onChainChanged(String chainId) {
+    setState(() {
+      _selectedChain = chainId;
+      _isLoading = true;
+      _errorMessage = "";
+    });
+    _fetchBalance();
   }
 
   @override
@@ -80,6 +105,38 @@ class _BalanceCardState extends State<BalanceCard> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Chain selector — switches which chain's wallet is displayed
+                Row(
+                  children: _chains.map((c) {
+                    final selected = c['id'] == _selectedChain;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        onTap: () => _onChainChanged(c['id']!),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Text(
+                            c['name']!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -115,7 +172,7 @@ class _BalanceCardState extends State<BalanceCard> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: Text(
-                        'SOL',
+                        _nativeSymbol,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.primaryColor,
