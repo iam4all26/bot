@@ -31,6 +31,31 @@ class _TerminalScreenState extends State<TerminalScreen> {
   String? _tokenError;
   Timer? _debounceTimer;
 
+  // Static chain list matching the chains seeded server-side.
+  static const List<Map<String, String>> _chains = [
+    {'id': 'solana', 'name': 'Solana', 'placeholder': 'Paste Solana Token Address'},
+    {'id': 'bsc', 'name': 'BSC', 'placeholder': 'Paste BSC Token Address (0x...)'},
+    {'id': 'robinhood', 'name': 'Robinhood', 'placeholder': 'Paste Robinhood Chain Token Address (0x...)'},
+  ];
+  String _selectedChain = 'solana';
+
+  bool _isValidAddressForChain(String address) {
+    if (_selectedChain == 'solana') {
+      return RegExp(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$').hasMatch(address);
+    }
+    return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(address);
+  }
+
+  void _onChainSelected(String chainId) {
+    setState(() {
+      _selectedChain = chainId;
+      _tokenData = null;
+      _tokenError = null;
+    });
+    // Re-validate whatever address is already typed against the new chain
+    if (_tokenController.text.trim().isNotEmpty) _onAddressChanged();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -62,7 +87,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final address = _tokenController.text.trim();
     _debounceTimer?.cancel();
 
-    if (address.length >= 32 && RegExp(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$').hasMatch(address)) {
+    if (_isValidAddressForChain(address)) {
       _debounceTimer = Timer(const Duration(milliseconds: 500), () {
         _fetchTokenInfo(address);
       });
@@ -85,7 +110,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     });
 
     final api = context.read<ApiService>();
-    final res = await api.getEndpoint('token_info.php?address=$address');
+    final res = await api.getEndpoint('token_info.php?address=$address&chain=$_selectedChain');
 
     if (mounted) {
       setState(() {
@@ -106,10 +131,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     }
   }
 
-  String? _validateSolanaAddress(String? value) {
+  String? _validateTokenAddress(String? value) {
     if (value == null || value.trim().isEmpty) return 'Token address required';
-    if (!RegExp(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$').hasMatch(value.trim())) {
-      return 'Invalid Solana token address';
+    if (!_isValidAddressForChain(value.trim())) {
+      return _selectedChain == 'solana' ? 'Invalid Solana token address' : 'Invalid ${_selectedChain.toUpperCase()} address (expects 0x...)';
     }
     return null;
   }
@@ -119,6 +144,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     setState(() => _isLoading = true);
     final api = context.read<ApiService>();
     final res = await api.postEndpoint('trade.php?action=manual_snipe', {
+      'chain': _selectedChain,
       'token_address': _tokenController.text.trim(),
       'trade_usd': _usdController.text,
       'tp_percent': _tpController.text,
@@ -178,12 +204,34 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           Text('Token Target', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: _chains.map((c) {
+                          final selected = c['id'] == _selectedChain;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () => _onChainSelected(c['id']!),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3)),
+                                ),
+                                child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _tokenController,
                         style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 14),
                         decoration: InputDecoration(
-                          labelText: 'Paste Solana Token Address',
+                          labelText: _chains.firstWhere((c) => c['id'] == _selectedChain)['placeholder'],
                           labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                           suffixIcon: IconButton(
                             icon: Icon(PhosphorIcons.clipboard, color: theme.primaryColor),
@@ -193,7 +241,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           fillColor: theme.colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         ),
-                        validator: _validateSolanaAddress,
+                        validator: _validateTokenAddress,
                       ),
                     ],
                   ),
@@ -290,7 +338,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                               controller: _usdController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
-                              decoration: InputDecoration(labelText: 'Trade Size (\$)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                              decoration: InputDecoration(labelText: 'Trade Size (\$) — executes via ${_selectedChain == 'solana' ? 'Jupiter' : 'Uniswap router'}', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                             ),
                           ),
                           const SizedBox(width: 16),
