@@ -217,10 +217,13 @@ class _UsersTabState extends State<UsersTab> {
     );
   }
 
-  Future<void> _showQuotaModal(int userId, dynamic daily, dynamic monthly, dynamic yearly) async {
+  Future<void> _showQuotaModal(int userId, dynamic daily, dynamic monthly, dynamic yearly, {dynamic maxPerTradeUsd, dynamic minPerTradeUsd, dynamic dailySpendCap}) async {
     final dailyCtrl = TextEditingController(text: daily?.toString() ?? '');
     final monthlyCtrl = TextEditingController(text: monthly?.toString() ?? '');
     final yearlyCtrl = TextEditingController(text: yearly?.toString() ?? '');
+    final maxPerTradeCtrl = TextEditingController(text: maxPerTradeUsd?.toString() ?? '');
+    final minPerTradeCtrl = TextEditingController(text: minPerTradeUsd?.toString() ?? '');
+    final dailyCapCtrl = TextEditingController(text: dailySpendCap?.toString() ?? '');
     bool isSaving = false;
 
     await showDialog(
@@ -238,12 +241,15 @@ class _UsersTabState extends State<UsersTab> {
                 Text('Trading Limits', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
-            content: Column(
+            content: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Leave blank for unlimited allocations.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                const SizedBox(height: 24),
+                Text('Leave any field blank to remove that limit and use the system default.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                const SizedBox(height: 16),
+                Text('TRADE COUNT ALLOCATIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 8),
                 TextField(
                   controller: dailyCtrl,
                   keyboardType: TextInputType.number,
@@ -256,6 +262,7 @@ class _UsersTabState extends State<UsersTab> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: dailyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => dailyCtrl.clear())) : null,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -271,6 +278,7 @@ class _UsersTabState extends State<UsersTab> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: monthlyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => monthlyCtrl.clear())) : null,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -286,9 +294,66 @@ class _UsersTabState extends State<UsersTab> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: yearlyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => yearlyCtrl.clear())) : null,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(height: 1, color: theme.colorScheme.outlineVariant),
+                const SizedBox(height: 16),
+                Text('DOLLAR SIZE LIMITS (all chains)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: maxPerTradeCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    labelText: 'Max Per Trade (\$)',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: 'System default',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: maxPerTradeCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => maxPerTradeCtrl.clear())) : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: minPerTradeCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    labelText: 'Min Per Trade (\$)',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: 'System floor (e.g. \$20)',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    helperText: 'Grants this user a lower minimum than the global floor. Leave blank to keep the system floor.',
+                    helperMaxLines: 2,
+                    helperStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: minPerTradeCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => minPerTradeCtrl.clear())) : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dailyCapCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    labelText: 'Daily Spend Cap (\$)',
+                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    hintText: 'System default',
+                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    suffixIcon: dailyCapCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => dailyCapCtrl.clear())) : null,
                   ),
                 ),
               ],
+              ),
             ),
             actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             actions: [
@@ -307,6 +372,9 @@ class _UsersTabState extends State<UsersTab> {
                       'max_trades_daily': dailyCtrl.text.trim(),
                       'max_trades_monthly': monthlyCtrl.text.trim(),
                       'max_trades_yearly': yearlyCtrl.text.trim(),
+                      'max_per_trade_usd': maxPerTradeCtrl.text.trim(),
+                      'min_per_trade_usd': minPerTradeCtrl.text.trim(),
+                      'daily_spend_cap': dailyCapCtrl.text.trim(),
                     },
                   );
                   if (mounted) {
@@ -471,7 +539,7 @@ class _UsersTabState extends State<UsersTab> {
                             side: BorderSide(color: theme.colorScheme.outlineVariant),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          onPressed: () => _showQuotaModal(u['id'], u['quotas']?['daily'], u['quotas']?['monthly'], u['quotas']?['yearly']),
+                          onPressed: () => _showQuotaModal(u['id'], u['quotas']?['daily'], u['quotas']?['monthly'], u['quotas']?['yearly'], maxPerTradeUsd: u['quotas']?['max_per_trade_usd'], minPerTradeUsd: u['quotas']?['min_per_trade_usd'], dailySpendCap: u['quotas']?['daily_spend_cap']),
                           icon: Icon(PhosphorIcons.ticket, color: theme.colorScheme.onSurfaceVariant, size: 16),
                           label: Text('Quotas', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
