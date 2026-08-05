@@ -489,27 +489,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 8),
                 Text('COMBINED ACROSS SOLANA, BSC & ROBINHOOD', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 0.8, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 12),
-                Row(
-                  children: ['solana', 'bsc', 'robinhood'].map((chainId) {
-                    final cb = _chainBalances[chainId]!;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22, height: 22,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
-                            child: chainId == 'solana'
-                                ? const SolanaIcon(size: 12, color: AppTheme.kainuwaPurple)
-                                : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
-                          ),
-                          const SizedBox(width: 6),
-                          Text('${cb['balance']} ${cb['symbol']}', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['solana', 'bsc', 'robinhood'].map((chainId) {
+                      final cb = _chainBalances[chainId]!;
+                      final rawBalance = double.tryParse(cb['balance'].toString()) ?? 0.0;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 14),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 20, height: 20,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
+                              child: chainId == 'solana'
+                                  ? const SolanaIcon(size: 11, color: AppTheme.kainuwaPurple)
+                                  : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                            ),
+                            const SizedBox(width: 5),
+                            Text('${rawBalance.toStringAsFixed(4)} ${cb['symbol']}', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ],
             ),
