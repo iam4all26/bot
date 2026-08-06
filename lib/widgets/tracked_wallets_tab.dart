@@ -14,8 +14,13 @@ class TrackedWalletsTab extends StatefulWidget {
 class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   final _walletController = TextEditingController();
   final _labelController = TextEditingController();
+  final _searchController = TextEditingController();
+
   List<dynamic> _wallets = [];
   bool _isLoading = false;
+
+  String _searchQuery = '';
+  String _selectedChainFilter = 'all'; // 'all', 'solana', 'bsc', 'robinhood'
 
   // Static chain list matching the chains seeded server-side.
   static const List<Map<String, String>> _chains = [
@@ -23,6 +28,14 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
     {'id': 'bsc', 'name': 'BSC'},
     {'id': 'robinhood', 'name': 'Robinhood'},
   ];
+
+  static const List<Map<String, String>> _filterChains = [
+    {'id': 'all', 'name': 'All Chains'},
+    {'id': 'solana', 'name': 'Solana'},
+    {'id': 'bsc', 'name': 'BSC'},
+    {'id': 'robinhood', 'name': 'Robinhood'},
+  ];
+
   String _addChain = 'solana';
 
   static const Map<String, Color> _chainColors = {
@@ -31,7 +44,33 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
     'robinhood': Color(0xFF00C805),
   };
 
-  @override void initState() { super.initState(); _fetchWallets(); }
+  @override 
+  void initState() { 
+    super.initState(); 
+    _fetchWallets(); 
+  }
+
+  @override
+  void dispose() {
+    _walletController.dispose();
+    _labelController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<dynamic> get _filteredWallets {
+    return _wallets.where((w) {
+      final label = (w['label'] ?? '').toString().toLowerCase();
+      final address = (w['address'] ?? '').toString().toLowerCase();
+      final chain = (w['chain'] ?? 'solana').toString().toLowerCase();
+      final query = _searchQuery.toLowerCase().trim();
+
+      final matchesQuery = query.isEmpty || label.contains(query) || address.contains(query);
+      final matchesChain = _selectedChainFilter == 'all' || chain == _selectedChainFilter;
+
+      return matchesQuery && matchesChain;
+    }).toList();
+  }
 
   Future<void> _fetchWallets() async {
     setState(() => _isLoading = true);
@@ -56,7 +95,7 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   }
 
   Future<void> _syncWebhook() async {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Syncing Helius Webhook...'), backgroundColor: AppTheme.warning(context)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Syncing Webhooks (Solana & EVM)...'), backgroundColor: AppTheme.warning(context)));
     final res = await context.read<ApiService>().getEndpoint('admin_wallets.php?action=sync_webhook');
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? ''), backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context)));
   }
@@ -271,7 +310,7 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
         backgroundColor: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context)), const SizedBox(width: 12), Text('Remove Tracker?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold))]),
-        content: Text('Are you sure you want to stop tracking this wallet? You must sync the webhook afterward.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
+        content: Text('Are you sure you want to stop tracking this wallet? You must sync the webhooks afterward.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
@@ -292,6 +331,8 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final filtered = _filteredWallets;
+
     return RefreshIndicator(
       onRefresh: _fetchWallets,
       color: theme.primaryColor,
@@ -355,6 +396,8 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
             ),
           ),
           const SizedBox(height: 32),
+          
+          // Header & Sync Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -363,17 +406,81 @@ class _TrackedWalletsTabState extends State<TrackedWalletsTab> {
                 onPressed: _syncWebhook,
                 style: OutlinedButton.styleFrom(side: BorderSide(color: AppTheme.warning(context)), foregroundColor: AppTheme.warning(context), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                 icon: const Icon(PhosphorIcons.arrowsClockwiseBold, size: 16),
-                label: const Text('Sync Webhook', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text('Sync Webhooks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               )
             ],
           ),
           const SizedBox(height: 16),
+
+          // Search Field
+          TextField(
+            controller: _searchController,
+            onChanged: (val) => setState(() => _searchQuery = val),
+            style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Search label or address...',
+              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
+              prefixIcon: Icon(PhosphorIcons.magnifyingGlass, color: theme.colorScheme.onSurfaceVariant, size: 18),
+              suffixIcon: _searchQuery.isNotEmpty 
+                ? IconButton(
+                    icon: Icon(PhosphorIcons.xCircleFill, color: theme.colorScheme.onSurfaceVariant, size: 18),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Chain Filter Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _filterChains.map((c) {
+                final selected = c['id'] == _selectedChainFilter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: FilterChip(
+                    label: Text(c['name']!),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _selectedChainFilter = c['id']!),
+                    selectedColor: theme.primaryColor.withOpacity(0.2),
+                    checkmarkColor: theme.primaryColor,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    side: BorderSide(color: selected ? theme.primaryColor : Colors.transparent),
+                    labelStyle: TextStyle(
+                      color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           if (_isLoading && _wallets.isEmpty) 
             Center(child: CircularProgressIndicator(color: theme.primaryColor))
           else if (_wallets.isEmpty) 
             Text('No wallets tracked yet.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))
+          else if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Text('No matching wallets found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+              ),
+            )
           else 
-            ..._wallets.map((w) => Padding(
+            ...filtered.map((w) => Padding(
               padding: const EdgeInsets.only(bottom: 16.0),
               child: GlassCard(
                 child: Column(
