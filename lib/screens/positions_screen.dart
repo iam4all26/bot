@@ -108,21 +108,45 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
   String _formatAddress(String addr) => addr.length <= 12 ? addr : '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
 
-  Future<void> _closeSinglePosition(int id) async {
-    final api = context.read<ApiService>();
-    if (api.isTradeLocked(id)) {
+  Future<void> _toggleLock(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (pId <= 0) return;
+    
+    final isCurrentlyLocked = (p['is_locked'] == 1 || p['is_locked'] == '1');
+    final newLockStatus = !isCurrentlyLocked;
+    
+    setState(() {
+      p['is_locked'] = newLockStatus ? 1 : 0;
+    });
+    
+    final res = await context.read<ApiService>().postEndpoint(
+      'trade.php?action=toggle_lock',
+      {'id': pId, 'is_locked': newLockStatus ? 1 : 0},
+    );
+    
+    if (mounted && res['status'] != 'success') {
+      setState(() {
+        p['is_locked'] = isCurrentlyLocked ? 1 : 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to sync lock status', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+    }
+  }
+
+  Future<void> _closeSinglePosition(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (p['is_locked'] == 1 || p['is_locked'] == '1') {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Trade is locked! 🔓 Unlock to close.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
       return;
     }
     
-    setState(() => _closingIds.add(id));
+    setState(() => _closingIds.add(pId));
     await Future.delayed(const Duration(milliseconds: 350));
 
-    final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
+    final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': pId});
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
-         setState(() => _closingIds.remove(id));
+         setState(() => _closingIds.remove(pId));
       }
       _fetchPositions(silent: true);
     }
@@ -237,14 +261,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
   }
 
   Future<void> _executeBatchClose(List<int> ids, String description) async {
-    final api = context.read<ApiService>();
-    List<int> unlockedIds = ids.where((id) => !api.isTradeLocked(id)).toList();
-    
-    if (unlockedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('All selected trades are locked! 🔓', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
-      return;
-    }
-
     final theme = Theme.of(context);
     final dangerColor = AppTheme.danger(context);
     
@@ -253,21 +269,23 @@ class _PositionsScreenState extends State<PositionsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
         title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: dangerColor), const SizedBox(width: 8), Text('Close $description?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
-        content: Text('Are you sure you want to close ${unlockedIds.length} open position(s)? Locked trades are ignored.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+        content: Text('Are you sure you want to close ${ids.length} open position(s)? Locked trades are ignored.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
-          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${unlockedIds.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${ids.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );
 
     if (confirm != true || !mounted) return;
     
-    setState(() => _closingIds.addAll(unlockedIds));
+    setState(() => _closingIds.addAll(ids));
     await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
-    for (int id in unlockedIds) {
+    final api = context.read<ApiService>();
+
+    for (int id in ids) {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
         if (res['status'] == 'success' || res['status'] == 'closed') successCount++;
@@ -275,7 +293,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.'), backgroundColor: AppTheme.success(context)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${ids.length} trades.'), backgroundColor: AppTheme.success(context)));
       _fetchPositions(silent: true);
     }
   }
@@ -289,6 +307,9 @@ class _PositionsScreenState extends State<PositionsScreen> {
     for (var p in _openPositions.where(_passesEnvFilter)) {
       final id = int.tryParse(p['id'].toString()) ?? 0;
       if (id <= 0) continue;
+      
+      // Skip processing locked trades for batch closes
+      if (p['is_locked'] == 1 || p['is_locked'] == '1') continue;
 
       allIds.add(id);
       final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
@@ -514,6 +535,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
                       final pId = int.tryParse(p['id'].toString()) ?? 0;
                       final bool isClosing = _closingIds.contains(pId);
+                      final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
 
                       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
@@ -572,16 +594,16 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               ),
                                             const Spacer(),
                                             GestureDetector(
-                                              onTap: () => apiService.toggleTradeLock(pId),
+                                              onTap: () => _toggleLock(p),
                                               child: Container(
                                                 padding: const EdgeInsets.all(6),
                                                 decoration: BoxDecoration(
-                                                  color: apiService.isTradeLocked(pId) ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                                                  color: isLocked ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: Icon(
-                                                  apiService.isTradeLocked(pId) ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
-                                                  color: apiService.isTradeLocked(pId) ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                                  isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
+                                                  color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
                                                   size: 16,
                                                 ),
                                               ),
@@ -701,7 +723,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                                                 ), 
-                                                onPressed: () => _closeSinglePosition(pId), 
+                                                onPressed: () => _closeSinglePosition(p), 
                                                 icon: const Icon(PhosphorIcons.handPalm, size: 18), 
                                                 label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
                                               ),

@@ -132,21 +132,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _quickClosePosition(int id) async {
-    final api = context.read<ApiService>();
-    if (api.isTradeLocked(id)) {
+  Future<void> _toggleLock(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (pId <= 0) return;
+    
+    final isCurrentlyLocked = (p['is_locked'] == 1 || p['is_locked'] == '1');
+    final newLockStatus = !isCurrentlyLocked;
+    
+    // Optimistic UI Update (Instant Feedback)
+    setState(() {
+      p['is_locked'] = newLockStatus ? 1 : 0;
+    });
+    
+    final res = await context.read<ApiService>().postEndpoint(
+      'trade.php?action=toggle_lock',
+      {'id': pId, 'is_locked': newLockStatus ? 1 : 0},
+    );
+    
+    if (mounted && res['status'] != 'success') {
+      // Revert if API fails
+      setState(() {
+        p['is_locked'] = isCurrentlyLocked ? 1 : 0;
+      });
+      _showFloatingSnackbar(res['message'] ?? 'Failed to sync lock status', isError: true);
+    }
+  }
+
+  Future<void> _quickClosePosition(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (p['is_locked'] == 1 || p['is_locked'] == '1') {
       _showFloatingSnackbar('Trade is locked! 🔓 Unlock to close.', isError: true);
       return;
     }
 
-    setState(() => _closingIds.add(id));
-    await Future.delayed(const Duration(milliseconds: 350)); // Allow shrink animation to play
+    setState(() => _closingIds.add(pId));
+    await Future.delayed(const Duration(milliseconds: 350)); 
 
-    final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
+    final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': pId});
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          _showFloatingSnackbar(res['message'] ?? 'Failed to close', isError: true);
-         setState(() => _closingIds.remove(id)); // Re-show if failed
+         setState(() => _closingIds.remove(pId)); 
       }
       _fetchDashboardData(silent: true);
     }
@@ -158,7 +184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     for (var p in _openPositions) {
       int pId = int.tryParse(p['id'].toString()) ?? 0;
-      if (api.isTradeLocked(pId)) continue;
+      if (p['is_locked'] == 1 || p['is_locked'] == '1') continue;
       
       bool isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
       if (type == 'manual' && isCopy) continue;
@@ -378,10 +404,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
-    final apiService = context.watch<ApiService>();
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
-    final isAdmin = apiService.role == 'admin';
+    final isAdmin = context.read<ApiService>().role == 'admin';
 
     double dailyPnl = 0.0;
     final now = DateTime.now();
@@ -644,6 +669,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
                   final bool isClosing = _closingIds.contains(pId);
+                  final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
                   
                   String botName = p['display_name'] ?? 'Manual';
                   if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
@@ -661,19 +687,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               leading: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  GestureDetector(
+                                    onTap: () => _toggleLock(p),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isLocked ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
+                                        color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
                                     child: Icon(PhosphorIcons.trendUp, size: 18, color: theme.primaryColor),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () => apiService.toggleTradeLock(pId),
-                                    child: Icon(
-                                      apiService.isTradeLocked(pId) ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
-                                      color: apiService.isTradeLocked(pId) ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
-                                      size: 20,
-                                    ),
                                   ),
                                 ],
                               ),
@@ -717,7 +750,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   InkWell(
-                                    onTap: () => _quickClosePosition(pId),
+                                    onTap: () => _quickClosePosition(p),
                                     borderRadius: BorderRadius.circular(20),
                                     child: Container(
                                       padding: const EdgeInsets.all(6),
