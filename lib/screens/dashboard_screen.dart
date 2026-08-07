@@ -31,7 +31,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isRefreshing = false;
   String _solBalance = "0.00000";
   String _usdValue = "0.00";
-  // Per-chain balances for the multi-chain portfolio breakdown
   Map<String, Map<String, dynamic>> _chainBalances = {
     'solana': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'SOL'},
     'bsc': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'BNB'},
@@ -47,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<dynamic> _openPositions = [];
   List<dynamic> _closedPositions = [];
   Timer? _pollingTimer;
+  final Set<int> _closingIds = {};
 
   @override
   void initState() {
@@ -80,8 +80,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         double totalUsd = 0.0;
 
         if (responses[0]['status'] == 'success') {
-          // FIXED: backend field renamed from 'sol_balance' to
-          // 'native_balance' when the API became chain-aware.
           _solBalance = responses[0]['data']['native_balance'] ?? responses[0]['data']['sol_balance'] ?? '0.00000';
           _usdValue = responses[0]['data']['usd_value'] ?? '0.00';
           final solUsd = double.tryParse(_usdValue) ?? 0.0;
@@ -89,8 +87,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _chainBalances['solana'] = {'balance': _solBalance, 'usd': solUsd, 'symbol': responses[0]['data']['native_symbol'] ?? 'SOL'};
         }
 
-        // BSC and Robinhood are additive to the portfolio total — errors on
-        // these (e.g. no wallet connected yet) don't block the Solana figure.
         if (responses[3]['status'] == 'success') {
           final bal = responses[3]['data']['native_balance'] ?? '0.00000';
           final usd = double.tryParse(responses[3]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
@@ -104,8 +100,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': responses[4]['data']['native_symbol'] ?? 'ETH'};
         }
 
-        // Portfolio total now reflects all connected chains combined, not
-        // just Solana — this is the figure shown in the big USD number.
         _usdValue = totalUsd.toStringAsFixed(2);
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
@@ -124,11 +118,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _fetchDashboardData(silent: true);
   }
 
-  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
-    final url = Uri.parse('https://dexscreener.com/$chain/$address');
-    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
-  }
-
   void _showFloatingSnackbar(String message, {bool isError = false}) {
     final theme = Theme.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -144,48 +133,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _quickClosePosition(int id) async {
-    _showFloatingSnackbar('Closing trade...');
-    final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': id});
+    final api = context.read<ApiService>();
+    if (api.isTradeLocked(id)) {
+      _showFloatingSnackbar('Trade is locked! 🔓 Unlock to close.', isError: true);
+      return;
+    }
+
+    setState(() => _closingIds.add(id));
+    await Future.delayed(const Duration(milliseconds: 350)); // Allow shrink animation to play
+
+    final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
     if (mounted) {
-      _showFloatingSnackbar(res['message'] ?? 'Action complete', isError: res['status'] != 'success');
+      if (res['status'] != 'success' && res['status'] != 'closed') {
+         _showFloatingSnackbar(res['message'] ?? 'Failed to close', isError: true);
+         setState(() => _closingIds.remove(id)); // Re-show if failed
+      }
       _fetchDashboardData(silent: true);
     }
   }
 
   Future<void> _panicClose(String type) async {
-    String title = 'PANIC SELL ALL';
-    String content = 'Are you sure you want to market-sell ALL active open positions immediately?';
-    if (type == 'manual') {
-      title = 'CLOSE MANUAL TRADES';
-      content = 'Are you sure you want to market-sell all your MANUAL open positions?';
-    } else if (type == 'copy') {
-      title = 'CLOSE COPY TRADES';
-      content = 'Are you sure you want to market-sell all COPY/BOT open positions?';
+    final api = context.read<ApiService>();
+    List<int> toClose = [];
+    
+    for (var p in _openPositions) {
+      int pId = int.tryParse(p['id'].toString()) ?? 0;
+      if (api.isTradeLocked(pId)) continue;
+      
+      bool isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
+      if (type == 'manual' && isCopy) continue;
+      if (type == 'copy' && !isCopy) continue;
+      
+      toClose.add(pId);
+    }
+    
+    if (toClose.isEmpty) {
+      _showFloatingSnackbar('No unlocked $type trades to close.', isError: true);
+      return;
     }
 
-    final theme = Theme.of(context);
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(title, style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold)),
-        content: Text(content, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CLOSE', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+    setState(() => _closingIds.addAll(toClose));
+    await Future.delayed(const Duration(milliseconds: 350));
 
-    if (confirm == true) {
-      await context.read<ApiService>().postEndpoint('trade.php?action=close_all', {'type': type});
-      if (mounted) _fetchDashboardData();
+    for (int id in toClose) {
+      await api.postEndpoint('trade.php?action=close_position', {'id': id});
     }
+    
+    if (mounted) _fetchDashboardData(silent: true);
   }
 
   void _showActionMenu(bool canTrade) {
@@ -384,9 +378,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
+    final apiService = context.watch<ApiService>();
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
-    final isAdmin = context.read<ApiService>().role == 'admin';
+    final isAdmin = apiService.role == 'admin';
 
     double dailyPnl = 0.0;
     final now = DateTime.now();
@@ -469,7 +464,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 24),
 
           GlassCard(
-            hasBubbles: true,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -525,7 +519,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Expanded(
                 child: GlassCard(
-                  hasBubbles: true,
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,7 +544,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: GlassCard(
-                  hasBubbles: true,
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,68 +643,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
+                  final bool isClosing = _closingIds.contains(pId);
                   
-                  // EXACT BOT NAMING FROM API
                   String botName = p['display_name'] ?? 'Manual';
                   if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
 
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                      child: Icon(PhosphorIcons.trendUp, size: 18, color: theme.primaryColor),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(_formatAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 6),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(5), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
-                        const SizedBox(width: 8),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), child: Text(botName, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-                          if (currency.isNaira)
-                            Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 11, color: AppTheme.success(context).withOpacity(0.8))),
-                        ],
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
-                            ),
-                            if (currency.isNaira && cpnl != null)
-                              Text(
-                                '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8)),
+                  return AnimatedSize(
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                    child: isClosing
+                        ? const SizedBox(width: double.infinity, height: 0)
+                        : AnimatedOpacity(
+                            duration: const Duration(milliseconds: 250),
+                            opacity: isClosing ? 0.0 : 1.0,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              leading: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+                                    child: Icon(PhosphorIcons.trendUp, size: 18, color: theme.primaryColor),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => apiService.toggleTradeLock(pId),
+                                    child: Icon(
+                                      apiService.isTradeLocked(pId) ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
+                                      color: apiService.isTradeLocked(pId) ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
                               ),
-                          ],
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () => _quickClosePosition(pId),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.1), shape: BoxShape.circle),
-                            child: Icon(PhosphorIcons.xBold, size: 14, color: AppTheme.danger(context)),
+                              title: Row(
+                                children: [
+                                  Text(_formatAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 6),
+                                  Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(5), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text((p['chain'] ?? 'solana').toString().toUpperCase(), style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+                                  const SizedBox(width: 8),
+                                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), child: Text(botName, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+                                ],
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+                                    if (currency.isNaira)
+                                      Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 11, color: AppTheme.success(context).withOpacity(0.8))),
+                                  ],
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                      ),
+                                      if (currency.isNaira && cpnl != null)
+                                        Text(
+                                          '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8)),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 12),
+                                  InkWell(
+                                    onTap: () => _quickClosePosition(pId),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.1), shape: BoxShape.circle),
+                                      child: Icon(PhosphorIcons.xBold, size: 14, color: AppTheme.danger(context)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
                   );
                 }).toList(),
               ),

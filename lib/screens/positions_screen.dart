@@ -23,6 +23,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
   bool _isManualRefreshing = false;
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
+  final Set<int> _closingIds = {};
 
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
 
@@ -108,17 +109,25 @@ class _PositionsScreenState extends State<PositionsScreen> {
   String _formatAddress(String addr) => addr.length <= 12 ? addr : '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
 
   Future<void> _closeSinglePosition(int id) async {
-    final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': id});
+    final api = context.read<ApiService>();
+    if (api.isTradeLocked(id)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Trade is locked! 🔓 Unlock to close.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+      return;
+    }
+    
+    setState(() => _closingIds.add(id));
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Action complete')));
+      if (res['status'] != 'success' && res['status'] != 'closed') {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+         setState(() => _closingIds.remove(id));
+      }
       _fetchPositions(silent: true);
     }
   }
 
-  // Live TP/SL editing — lets you loosen or remove a limit while a position
-  // is running (e.g. price is about to hit SL but you think it'll retrace,
-  // or price is ripping toward TP and you want it to keep riding).
-  // Backend already treats 0 as "no limit" — this just wires the UI to it.
   Future<void> _editLimits(Map<String, dynamic> p) async {
     final tpCtrl = TextEditingController(text: (p['tp_percent'] != null && double.tryParse(p['tp_percent'].toString()) != 0) ? p['tp_percent'].toString() : '');
     final slCtrl = TextEditingController(text: (p['sl_percent'] != null && double.tryParse(p['sl_percent'].toString()) != 0) ? p['sl_percent'].toString() : '');
@@ -228,7 +237,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
   }
 
   Future<void> _executeBatchClose(List<int> ids, String description) async {
-    if (ids.isEmpty) return;
+    final api = context.read<ApiService>();
+    List<int> unlockedIds = ids.where((id) => !api.isTradeLocked(id)).toList();
+    
+    if (unlockedIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('All selected trades are locked! 🔓', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+      return;
+    }
 
     final theme = Theme.of(context);
     final dangerColor = AppTheme.danger(context);
@@ -238,21 +253,21 @@ class _PositionsScreenState extends State<PositionsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
         title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: dangerColor), const SizedBox(width: 8), Text('Close $description?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
-        content: Text('Are you sure you want to close ${ids.length} open position(s)?', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+        content: Text('Are you sure you want to close ${unlockedIds.length} open position(s)? Locked trades are ignored.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
-          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${ids.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${unlockedIds.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );
 
     if (confirm != true || !mounted) return;
-    setState(() => _isLoading = true);
+    
+    setState(() => _closingIds.addAll(unlockedIds));
+    await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
-    final api = context.read<ApiService>();
-
-    for (int id in ids) {
+    for (int id in unlockedIds) {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
         if (res['status'] == 'success' || res['status'] == 'closed') successCount++;
@@ -260,7 +275,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${ids.length} trades.'), backgroundColor: AppTheme.success(context)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.'), backgroundColor: AppTheme.success(context)));
       _fetchPositions(silent: true);
     }
   }
@@ -411,7 +426,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
-    final isAdmin = context.read<ApiService>().role == 'admin';
+    final apiService = context.watch<ApiService>();
+    final isAdmin = apiService.role == 'admin';
 
     final finalOpenList = _openPositions.where(_passesEnvFilter).toList();
 
@@ -496,13 +512,14 @@ class _PositionsScreenState extends State<PositionsScreen> {
                       final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
                       final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
                       final isReal = p['is_real'] == 1 || p['is_real'] == '1';
+                      final pId = int.tryParse(p['id'].toString()) ?? 0;
+                      final bool isClosing = _closingIds.contains(pId);
 
                       final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
                       
                       String mainTitle = 'Manual Trade';
                       String? adminBadge;
 
-                      // ADMIN DUAL IDENTITY FIX
                       if (isCopy) {
                          String label = p['wallet_label']?.toString() ?? '';
                          final botIdRaw = p['bot_id']?.toString();
@@ -510,166 +527,192 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
                          if (isAdmin && label.isNotEmpty && label != 'Manual') {
                             mainTitle = label.toUpperCase(); 
-                            adminBadge = sysBotName; // Admin sees BOTH
+                            adminBadge = sysBotName;
                          } else {
-                            mainTitle = sysBotName; // Normal user just sees "Bot 01"
+                            mainTitle = sysBotName; 
                          }
                       }
 
                       const chainAbbrev = {'solana': 'SOL', 'bsc': 'BSC', 'robinhood': 'RBH'};
                       final chainLabel = chainAbbrev[(p['chain'] ?? 'solana').toString()] ?? (p['chain'] ?? 'SOL').toString().toUpperCase();
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: GlassCard(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
-                                    child: Text(chainLabel, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                                  ),
-                                  if (adminBadge != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8.0),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
-                                        child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  InkWell(
-                                    onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
-                                    child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)]),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isReal ? AppTheme.danger(context).withOpacity(0.12) : AppTheme.warning(context).withOpacity(0.12), 
-                                      borderRadius: BorderRadius.circular(8), 
-                                      border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))
-                                    ),
-                                    child: isReal
-                                        ? Text('LIVE', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
-                                        : const Text('📄', style: TextStyle(fontSize: 12)),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              
-                              Row(
-                                children: [
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIVE MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['current_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-
-                              Row(
-                                children: [
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('TP TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
-                                    Text((double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? '+${p['tp_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
-                                  ])),
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('SL TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
-                                    Text((double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? '-${p['sl_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
-                                  ])),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-
-                              Row(
-                                children: [
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('UNREALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
-                                    Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14)),
-                                    if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 11)),
-                                  ])),
-                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
-                                    Text('\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
-                                    if (currency.isNaira) Text('≈ ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ])),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              Container(height: 1, color: theme.colorScheme.outlineVariant),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14),
-                                  const SizedBox(width: 6),
-                                  Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              Row(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: theme.colorScheme.outlineVariant),
-                                    ),
-                                    child: IconButton(
-                                      onPressed: () => _editLimits(p),
-                                      icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
-                                      tooltip: 'Edit TP/SL',
-                                      padding: const EdgeInsets.all(14),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  if (!isReal) ...[
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: AppTheme.success(context).withOpacity(0.5)),
-                                          foregroundColor: AppTheme.success(context),
-                                          padding: const EdgeInsets.symmetric(vertical: 14),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                      return AnimatedSize(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: isClosing
+                            ? const SizedBox(width: double.infinity, height: 0)
+                            : AnimatedOpacity(
+                                duration: const Duration(milliseconds: 250),
+                                opacity: isClosing ? 0.0 : 1.0,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 16.0),
+                                  child: GlassCard(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                                              child: Text(chainLabel, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                            ),
+                                            if (adminBadge != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 8.0),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
+                                                  child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ),
+                                            const Spacer(),
+                                            GestureDetector(
+                                              onTap: () => apiService.toggleTradeLock(pId),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: apiService.isTradeLocked(pId) ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  apiService.isTradeLocked(pId) ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
+                                                  color: apiService.isTradeLocked(pId) ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        onPressed: () => _goLive(p),
-                                        icon: const Icon(PhosphorIcons.lightningFill, size: 18),
-                                        label: const Text('Go Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                  ],
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: AppTheme.danger(context).withOpacity(0.5)), 
-                                        foregroundColor: AppTheme.danger(context),
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                                      ), 
-                                      onPressed: () => _closeSinglePosition(p['id']), 
-                                      icon: const Icon(PhosphorIcons.handPalm, size: 18), 
-                                      label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
+                                        const SizedBox(height: 12),
+
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                              child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)]),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: isReal ? AppTheme.danger(context).withOpacity(0.12) : AppTheme.warning(context).withOpacity(0.12), 
+                                                borderRadius: BorderRadius.circular(8), 
+                                                border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))
+                                              ),
+                                              child: isReal
+                                                  ? Text('LIVE', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
+                                                  : const Text('📄', style: TextStyle(fontSize: 12)),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIVE MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['current_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('TP TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text((double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? '+${p['tp_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            ])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('SL TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text((double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? '-${p['sl_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            ])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('UNREALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14)),
+                                              if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 11)),
+                                            ])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text('\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                              if (currency.isNaira) Text('≈ ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold)),
+                                            ])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        Container(height: 1, color: theme.colorScheme.outlineVariant),
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          children: [
+                                            Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14),
+                                            const SizedBox(width: 6),
+                                            Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+
+                                        Row(
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: theme.colorScheme.outlineVariant),
+                                              ),
+                                              child: IconButton(
+                                                onPressed: () => _editLimits(p),
+                                                icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
+                                                tooltip: 'Edit TP/SL',
+                                                padding: const EdgeInsets.all(14),
+                                                constraints: const BoxConstraints(),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            if (!isReal) ...[
+                                              Expanded(
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    side: BorderSide(color: AppTheme.success(context).withOpacity(0.5)),
+                                                    foregroundColor: AppTheme.success(context),
+                                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                                  ),
+                                                  onPressed: () => _goLive(p),
+                                                  icon: const Icon(PhosphorIcons.lightningFill, size: 18),
+                                                  label: const Text('Go Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                            ],
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                style: OutlinedButton.styleFrom(
+                                                  side: BorderSide(color: AppTheme.danger(context).withOpacity(0.5)), 
+                                                  foregroundColor: AppTheme.danger(context),
+                                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                                ), 
+                                                onPressed: () => _closeSinglePosition(pId), 
+                                                icon: const Icon(PhosphorIcons.handPalm, size: 18), 
+                                                label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      ],
                                     ),
                                   ),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
+                                ),
+                              ),
                       );
                     },
                   ),

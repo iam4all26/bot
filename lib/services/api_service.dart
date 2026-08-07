@@ -11,6 +11,7 @@ class ApiService extends ChangeNotifier {
   String? _role;
   bool _isInit = false;
   bool _allowManual = false;
+  final Set<int> _lockedTradeIds = {};
 
   bool get isAuthenticated => _token != null && _token!.isNotEmpty;
   bool get isInitialized => _isInit;
@@ -19,6 +20,17 @@ class ApiService extends ChangeNotifier {
 
   ApiService() {
     _initAuth();
+  }
+
+  bool isTradeLocked(int id) => _lockedTradeIds.contains(id);
+
+  void toggleTradeLock(int id) {
+    if (_lockedTradeIds.contains(id)) {
+      _lockedTradeIds.remove(id);
+    } else {
+      _lockedTradeIds.add(id);
+    }
+    notifyListeners();
   }
 
   Future<void> _initAuth() async {
@@ -72,6 +84,7 @@ class ApiService extends ChangeNotifier {
     _token = null;
     _role = null;
     _allowManual = false;
+    _lockedTradeIds.clear();
     try {
       await _storage.delete(key: 'api_token');
       await _storage.delete(key: 'user_role');
@@ -108,7 +121,6 @@ class ApiService extends ChangeNotifier {
       );
       return jsonDecode(res.body);
     } catch (e) {
-      // This will now expose FormatExceptions if PHP spits out HTML or errors instead of JSON
       return {'status': 'error', 'message': 'API Error: $e'};
     }
   }
