@@ -10,6 +10,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/animated_background.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pnl_share_dialog.dart';
+import 'pnl_calendar_screen.dart';
 
 enum ClosedFilterType { all, profit, loss, copy, manual }
 enum DateRangeFilter { allTime, today, last7Days, last30Days }
@@ -38,6 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _closedSearchQuery = '';
   ClosedFilterType _selectedClosedType = ClosedFilterType.all;
   String? _selectedClosedBot; 
+  String _selectedChainFilter = 'All Chains';
 
   @override
   void initState() {
@@ -127,7 +129,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
         if (rawDisplay != _selectedClosedBot) passBot = false;
       }
 
-      if (passSearch && passType && passBot) {
+      bool passChain = true;
+      if (_selectedChainFilter != 'All Chains') {
+        String pChain = (p['chain'] ?? 'solana').toString().toLowerCase();
+        String fChain = _selectedChainFilter.toLowerCase();
+        if (pChain != fChain) passChain = false;
+      }
+
+      if (passSearch && passType && passBot && passChain) {
         _statsAll++;
         if (isToday) _statsToday++;
         if (isWeek) _statsWeek++;
@@ -247,7 +256,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return SizedBox(
       width: 300,
       child: GlassCard(
-        hasBubbles: true,
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,6 +330,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('TRADE HISTORY', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
+        actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.calendarBlank, color: theme.colorScheme.onSurfaceVariant),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PnlCalendarScreen())),
+          ),
+        ],
       ),
       body: AnimatedCryptoBackground(
         child: Column(
@@ -385,35 +399,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(PhosphorIcons.robot, size: 18, color: AppTheme.info(context)),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
-                                            isExpanded: true,
-                                            value: _selectedClosedBot ?? 'All Bots', 
-                                            dropdownColor: theme.colorScheme.surface, 
-                                            style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold), 
-                                            icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 16),
-                                            items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Text(bot, style: GoogleFonts.spaceGrotesk()))).toList(),
-                                            onChanged: (val) {
-                                              _selectedClosedBot = (val == 'All Bots') ? null : val;
-                                              _processData();
-                                            },
-                                          ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(PhosphorIcons.robot, size: 16, color: AppTheme.info(context)),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: DropdownButtonHideUnderline(
+                                                child: DropdownButton<String>(
+                                                  isExpanded: true,
+                                                  value: _selectedClosedBot ?? 'All Bots', 
+                                                  dropdownColor: theme.colorScheme.surface, 
+                                                  style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold), 
+                                                  icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 14),
+                                                  items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Text(bot, style: GoogleFonts.spaceGrotesk(), overflow: TextOverflow.ellipsis))).toList(),
+                                                  onChanged: (val) {
+                                                    _selectedClosedBot = (val == 'All Bots') ? null : val;
+                                                    _processData();
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: theme.colorScheme.outlineVariant),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(PhosphorIcons.link, size: 16, color: theme.primaryColor),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: DropdownButtonHideUnderline(
+                                                child: DropdownButton<String>(
+                                                  isExpanded: true,
+                                                  value: _selectedChainFilter, 
+                                                  dropdownColor: theme.colorScheme.surface, 
+                                                  style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold), 
+                                                  icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 14),
+                                                  items: ['All Chains', 'Solana', 'BSC', 'Robinhood'].map((c) => DropdownMenuItem(value: c, child: Text(c, style: GoogleFonts.spaceGrotesk(), overflow: TextOverflow.ellipsis))).toList(),
+                                                  onChanged: (val) {
+                                                    _selectedChainFilter = val ?? 'All Chains';
+                                                    _processData();
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -509,7 +562,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   }
                               }
 
-                              // Abbreviated chain label — SOL / BSC / RBH instead of full names
                               const chainAbbrev = {'solana': 'SOL', 'bsc': 'BSC', 'robinhood': 'RBH'};
                               final chainLabel = chainAbbrev[(p['chain'] ?? 'solana').toString()] ?? (p['chain'] ?? 'SOL').toString().toUpperCase();
                               
