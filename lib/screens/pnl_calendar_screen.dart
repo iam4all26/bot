@@ -97,7 +97,7 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
 
     int daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
     int firstWeekday = DateTime(_currentMonth.year, _currentMonth.month, 1).weekday; 
-    int prefixDays = firstWeekday == 7 ? 0 : firstWeekday; // Adjust so Sunday is 0
+    int prefixDays = firstWeekday == 7 ? 0 : firstWeekday; 
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -132,9 +132,9 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Text(DateFormat('MMM yyyy').format(_currentMonth), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           IconButton(
                             icon: Icon(PhosphorIcons.caretRightBold, color: theme.colorScheme.onSurfaceVariant, size: 18),
                             onPressed: () => _changeMonth(1),
@@ -143,19 +143,22 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(PhosphorIcons.currencyCircleDollarFill, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(width: 6),
-                            Text(currency.isNaira ? 'NGN' : 'USD', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
-                          ],
+                      GestureDetector(
+                        onTap: () => currency.toggleCurrency(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.outlineVariant),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(PhosphorIcons.currencyCircleDollarFill, size: 16, color: theme.primaryColor),
+                              const SizedBox(width: 6),
+                              Text(currency.isNaira ? 'NGN' : 'USD', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
                         ),
                       )
                     ],
@@ -166,50 +169,76 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: GlassCard(
                     padding: const EdgeInsets.all(20),
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Total PnL', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${totalPnl > 0 ? '+' : ''}${currency.format(totalPnl)}', 
-                                style: GoogleFonts.spaceGrotesk(color: totalPnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontSize: 15, fontWeight: FontWeight.bold)
+                        Text('Total Monthly PnL', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${totalPnl >= 0 ? '+' : ''}${currency.format(totalPnl)}', 
+                              style: GoogleFonts.spaceGrotesk(color: totalPnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5)
+                            ),
+                            if (currency.isNaira) ...[
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4.0),
+                                child: Text(
+                                  '≈ ${totalPnl >= 0 ? '+' : ''}\$${totalPnl.abs().toStringAsFixed(2)}', 
+                                  style: GoogleFonts.spaceGrotesk(color: totalPnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold)
+                                ),
                               ),
                             ]
-                          ),
+                          ],
                         ),
-                        Expanded(
-                          flex: 4,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Profitable Days/Amount', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$winDays / +${currency.format(winAmount)}', 
-                                style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontSize: 14, fontWeight: FontWeight.bold)
+                        const SizedBox(height: 16),
+                        Container(height: 1, color: theme.colorScheme.outlineVariant),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(PhosphorIcons.trendUpBold, color: AppTheme.success(context), size: 14),
+                                      const SizedBox(width: 6),
+                                      Text('Profits ($winDays days)', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '+${currency.format(winAmount)}', 
+                                    style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontSize: 15, fontWeight: FontWeight.bold)
+                                  ),
+                                ]
                               ),
-                            ]
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text('Loss Days/Amount', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$lossDays / ${currency.format(lossAmount)}', 
-                                style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold)
+                            ),
+                            Container(width: 1, height: 30, color: theme.colorScheme.outlineVariant),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(PhosphorIcons.trendDownBold, color: AppTheme.danger(context), size: 14),
+                                      const SizedBox(width: 6),
+                                      Text('Losses ($lossDays days)', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    currency.format(lossAmount), 
+                                    style: GoogleFonts.spaceGrotesk(color: AppTheme.danger(context), fontSize: 15, fontWeight: FontWeight.bold)
+                                  ),
+                                ]
                               ),
-                            ]
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -255,11 +284,11 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
 
                       if (hasTrades) {
                         if (dayPnl > 0) {
-                          bgColor = AppTheme.success(context).withOpacity(0.15);
+                          bgColor = AppTheme.success(context).withOpacity(0.12);
                           textColor = AppTheme.success(context);
                           pnlStr = '+${currency.format(dayPnl)}';
                         } else if (dayPnl < 0) {
-                          bgColor = AppTheme.danger(context).withOpacity(0.15);
+                          bgColor = AppTheme.danger(context).withOpacity(0.12);
                           textColor = AppTheme.danger(context);
                           pnlStr = currency.format(dayPnl);
                         } else {

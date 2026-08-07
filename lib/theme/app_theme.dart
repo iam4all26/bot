@@ -6,26 +6,27 @@ class AppTheme {
   static const Color kainuwaPurple = Color(0xFF7C3AED);
   static const Color kainuwaGold = Color(0xFFF59E0B);
   
-  // Semantic Helpers: Pure Red & Vibrant Green
-  static Color success(BuildContext context) => const Color(0xFF00E676); 
-  static Color danger(BuildContext context) => const Color(0xFFFF0000); 
-  static Color warning(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFFF59E0B) : const Color(0xFFFBBF24);
-  static Color info(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFF3B82F6) : const Color(0xFF60A5FA);
+  // Semantic Helpers: Adapts for perfect contrast in both modes
+  static Color success(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFF059669) : const Color(0xFF00E676); 
+  static Color danger(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFFDC2626) : const Color(0xFFFF0000); 
+  static Color warning(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFFD97706) : const Color(0xFFFBBF24);
+  static Color info(BuildContext context) => Theme.of(context).brightness == Brightness.light ? const Color(0xFF2563EB) : const Color(0xFF60A5FA);
 
   static ThemeData get lightTheme {
     return ThemeData(
       brightness: Brightness.light,
       primaryColor: const Color(0xFF7C3AED),
-      scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+      // Softer, premium cool-gray background to reduce eye strain
+      scaffoldBackgroundColor: const Color(0xFFEEF2F6),
       colorScheme: const ColorScheme.light(
         primary: Color(0xFF7C3AED),
         secondary: Color(0xFFF59E0B),
         surface: Color(0xFFFFFFFF),
-        surfaceContainerHighest: Color(0xFFF9FAFB),
-        onSurface: Color(0xFF111827),
-        onSurfaceVariant: Color(0xFF6B7280),
-        outline: Color(0xFFE5E7EB),
-        outlineVariant: Color(0xFFECEFF3),
+        surfaceContainerHighest: Color(0xFFE2E8F0),
+        onSurface: Color(0xFF0F172A),
+        onSurfaceVariant: Color(0xFF475569), // Darker gray for vastly improved readability
+        outline: Color(0xFFCBD5E1),
+        outlineVariant: Color(0xFFE2E8F0),
       ),
       textTheme: GoogleFonts.spaceGroteskTextTheme(ThemeData.light().textTheme),
       useMaterial3: true,
@@ -33,7 +34,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: Color(0xFF111827)),
+        iconTheme: IconThemeData(color: Color(0xFF0F172A)),
       ),
     );
   }
