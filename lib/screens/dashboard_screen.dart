@@ -90,21 +90,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _usdValue = responses[0]['data']['usd_value'] ?? '0.00';
           final solUsd = double.tryParse(_usdValue) ?? 0.0;
           totalUsd += solUsd;
-          _chainBalances['solana'] = {'balance': _solBalance, 'usd': solUsd, 'symbol': responses[0]['data']['native_symbol'] ?? 'SOL'};
+          _chainBalances['solana'] = {'balance': _solBalance, 'usd': solUsd, 'symbol': 'SOL'};
         }
 
         if (responses[3]['status'] == 'success') {
           final bal = responses[3]['data']['native_balance'] ?? '0.00000';
           final usd = double.tryParse(responses[3]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
           totalUsd += usd;
-          _chainBalances['bsc'] = {'balance': bal, 'usd': usd, 'symbol': responses[3]['data']['native_symbol'] ?? 'BNB'};
+          _chainBalances['bsc'] = {'balance': bal, 'usd': usd, 'symbol': 'BNB'}; // Forced override
         }
         
         if (responses[4]['status'] == 'success') {
           final bal = responses[4]['data']['native_balance'] ?? '0.00000';
           final usd = double.tryParse(responses[4]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
           totalUsd += usd;
-          _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': responses[4]['data']['native_symbol'] ?? 'ETH'};
+          _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': 'ETH'}; // Forced override
         }
 
         _usdValue = totalUsd.toStringAsFixed(2);
@@ -253,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   subtitle: Text('Calculate USD to Naira dynamically', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(ctx);
-                    showDialog(context: context, builder: (ctx) => CurrencyCalculatorDialog());
+                    showDialog(context: context, builder: (ctx) => const CurrencyCalculatorDialog());
                   },
                 ),
               ],
@@ -354,10 +354,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     final List<Widget> pages = [
-      _buildPremiumHome(theme, 0),
+      _buildPremiumHome(theme),
       const PositionsScreen(),
-      isAdmin ? const AdminScreen() : const CopyBotsScreen(),
-      const SettingsScreen(),
+      const CopyBotsScreen(),
+      isAdmin ? const AdminScreen() : const SettingsScreen(),
     ];
 
     return PopScope(
@@ -389,11 +389,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme),
                 _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Positions', 1, theme),
                 _buildActionNavItem(theme, canTrade),
+                _buildNavItem(PhosphorIcons.robot, PhosphorIcons.robotFill, 'Bots', 2, theme),
                 if (isAdmin) 
-                  _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 2, theme)
+                  _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 3, theme)
                 else 
-                  _buildNavItem(PhosphorIcons.robot, PhosphorIcons.robotFill, 'Bots', 2, theme),
-                _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', 3, theme),
+                  _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', 3, theme),
               ],
             ),
           ),
@@ -402,7 +402,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPremiumHome(ThemeData theme, int profileIndex) {
+  Widget _buildPremiumHome(ThemeData theme) {
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
     final isAdmin = context.read<ApiService>().role == 'admin';
@@ -430,7 +430,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               InkWell(
-                onTap: () => setState(() => _currentIndex = profileIndex),
+                onTap: () => setState(() => _currentIndex = isAdmin ? 3 : 2),
                 borderRadius: BorderRadius.circular(12),
                 child: Row(
                   children: [
@@ -455,6 +455,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               Row(
                 children: [
+                  IconButton(
+                    icon: Icon(PhosphorIcons.gearFill, color: theme.colorScheme.onSurfaceVariant), 
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  ),
                   IconButton(
                     icon: Icon(isDark ? PhosphorIcons.sunFill : PhosphorIcons.moonFill, color: theme.colorScheme.onSurfaceVariant), 
                     onPressed: () => context.read<ThemeProvider>().toggleTheme(),
@@ -540,34 +544,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
                 const SizedBox(height: 8),
                 Text('COMBINED ACROSS SOLANA, BSC & ROBINHOOD', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 0.8, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: ['solana', 'bsc', 'robinhood'].map((chainId) {
-                      final cb = _chainBalances[chainId]!;
-                      final rawBalance = double.tryParse(cb['balance'].toString()) ?? 0.0;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 14),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 20, height: 20,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
-                              child: chainId == 'solana'
-                                  ? const SolanaIcon(size: 11, color: AppTheme.kainuwaPurple)
-                                  : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
-                            ),
-                            const SizedBox(width: 5),
-                            Text('${rawBalance.toStringAsFixed(4)} ${cb['symbol']}', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 11)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                const SizedBox(height: 16),
+                
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: ['solana', 'bsc', 'robinhood'].map((chainId) {
+                    final cb = _chainBalances[chainId]!;
+                    final rawBalance = double.tryParse(cb['balance'].toString()) ?? 0.0;
+                    final usdValue = double.tryParse(cb['usd'].toString()) ?? 0.0;
+                    final displaySymbol = {'solana': 'SOL', 'bsc': 'BNB', 'robinhood': 'ETH'}[chainId] ?? 'SOL';
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 28, height: 28,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
+                            child: chainId == 'solana'
+                                ? const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple)
+                                : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${rawBalance.toStringAsFixed(5)} $displaySymbol', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(height: 2),
+                              Text('≈ \$${usdValue.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ]
+                          )
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
+
                 const SizedBox(height: 20),
                 Container(height: 1, color: theme.colorScheme.outlineVariant),
                 const SizedBox(height: 16),
