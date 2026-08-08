@@ -97,14 +97,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final bal = responses[3]['data']['native_balance'] ?? '0.00000';
           final usd = double.tryParse(responses[3]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
           totalUsd += usd;
-          _chainBalances['bsc'] = {'balance': bal, 'usd': usd, 'symbol': 'BNB'}; // Forced override
+          _chainBalances['bsc'] = {'balance': bal, 'usd': usd, 'symbol': 'BNB'}; 
         }
         
         if (responses[4]['status'] == 'success') {
           final bal = responses[4]['data']['native_balance'] ?? '0.00000';
           final usd = double.tryParse(responses[4]['data']['usd_value']?.toString() ?? '0') ?? 0.0;
           totalUsd += usd;
-          _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': 'ETH'}; // Forced override
+          _chainBalances['robinhood'] = {'balance': bal, 'usd': usd, 'symbol': 'ETH'}; 
         }
 
         _usdValue = totalUsd.toStringAsFixed(2);
@@ -206,6 +206,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     
     if (mounted) _fetchDashboardData(silent: true);
+  }
+
+  Future<void> _editLimits(Map<String, dynamic> p) async {
+    final tpCtrl = TextEditingController(text: (p['tp_percent'] != null && double.tryParse(p['tp_percent'].toString()) != 0) ? p['tp_percent'].toString() : '');
+    final slCtrl = TextEditingController(text: (p['sl_percent'] != null && double.tryParse(p['sl_percent'].toString()) != 0) ? p['sl_percent'].toString() : '');
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Row(children: [Icon(PhosphorIcons.slidersHorizontalBold, color: theme.primaryColor), const SizedBox(width: 12), Text('Edit Live Targets', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold))]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Leave a field blank (or 0) to remove that limit.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                const SizedBox(height: 20),
+                TextField(controller: tpCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
+                const SizedBox(height: 12),
+                TextField(controller: slCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Stop Loss (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
+              ],
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                onPressed: isSaving ? null : () async {
+                  setStateDialog(() => isSaving = true);
+                  final tpVal = tpCtrl.text.trim().isEmpty ? '0' : tpCtrl.text.trim();
+                  final slVal = slCtrl.text.trim().isEmpty ? '0' : slCtrl.text.trim();
+                  final res = await this.context.read<ApiService>().postEndpoint('trade.php?action=update_tpsl', {'id': p['id'], 'tp_percent': tpVal, 'sl_percent': slVal});
+                  if (this.mounted) {
+                    Navigator.pop(ctx);
+                    _showFloatingSnackbar(res['message'] ?? 'Updated', isError: res['status'] != 'success');
+                    _fetchDashboardData(silent: true);
+                  }
+                },
+                child: isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
+    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
   void _showActionMenu(bool canTrade) {
@@ -546,46 +601,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text('COMBINED ACROSS SOLANA, BSC & ROBINHOOD', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, letterSpacing: 0.8, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 16),
                 
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: ['solana', 'bsc', 'robinhood'].map((chainId) {
-                    final cb = _chainBalances[chainId]!;
-                    final rawBalance = double.tryParse(cb['balance'].toString()) ?? 0.0;
-                    final usdValue = double.tryParse(cb['usd'].toString()) ?? 0.0;
-                    final displaySymbol = {'solana': 'SOL', 'bsc': 'BNB', 'robinhood': 'ETH'}[chainId] ?? 'SOL';
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.colorScheme.outlineVariant),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 28, height: 28,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
-                            child: chainId == 'solana'
-                                ? const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple)
-                                : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cardWidth = (constraints.maxWidth - 10) / 2;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: ['solana', 'bsc', 'robinhood'].map((chainId) {
+                        final cb = _chainBalances[chainId]!;
+                        final rawBalance = double.tryParse(cb['balance'].toString()) ?? 0.0;
+                        final usdValue = double.tryParse(cb['usd'].toString()) ?? 0.0;
+                        final displaySymbol = {'solana': 'SOL', 'bsc': 'BNB', 'robinhood': 'ETH'}[chainId] ?? 'SOL';
+                        
+                        return Container(
+                          width: cardWidth,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.outlineVariant),
                           ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('${rawBalance.toStringAsFixed(5)} $displaySymbol', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                              const SizedBox(height: 2),
-                              Text('≈ \$${usdValue.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
-                            ]
-                          )
-                        ],
-                      ),
+                              Container(
+                                width: 28, height: 28,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
+                                child: chainId == 'solana'
+                                    ? const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple)
+                                    : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('${rawBalance.toStringAsFixed(5)} $displaySymbol', style: TextStyle(color: _chainColors[chainId] ?? theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 2),
+                                    Text('≈ \$${usdValue.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                  ]
+                                ),
+                              )
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  }
                 ),
 
                 const SizedBox(height: 20),
@@ -708,9 +771,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             GlassCard(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: EdgeInsets.zero,
               child: Column(
-                children: _openPositions.map((p) {
+                children: _openPositions.asMap().entries.map((entry) {
+                  int idx = entry.key;
+                  var p = entry.value;
+                  
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
@@ -723,106 +789,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
                   final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
                   final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
+                  
+                  final bool isReal = p['is_real'] == 1 || p['is_real'] == '1';
+                  final double tp = double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0.0;
+                  final double sl = double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0.0;
+                  final double size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
+                  final double pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
 
-                  return AnimatedSize(
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutCubic,
-                    child: isClosing
-                        ? const SizedBox(width: double.infinity, height: 0)
-                        : AnimatedOpacity(
-                            duration: const Duration(milliseconds: 250),
-                            opacity: isClosing ? 0.0 : 1.0,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              leading: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => _toggleLock(p),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: isLocked ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
-                                        color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), shape: BoxShape.circle),
-                                    child: Icon(PhosphorIcons.trendUp, size: 18, color: theme.primaryColor),
-                                  ),
-                                ],
-                              ),
-                              title: Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
-                                    child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
-                                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
-                                    child: Text(botName, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
-                                  ),
-                                ],
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 6.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Size: \$${p['virtual_usd_amount']}  •  MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-                                    if (currency.isNaira)
-                                      Text('Size: ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(fontSize: 11, color: AppTheme.success(context).withOpacity(0.8))),
-                                  ],
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                  return Column(
+                    children: [
+                      if (idx > 0) Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: isClosing
+                            ? const SizedBox(width: double.infinity, height: 0)
+                            : AnimatedOpacity(
+                                duration: const Duration(milliseconds: 250),
+                                opacity: isClosing ? 0.0 : 1.0,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)}' : '-',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                      Row(
+                                        children: [
+                                          GestureDetector(
+                                            onTap: () => _toggleLock(p),
+                                            child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(4), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                            child: Text(chainLabel, style: TextStyle(fontSize: 8, color: chainColor, fontWeight: FontWeight.bold)),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)), 
+                                              child: Text(botName, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Text(isReal ? 'LIVE' : '📄', style: TextStyle(color: isReal ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ],
                                       ),
-                                      if (currency.isNaira && cpnl != null)
-                                        Text(
-                                          '≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8)),
-                                        ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Expanded(
+                                            flex: 3,
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
+                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                                ),
+                                                if (currency.isNaira && cpnl != null)
+                                                  Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
+                                                const SizedBox(height: 6),
+                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                const SizedBox(height: 2),
+                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                onPressed: () => _editLimits(p),
+                                                icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              ),
+                                              IconButton(
+                                                onPressed: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                                icon: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 18),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              ),
+                                              IconButton(
+                                                onPressed: () => _quickClosePosition(p),
+                                                icon: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 22),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              ),
+                                            ],
+                                          )
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  InkWell(
-                                    onTap: () => _quickClosePosition(p),
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.1), shape: BoxShape.circle),
-                                      child: Icon(PhosphorIcons.xBold, size: 14, color: AppTheme.danger(context)),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ),
           ],
