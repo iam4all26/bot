@@ -948,54 +948,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ],
                                       ),
                                       const SizedBox(height: 12),
+                                      
+                                      Text(
+                                        cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                      ),
+                                      if (currency.isNaira && cpnl != null)
+                                        Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
+                                      const SizedBox(height: 8),
+
                                       Row(
                                         crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
                                           Expanded(
-                                            flex: 3,
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text(
-                                                  cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
-                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
-                                                ),
-                                                if (currency.isNaira && cpnl != null)
-                                                  Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
-                                                const SizedBox(height: 6),
-                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
-                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                               ],
                                             ),
                                           ),
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              IconButton(
-                                                onPressed: () => _editLimits(p),
-                                                icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              GestureDetector(
+                                                onTap: () => _editLimits(p),
+                                                child: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 20),
                                               ),
-                                              IconButton(
-                                                onPressed: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
-                                                icon: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 18),
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              const SizedBox(width: 16),
+                                              GestureDetector(
+                                                onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                                child: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 20),
                                               ),
-                                              if (!isReal)
-                                                IconButton(
-                                                  onPressed: () => _goLive(p),
-                                                  icon: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 20),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              if (!isReal) ...[
+                                                const SizedBox(width: 16),
+                                                GestureDetector(
+                                                  onTap: () => _goLive(p),
+                                                  child: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 22),
                                                 ),
-                                              IconButton(
-                                                onPressed: () => _quickClosePosition(p),
-                                                icon: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 22),
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              ],
+                                              const SizedBox(width: 16),
+                                              GestureDetector(
+                                                onTap: () => _quickClosePosition(p),
+                                                child: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 24),
                                               ),
                                             ],
                                           )
