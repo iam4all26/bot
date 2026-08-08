@@ -41,6 +41,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String? _selectedClosedBot; 
   String _selectedChainFilter = 'All Chains';
 
+  static final Map<String, Color> _chainColors = {
+    'solana': AppTheme.kainuwaPurple,
+    'bsc': const Color(0xFFF0B90B),
+    'robinhood': const Color(0xFF00C805),
+  };
+
   @override
   void initState() {
     super.initState();
@@ -562,8 +568,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   }
                               }
 
-                              const chainAbbrev = {'solana': 'SOL', 'bsc': 'BSC', 'robinhood': 'RBH'};
-                              final chainLabel = chainAbbrev[(p['chain'] ?? 'solana').toString()] ?? (p['chain'] ?? 'SOL').toString().toUpperCase();
+                              final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
+                              final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
+                              final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
                               
                               String winRateText = '';
                               if (_winRates.containsKey(mainTitle)) {
@@ -581,29 +588,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(mainTitle, style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
-                                                  if (winRateText.isNotEmpty)
-                                                    Text(winRateText, style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14)),
-                                                ],
-                                              ),
-                                              if (subTitle.isNotEmpty)
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Wrap(
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                                  spacing: 6,
+                                                  runSpacing: 6,
+                                                  children: [
+                                                    Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                      decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                                      child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                    if (subTitle.isNotEmpty)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                                        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
+                                                        child: Text(subTitle, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
+                                                      ),
+                                                  ],
+                                                ),
                                                 Padding(
-                                                  padding: const EdgeInsets.only(top: 4.0),
+                                                  padding: const EdgeInsets.only(top: 8, bottom: 4),
                                                   child: Row(
                                                     children: [
-                                                      Icon(PhosphorIcons.robotFill, size: 12, color: AppTheme.info(context)),
-                                                      const SizedBox(width: 4),
-                                                      Text(subTitle, style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontSize: 11, fontWeight: FontWeight.bold)),
+                                                      Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                                      if (winRateText.isNotEmpty)
+                                                        Text(winRateText, style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 12)),
                                                     ],
                                                   ),
                                                 ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
+                                          const SizedBox(width: 8),
                                           InkWell(
                                             onTap: () {
                                               showDialog(
@@ -612,31 +633,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                               );
                                             },
                                             borderRadius: BorderRadius.circular(8),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                                  margin: const EdgeInsets.only(right: 8),
-                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
-                                                  child: Text(chainLabel, style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                                                ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                  decoration: BoxDecoration(
-                                                    color: theme.primaryColor.withOpacity(0.12),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
-                                                      const SizedBox(width: 4), 
-                                                      Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: theme.primaryColor.withOpacity(0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
+                                                  const SizedBox(width: 4), 
+                                                  Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -648,7 +659,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         children: [
                                           InkWell(
                                             onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'), 
-                                            child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)])
+                                            child: Row(children: [Text('View Chart', style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 12)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowSquareOutBold, color: AppTheme.info(context), size: 14)])
                                           ),
                                           Row(
                                             children: [

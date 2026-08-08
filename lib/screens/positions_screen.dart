@@ -7,7 +7,6 @@ import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../theme/app_theme.dart';
-import 'history_screen.dart'; 
 
 enum TradeEnvironment { all, real, paper }
 
@@ -26,6 +25,12 @@ class _PositionsScreenState extends State<PositionsScreen> {
   final Set<int> _closingIds = {};
 
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
+  
+  static final Map<String, Color> _chainColors = {
+    'solana': AppTheme.kainuwaPurple,
+    'bsc': const Color(0xFFF0B90B),
+    'robinhood': const Color(0xFF00C805),
+  };
 
   @override
   void initState() {
@@ -261,6 +266,14 @@ class _PositionsScreenState extends State<PositionsScreen> {
   }
 
   Future<void> _executeBatchClose(List<int> ids, String description) async {
+    final api = context.read<ApiService>();
+    List<int> unlockedIds = ids.where((id) => !api.isTradeLocked(id)).toList();
+    
+    if (unlockedIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('All selected trades are locked! 🔓', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+      return;
+    }
+
     final theme = Theme.of(context);
     final dangerColor = AppTheme.danger(context);
     
@@ -269,23 +282,21 @@ class _PositionsScreenState extends State<PositionsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
         title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: dangerColor), const SizedBox(width: 8), Text('Close $description?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16))]),
-        content: Text('Are you sure you want to close ${ids.length} open position(s)? Locked trades are ignored.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+        content: Text('Are you sure you want to close ${unlockedIds.length} open position(s)? Locked trades are ignored.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
-          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${ids.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: dangerColor, foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: Text('Close ${unlockedIds.length} Trade(s)', style: const TextStyle(fontWeight: FontWeight.bold))),
         ],
       ),
     );
 
     if (confirm != true || !mounted) return;
     
-    setState(() => _closingIds.addAll(ids));
+    setState(() => _closingIds.addAll(unlockedIds));
     await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
-    final api = context.read<ApiService>();
-
-    for (int id in ids) {
+    for (int id in unlockedIds) {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
         if (res['status'] == 'success' || res['status'] == 'closed') successCount++;
@@ -293,7 +304,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${ids.length} trades.'), backgroundColor: AppTheme.success(context)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.'), backgroundColor: AppTheme.success(context)));
       _fetchPositions(silent: true);
     }
   }
@@ -308,7 +319,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
       final id = int.tryParse(p['id'].toString()) ?? 0;
       if (id <= 0) continue;
       
-      // Skip processing locked trades for batch closes
       if (p['is_locked'] == 1 || p['is_locked'] == '1') continue;
 
       allIds.add(id);
@@ -470,21 +480,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
               if (mounted) setState(() => _isManualRefreshing = false);
             },
           ),
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor.withOpacity(0.12),
-                foregroundColor: theme.primaryColor,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
-              ),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
-              icon: const Icon(PhosphorIcons.clockCounterClockwiseBold, size: 16),
-              label: const Text('History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-          )
         ],
       ),
       body: Column(
@@ -555,8 +550,9 @@ class _PositionsScreenState extends State<PositionsScreen> {
                          }
                       }
 
-                      const chainAbbrev = {'solana': 'SOL', 'bsc': 'BSC', 'robinhood': 'RBH'};
-                      final chainLabel = chainAbbrev[(p['chain'] ?? 'solana').toString()] ?? (p['chain'] ?? 'SOL').toString().toUpperCase();
+                      final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
+                      final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
+                      final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
 
                       return AnimatedSize(
                         duration: const Duration(milliseconds: 350),
@@ -576,23 +572,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                         Row(
                                           crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
-                                            Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)),
-                                              child: Text(chainLabel, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                                            ),
-                                            if (adminBadge != null)
-                                              Padding(
-                                                padding: const EdgeInsets.only(left: 8.0),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.2))),
-                                                  child: Text(adminBadge, style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                ),
-                                              ),
-                                            const Spacer(),
                                             GestureDetector(
                                               onTap: () => _toggleLock(p),
                                               child: Container(
@@ -608,17 +587,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 ),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            InkWell(
-                                              onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
-                                              child: Row(children: [Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowUpRight, color: AppTheme.info(context), size: 16)]),
-                                            ),
+                                            const Spacer(),
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                               decoration: BoxDecoration(
@@ -632,7 +601,32 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 20),
+                                        const SizedBox(height: 12),
+
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                              child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
+                                            ),
+                                            if (adminBadge != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
+                                                child: Text(adminBadge, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
+                                              ),
+                                          ],
+                                        ),
+                                        
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8, bottom: 20),
+                                          child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13)),
+                                        ),
                                         
                                         Row(
                                           children: [
@@ -694,6 +688,21 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 onPressed: () => _editLimits(p),
                                                 icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
                                                 tooltip: 'Edit TP/SL',
+                                                padding: const EdgeInsets.all(14),
+                                                constraints: const BoxConstraints(),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: theme.colorScheme.outlineVariant),
+                                              ),
+                                              child: IconButton(
+                                                onPressed: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                                icon: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 18),
+                                                tooltip: 'DexScreener',
                                                 padding: const EdgeInsets.all(14),
                                                 constraints: const BoxConstraints(),
                                               ),
