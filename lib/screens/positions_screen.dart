@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../theme/app_theme.dart';
+import 'history_screen.dart';
 
 enum TradeEnvironment { all, real, paper }
 
@@ -84,6 +85,25 @@ class _PositionsScreenState extends State<PositionsScreen> {
     } catch (_) { return utcString; }
   }
 
+  String calculateTimeInTrade(String? openedAtStr) {
+    if (openedAtStr == null || openedAtStr.isEmpty) return '-';
+    try {
+      String startStr = openedAtStr.replaceAll(' ', 'T');
+      if (!startStr.endsWith('Z')) startStr += 'Z';
+      final start = DateTime.parse(startStr);
+      DateTime end = DateTime.now().toUtc();
+
+      final diff = end.difference(start);
+      if (diff.inMinutes < 1) return '< 1m';
+
+      List<String> parts = [];
+      if (diff.inDays > 0) parts.add('${diff.inDays}d');
+      if (diff.inHours % 24 > 0) parts.add('${diff.inHours % 24}h');
+      if (diff.inMinutes % 60 > 0) parts.add('${diff.inMinutes % 60}m');
+      return parts.join(' ');
+    } catch (_) { return '-'; }
+  }
+
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = double.tryParse(v.toString()) ?? 0.0;
@@ -152,31 +172,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Leave a field blank (or 0) to remove that limit — the position will keep running with no cap on that side.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                Text('Leave a field blank (or 0) to remove that limit.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                 const SizedBox(height: 20),
-                TextField(
-                  controller: tpCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Take Profit (%)',
-                    filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => tpCtrl.clear())),
-                  ),
-                ),
+                TextField(controller: tpCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: slCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Stop Loss (%)',
-                    filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => slCtrl.clear())),
-                  ),
-                ),
+                TextField(controller: slCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Stop Loss (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
               ],
             ),
             actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -191,8 +191,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                   final res = await this.context.read<ApiService>().postEndpoint('trade.php?action=update_tpsl', {'id': p['id'], 'tp_percent': tpVal, 'sl_percent': slVal});
                   if (this.mounted) {
                     Navigator.pop(ctx);
-                    final ok = res['status'] == 'success';
-                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Updated'), backgroundColor: ok ? AppTheme.success(this.context) : AppTheme.danger(this.context)));
+                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Updated', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: res['status'] == 'success' ? AppTheme.success(this.context) : AppTheme.danger(this.context)));
                     _fetchPositions(silent: true);
                   }
                 },
@@ -205,7 +204,39 @@ class _PositionsScreenState extends State<PositionsScreen> {
     );
   }
 
+  Future<void> _goLive(Map<String, dynamic> p) async {
+    final theme = Theme.of(context);
+    final chainName = (p['chain'] ?? 'solana').toString().toUpperCase();
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [Icon(PhosphorIcons.lightningFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Go Live on $chainName?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]),
+        content: Text('This executes an instant REAL trade on this token using your master wallet, mirroring this paper position\'s size and TP/SL. Real funds — cannot be undone.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: const Text('Go Live Now', style: TextStyle(fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final res = await context.read<ApiService>().postEndpoint('trade.php?action=mirror_real', {'id': p['id']});
+    if (mounted) {
+      final ok = res['status'] == 'success' || res['status'] == 'ok';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] ?? (ok ? 'Live trade executed.' : 'Failed to go live.'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: ok ? AppTheme.success(context) : AppTheme.danger(context),
+      ));
+      _fetchPositions(silent: true);
+    }
+  }
+
   Future<void> _executeBatchClose(List<int> ids, String description) async {
+    final api = context.read<ApiService>();
     List<int> unlockedIds = ids.where((id) {
       final item = _openPositions.firstWhere((p) => (int.tryParse(p['id'].toString()) ?? 0) == id, orElse: () => null);
       if (item == null) return true;
@@ -239,7 +270,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
-    final api = context.read<ApiService>();
 
     for (int id in unlockedIds) {
       try {
@@ -249,7 +279,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.'), backgroundColor: AppTheme.success(context)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.success(context)));
       _fetchPositions(silent: true);
     }
   }
@@ -425,6 +455,21 @@ class _PositionsScreenState extends State<PositionsScreen> {
               if (mounted) setState(() => _isManualRefreshing = false);
             },
           ),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor.withOpacity(0.12),
+                foregroundColor: theme.primaryColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
+              ),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
+              icon: const Icon(PhosphorIcons.clockCounterClockwiseBold, size: 16),
+              label: const Text('History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          )
         ],
       ),
       body: Column(
@@ -465,132 +510,232 @@ class _PositionsScreenState extends State<PositionsScreen> {
               ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
               : finalOpenList.isEmpty 
                 ? Center(child: Text('No active open positions.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
-                : Padding(
+                : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
-                    child: GlassCard(
-                      padding: EdgeInsets.zero,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shrinkWrap: true,
-                        itemCount: finalOpenList.length,
-                        separatorBuilder: (ctx, idx) => Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                        itemBuilder: (context, index) {
-                          final p = finalOpenList[index];
-                          final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
-                          final bool cpIsProfit = (cpnl ?? 0) >= 0;
-                          final pId = int.tryParse(p['id'].toString()) ?? 0;
-                          final bool isClosing = _closingIds.contains(pId);
-                          final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
+                    itemCount: finalOpenList.length,
+                    itemBuilder: (context, index) {
+                      final p = finalOpenList[index];
+                      final pnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '0') ?? 0.0;
+                      final pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
+                      final isReal = p['is_real'] == 1 || p['is_real'] == '1';
+                      final pId = int.tryParse(p['id'].toString()) ?? 0;
+                      final bool isClosing = _closingIds.contains(pId);
+                      final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
 
-                          final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
-                          
-                          String botName = p['display_name'] ?? 'Manual';
-                          if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
+                      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
+                      
+                      String mainTitle = 'Manual Trade';
+                      String? adminBadge;
 
-                          final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
-                          final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
-                          final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
-                          
-                          final bool isReal = p['is_real'] == 1 || p['is_real'] == '1';
-                          final double tp = double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0.0;
-                          final double sl = double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0.0;
-                          final double size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
-                          final double pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
+                      if (isCopy) {
+                         String label = p['wallet_label']?.toString() ?? '';
+                         final botIdRaw = p['bot_id']?.toString();
+                         final sysBotName = (botIdRaw != null && botIdRaw.isNotEmpty && botIdRaw != 'null') ? 'Bot ${botIdRaw.padLeft(2, '0')}' : 'Bot';
 
-                          return AnimatedSize(
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeOutCubic,
-                            child: isClosing
-                                ? const SizedBox(width: double.infinity, height: 0)
-                                : AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 250),
-                                    opacity: isClosing ? 0.0 : 1.0,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              GestureDetector(
-                                                onTap: () => _toggleLock(p),
-                                                child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
+                         if (isAdmin && label.isNotEmpty && label != 'Manual') {
+                            mainTitle = label.toUpperCase(); 
+                            adminBadge = sysBotName;
+                         } else {
+                            mainTitle = sysBotName; 
+                         }
+                      }
+
+                      final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
+                      final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
+                      final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
+
+                      return AnimatedSize(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: isClosing
+                            ? const SizedBox(width: double.infinity, height: 0)
+                            : AnimatedOpacity(
+                                duration: const Duration(milliseconds: 250),
+                                opacity: isClosing ? 0.0 : 1.0,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 16.0),
+                                  child: GlassCard(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () => _toggleLock(p),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: isLocked ? AppTheme.warning(context).withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen,
+                                                  color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                                  size: 16,
+                                                ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
-                                              const SizedBox(width: 6),
+                                            ),
+                                            const Spacer(),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: isReal ? AppTheme.danger(context).withOpacity(0.12) : AppTheme.warning(context).withOpacity(0.12), 
+                                                borderRadius: BorderRadius.circular(8), 
+                                                border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))
+                                              ),
+                                              child: isReal
+                                                  ? Text('LIVE', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
+                                                  : const Text('📄', style: TextStyle(fontSize: 12)),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            Text(_formatFullAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                              child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
+                                            ),
+                                            if (adminBadge != null)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(4), border: Border.all(color: chainColor.withOpacity(0.3))),
-                                                child: Text(chainLabel, style: TextStyle(fontSize: 8, color: chainColor, fontWeight: FontWeight.bold)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
+                                                child: Text(adminBadge, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
                                               ),
-                                              const SizedBox(width: 6),
-                                              Flexible(
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
-                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)), 
-                                                  child: Text(botName, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)
-                                                ),
+                                          ],
+                                        ),
+                                        
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8, bottom: 20),
+                                          child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13)),
+                                        ),
+                                        
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIVE MCAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['current_mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('TP TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text((double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? '+${p['tp_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.success(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            ])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('SL TARGET', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text((double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? '-${p['sl_percent']}%' : 'No limit', style: TextStyle(color: (double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0) > 0 ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14)),
+                                            ])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+
+                                        Row(
+                                          children: [
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('UNREALIZED P&L', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14)),
+                                              if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 11)),
+                                            ])),
+                                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                              Text('TRADE SIZE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6),
+                                              Text('\$${double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                                              if (currency.isNaira) Text('≈ ${currency.format(p['virtual_usd_amount'])}', style: TextStyle(color: AppTheme.success(context).withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold)),
+                                            ])),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        Container(height: 1, color: theme.colorScheme.outlineVariant),
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          children: [
+                                            Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14),
+                                            const SizedBox(width: 6),
+                                            Text('${calculateTimeInTrade(p['opened_at'])} • ${formatLagosTime(p['opened_at'])}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+
+                                        Row(
+                                          children: [
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: theme.colorScheme.outlineVariant),
                                               ),
-                                              const Spacer(),
-                                              Text(isReal ? 'LIVE' : '📄', style: TextStyle(color: isReal ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
+                                              child: IconButton(
+                                                onPressed: () => _editLimits(p),
+                                                icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
+                                                tooltip: 'Edit TP/SL',
+                                                padding: const EdgeInsets.all(14),
+                                                constraints: const BoxConstraints(),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: theme.colorScheme.outlineVariant),
+                                              ),
+                                              child: IconButton(
+                                                onPressed: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                                icon: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 18),
+                                                tooltip: 'DexScreener',
+                                                padding: const EdgeInsets.all(14),
+                                                constraints: const BoxConstraints(),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            if (!isReal) ...[
                                               Expanded(
-                                                flex: 3,
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
-                                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
-                                                    ),
-                                                    if (currency.isNaira && cpnl != null)
-                                                      Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
-                                                    const SizedBox(height: 6),
-                                                    Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                                                    const SizedBox(height: 2),
-                                                    Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                                                  ],
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    side: BorderSide(color: AppTheme.success(context).withOpacity(0.5)),
+                                                    foregroundColor: AppTheme.success(context),
+                                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                                  ),
+                                                  onPressed: () => _goLive(p),
+                                                  icon: const Icon(PhosphorIcons.lightningFill, size: 18),
+                                                  label: const Text('Go Live', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
                                                 ),
                                               ),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    onPressed: () => _editLimits(p),
-                                                    icon: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 18),
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                                  ),
-                                                  IconButton(
-                                                    onPressed: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
-                                                    icon: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 18),
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                                  ),
-                                                  IconButton(
-                                                    onPressed: () => _closeSinglePosition(p),
-                                                    icon: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 22),
-                                                    padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                                  ),
-                                                ],
-                                              )
+                                              const SizedBox(width: 10),
                                             ],
-                                          ),
-                                        ],
-                                      ),
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                style: OutlinedButton.styleFrom(
+                                                  side: BorderSide(color: AppTheme.danger(context).withOpacity(0.5)), 
+                                                  foregroundColor: AppTheme.danger(context),
+                                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                                                ), 
+                                                onPressed: () => _closeSinglePosition(p), 
+                                                icon: const Icon(PhosphorIcons.handPalm, size: 18), 
+                                                label: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      ],
                                     ),
                                   ),
-                          );
-                        },
-                      ),
-                    ),
+                                ),
+                              ),
+                      );
+                    },
                   ),
           ),
         ],
