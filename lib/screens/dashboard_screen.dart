@@ -984,6 +984,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                 padding: EdgeInsets.zero,
                                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                               ),
+                                              if (!isReal)
+                                                IconButton(
+                                                  onPressed: () => _goLive(p),
+                                                  icon: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 20),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                ),
                                               IconButton(
                                                 onPressed: () => _quickClosePosition(p),
                                                 icon: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 22),

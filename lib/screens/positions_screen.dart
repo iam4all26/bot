@@ -84,6 +84,25 @@ class _PositionsScreenState extends State<PositionsScreen> {
     } catch (_) { return utcString; }
   }
 
+  String calculateTimeInTrade(String? openedAtStr) {
+    if (openedAtStr == null || openedAtStr.isEmpty) return '-';
+    try {
+      String startStr = openedAtStr.replaceAll(' ', 'T');
+      if (!startStr.endsWith('Z')) startStr += 'Z';
+      final start = DateTime.parse(startStr);
+      DateTime end = DateTime.now().toUtc();
+
+      final diff = end.difference(start);
+      if (diff.inMinutes < 1) return '< 1m';
+
+      List<String> parts = [];
+      if (diff.inDays > 0) parts.add('${diff.inDays}d');
+      if (diff.inHours % 24 > 0) parts.add('${diff.inHours % 24}h');
+      if (diff.inMinutes % 60 > 0) parts.add('${diff.inMinutes % 60}m');
+      return parts.join(' ');
+    } catch (_) { return '-'; }
+  }
+
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = double.tryParse(v.toString()) ?? 0.0;
@@ -104,12 +123,19 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final isCurrentlyLocked = (p['is_locked'] == 1 || p['is_locked'] == '1');
     final newLockStatus = !isCurrentlyLocked;
     
-    setState(() { p['is_locked'] = newLockStatus ? 1 : 0; });
+    setState(() {
+      p['is_locked'] = newLockStatus ? 1 : 0;
+    });
     
-    final res = await context.read<ApiService>().postEndpoint('trade.php?action=toggle_lock', {'id': pId, 'is_locked': newLockStatus ? 1 : 0});
+    final res = await context.read<ApiService>().postEndpoint(
+      'trade.php?action=toggle_lock',
+      {'id': pId, 'is_locked': newLockStatus ? 1 : 0},
+    );
     
     if (mounted && res['status'] != 'success') {
-      setState(() { p['is_locked'] = isCurrentlyLocked ? 1 : 0; });
+      setState(() {
+        p['is_locked'] = isCurrentlyLocked ? 1 : 0;
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to sync lock status', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
     }
   }
@@ -664,6 +690,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                     padding: EdgeInsets.zero,
                                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                                   ),
+                                                  if (!isReal)
+                                                    IconButton(
+                                                      onPressed: () => _goLive(p),
+                                                      icon: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 20),
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                    ),
                                                   IconButton(
                                                     onPressed: () => _closeSinglePosition(p),
                                                     icon: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 22),
