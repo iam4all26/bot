@@ -226,7 +226,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Leave a field blank (or 0) to remove that limit.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text('Leave a field blank (or 0) to remove that limit.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12))),
+                    TextButton.icon(
+                      onPressed: () {
+                        setStateDialog(() {
+                          tpCtrl.clear();
+                          slCtrl.clear();
+                        });
+                      },
+                      icon: Icon(PhosphorIcons.trash, size: 14, color: AppTheme.danger(context)),
+                      label: Text('Clear All', style: TextStyle(color: AppTheme.danger(context), fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                    )
+                  ],
+                ),
                 const SizedBox(height: 20),
                 TextField(controller: tpCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
                 const SizedBox(height: 12),
@@ -254,6 +270,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _goLive(Map<String, dynamic> p) async {
+    final theme = Theme.of(context);
+    final chainName = (p['chain'] ?? 'solana').toString().toUpperCase();
+    final defaultAmount = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '20.00';
+    
+    final amountCtrl = TextEditingController(text: defaultAmount);
+    bool removeLimits = false;
+    bool isSubmitting = false;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(children: [Icon(PhosphorIcons.lightningFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Go Live on $chainName?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Execute a REAL trade mirroring this token.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+                const SizedBox(height: 16),
+                Text('TRADE AMOUNT (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant, size: 18),
+                    filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [5, 10, 20, 50, 100].map((amt) => InkWell(
+                    onTap: () => setStateDialog(() => amountCtrl.text = amt.toStringAsFixed(2)),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                      child: Text('\$$amt', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  )).toList(),
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: () => setStateDialog(() => removeLimits = !removeLimits),
+                  child: Row(
+                    children: [
+                      Icon(removeLimits ? PhosphorIcons.checkSquareFill : PhosphorIcons.square, color: removeLimits ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Remove all limits (No TP/SL)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), 
+                onPressed: isSubmitting ? null : () async {
+                  setStateDialog(() => isSubmitting = true);
+                  final payload = {
+                    'id': p['id'],
+                    'trade_usd': amountCtrl.text.trim(),
+                  };
+                  if (removeLimits) {
+                    payload['tp_percent'] = '0';
+                    payload['sl_percent'] = '0';
+                  }
+                  final res = await this.context.read<ApiService>().postEndpoint('trade.php?action=mirror_real', payload);
+                  if (this.mounted) {
+                    Navigator.pop(ctx, true);
+                    final ok = res['status'] == 'success' || res['status'] == 'ok';
+                    _showFloatingSnackbar(res['message'] ?? (ok ? 'Live trade executed.' : 'Failed to go live.'), isError: !ok);
+                    _fetchDashboardData(silent: true);
+                  }
+                }, 
+                child: isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Go Live', style: TextStyle(fontWeight: FontWeight.bold))
+              ),
+            ],
+          );
+        }
       ),
     );
   }
