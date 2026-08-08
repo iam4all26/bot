@@ -266,8 +266,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
   }
 
   Future<void> _executeBatchClose(List<int> ids, String description) async {
-    final api = context.read<ApiService>();
-    List<int> unlockedIds = ids.where((id) => !api.isTradeLocked(id)).toList();
+    List<int> unlockedIds = ids.where((id) {
+      final item = _openPositions.firstWhere((p) => (int.tryParse(p['id'].toString()) ?? 0) == id, orElse: () => null);
+      if (item == null) return true;
+      return !(item['is_locked'] == 1 || item['is_locked'] == '1');
+    }).toList();
     
     if (unlockedIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('All selected trades are locked! 🔓', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
@@ -296,6 +299,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
     await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
+    final api = context.read<ApiService>();
+
     for (int id in unlockedIds) {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});

@@ -70,13 +70,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final api = context.read<ApiService>();
     
     final responses = await Future.wait([
-      api.getEndpoint('balance.php?chain=solana'), // 0
-      api.getEndpoint('positions.php?action=fetch'), // 1
-      api.getEndpoint('wallet.php?action=get&chain=solana'), // 2
-      api.getEndpoint('balance.php?chain=bsc'), // 3
-      api.getEndpoint('balance.php?chain=robinhood'), // 4
-      api.getEndpoint('wallet.php?action=get&chain=bsc'), // 5
-      api.getEndpoint('wallet.php?action=get&chain=robinhood'), // 6
+      api.getEndpoint('balance.php?chain=solana'),
+      api.getEndpoint('positions.php?action=fetch'),
+      api.getEndpoint('wallet.php?action=get&chain=solana'),
+      api.getEndpoint('balance.php?chain=bsc'),
+      api.getEndpoint('balance.php?chain=robinhood'),
+      api.getEndpoint('wallet.php?action=get&chain=bsc'),
+      api.getEndpoint('wallet.php?action=get&chain=robinhood'),
     ]);
 
     if (mounted) {
@@ -253,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   subtitle: Text('Calculate USD to Naira dynamically', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(ctx);
-                    showDialog(context: context, builder: (ctx) => const CurrencyCalculatorDialog());
+                    showDialog(context: context, builder: (ctx) => CurrencyCalculatorDialog());
                   },
                 ),
               ],
@@ -807,6 +807,236 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String text = newValue.text.replaceAll(RegExp(r'[^0-9.]'), '');
+    int dotCount = text.split('.').length - 1;
+    if (dotCount > 1) return oldValue;
+    
+    List<String> parts = text.split('.');
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String mathFunc(Match match) => '${match[1]},';
+    String whole = parts[0].replaceAllMapped(reg, mathFunc);
+    String finalString = parts.length > 1 ? '$whole.${parts[1]}' : whole;
+    
+    int cursorOffset = newValue.selection.end + (finalString.length - newValue.text.length);
+    if (cursorOffset < 0) cursorOffset = 0;
+    if (cursorOffset > finalString.length) cursorOffset = finalString.length;
+    
+    return TextEditingValue(
+      text: finalString,
+      selection: TextSelection.collapsed(offset: cursorOffset),
+    );
+  }
+}
+
+class CurrencyCalculatorDialog extends StatefulWidget {
+  const CurrencyCalculatorDialog({super.key});
+
+  @override
+  State<CurrencyCalculatorDialog> createState() => _CurrencyCalculatorDialogState();
+}
+
+class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
+  final TextEditingController _usdController = TextEditingController();
+  final TextEditingController _ngnController = TextEditingController();
+  
+  double _activeRate = 1500.0;
+  bool _isInitialized = false;
+
+  String _usdWords = "";
+  String _ngnWords = "";
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      try {
+        _activeRate = context.read<CurrencyProvider>().exchangeRate; 
+      } catch (_) {
+        _activeRate = 1500.0;
+      }
+      _isInitialized = true;
+    }
+  }
+
+  String _numberToWords(int number) {
+    if (number == 0) return "Zero";
+    if (number < 0) return "Minus ${_numberToWords(number.abs())}";
+    String words = "";
+    if ((number / 1000000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000000).floor())} Billion ";
+      number %= 1000000000;
+    }
+    if ((number / 1000000).floor() > 0) {
+      words += "${_numberToWords((number / 1000000).floor())} Million ";
+      number %= 1000000;
+    }
+    if ((number / 1000).floor() > 0) {
+      words += "${_numberToWords((number / 1000).floor())} Thousand ";
+      number %= 1000;
+    }
+    if ((number / 100).floor() > 0) {
+      words += "${_numberToWords((number / 100).floor())} Hundred ";
+      number %= 100;
+    }
+    if (number > 0) {
+      if (words != "") words += "and ";
+      var unitsMap = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      var tensMap = ["Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+      if (number < 20) {
+        words += unitsMap[number];
+      } else {
+        words += tensMap[(number / 10).floor()];
+        if ((number % 10) > 0) {
+          words += "-${unitsMap[number % 10]}";
+        }
+      }
+    }
+    return words.trim();
+  }
+
+  String _formatWithCommas(String text) {
+    List<String> parts = text.split('.');
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String mathFunc(Match match) => '${match[1]},';
+    String whole = parts[0].replaceAllMapped(reg, mathFunc);
+    return parts.length > 1 ? '$whole.${parts[1]}' : whole;
+  }
+
+  void _updateWords() {
+    double usd = double.tryParse(_usdController.text.replaceAll(',', '')) ?? 0;
+    double ngn = double.tryParse(_ngnController.text.replaceAll(',', '')) ?? 0;
+    setState(() {
+      _usdWords = usd > 0 ? '${_numberToWords(usd.floor())} Dollars' : '';
+      _ngnWords = ngn > 0 ? '${_numberToWords(ngn.floor())} Naira' : '';
+    });
+  }
+
+  void _onUsdChanged(String value) {
+    if (value.isEmpty) { 
+      _ngnController.clear(); 
+      _updateWords();
+      return; 
+    }
+    double usd = double.tryParse(value.replaceAll(',', '')) ?? 0;
+    _ngnController.text = _formatWithCommas((usd * _activeRate).toStringAsFixed(2));
+    _updateWords();
+  }
+
+  void _onNgnChanged(String value) {
+    if (value.isEmpty) { 
+      _usdController.clear(); 
+      _updateWords();
+      return; 
+    }
+    double ngn = double.tryParse(value.replaceAll(',', '')) ?? 0;
+    if (_activeRate > 0) _usdController.text = _formatWithCommas((ngn / _activeRate).toStringAsFixed(2));
+    _updateWords();
+  }
+
+  @override
+  void dispose() {
+    _usdController.dispose();
+    _ngnController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Dialog(
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(PhosphorIcons.calculatorFill, color: theme.primaryColor, size: 24),
+                    const SizedBox(width: 8),
+                    Text('Calculator', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                IconButton(icon: Icon(PhosphorIcons.xBold, color: theme.colorScheme.onSurfaceVariant, size: 20), onPressed: () => Navigator.pop(context), padding: EdgeInsets.zero, constraints: const BoxConstraints())
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Text('Active Rate: 1 USD = ₦${_formatWithCommas(_activeRate.toStringAsFixed(2))}', style: TextStyle(color: AppTheme.success(context), fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 24),
+            
+            Text('Amount in USD (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _usdController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [ThousandsSeparatorInputFormatter()],
+              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 18),
+              decoration: InputDecoration(
+                prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                hintText: '0.00',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+              ),
+              onChanged: _onUsdChanged,
+            ),
+            if (_usdWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Text(_usdWords, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontStyle: FontStyle.italic)),
+              ),
+            
+            const SizedBox(height: 16),
+            Center(child: Icon(PhosphorIcons.arrowsDownUp, color: theme.colorScheme.onSurfaceVariant, size: 24)),
+            const SizedBox(height: 16),
+
+            Text('Amount in Naira (₦)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ngnController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [ThousandsSeparatorInputFormatter()],
+              style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 18),
+              decoration: InputDecoration(
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 14, top: 11, right: 8),
+                  child: Text('₦', style: TextStyle(color: AppTheme.success(context), fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                filled: true,
+                fillColor: AppTheme.success(context).withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                hintText: '0.00',
+                hintStyle: TextStyle(color: AppTheme.success(context).withOpacity(0.3)),
+              ),
+              onChanged: _onNgnChanged,
+            ),
+            if (_ngnWords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Text(_ngnWords, style: TextStyle(color: AppTheme.success(context), fontSize: 11, fontStyle: FontStyle.italic)),
+              ),
+          ],
+        ),
       ),
     );
   }
