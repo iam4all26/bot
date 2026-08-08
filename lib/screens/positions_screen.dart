@@ -140,7 +140,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
-  Future<void> _closeSinglePosition(dynamic p) async {
+  Future<void> _quickClosePosition(dynamic p) async {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (p['is_locked'] == 1 || p['is_locked'] == '1') {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Trade is locked! 🔓 Unlock to close.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
@@ -654,25 +654,24 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                             ],
                                           ),
                                           const SizedBox(height: 12),
-                                          
-                                          Text(
-                                            cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
-                                          ),
-                                          if (currency.isNaira && cpnl != null)
-                                            Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
-                                          const SizedBox(height: 8),
-
                                           Row(
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Expanded(
+                                                flex: 3,
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                    Text(
+                                                      cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
+                                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                                    ),
+                                                    if (currency.isNaira && cpnl != null)
+                                                      Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
+                                                    const SizedBox(height: 6),
+                                                    Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                     const SizedBox(height: 2),
-                                                    Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                    Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                   ],
                                                 ),
                                               ),
