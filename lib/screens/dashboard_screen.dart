@@ -142,7 +142,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // NEW: Chain-colored top-aligned snackbar
   void _showTopChainSnackbar(String message, Color chainColor) {
     final size = MediaQuery.of(context).size;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -157,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: chainColor,
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.only(
-          bottom: size.height - 140, // Pushes it perfectly to the top of the screen
+          bottom: size.height - 140, 
           left: 24,
           right: 24,
         ),
@@ -235,6 +234,170 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) _fetchDashboardData(silent: true);
   }
 
+  Future<void> _editLimits(Map<String, dynamic> p) async {
+    final tpCtrl = TextEditingController(text: (p['tp_percent'] != null && double.tryParse(p['tp_percent'].toString()) != 0) ? p['tp_percent'].toString() : '');
+    final slCtrl = TextEditingController(text: (p['sl_percent'] != null && double.tryParse(p['sl_percent'].toString()) != 0) ? p['sl_percent'].toString() : '');
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Row(children: [Icon(PhosphorIcons.slidersHorizontalBold, color: theme.primaryColor), const SizedBox(width: 12), Text('Edit Live Targets', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold))]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text('Leave a field blank (or 0) to remove that limit.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12))),
+                    TextButton.icon(
+                      onPressed: () {
+                        setStateDialog(() {
+                          tpCtrl.clear();
+                          slCtrl.clear();
+                        });
+                      },
+                      icon: Icon(PhosphorIcons.trash, size: 14, color: AppTheme.danger(context)),
+                      label: Text('Clear All', style: TextStyle(color: AppTheme.danger(context), fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(controller: tpCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Take Profit (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
+                const SizedBox(height: 12),
+                TextField(controller: slCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold), decoration: InputDecoration(labelText: 'Stop Loss (%)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
+              ],
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                onPressed: isSaving ? null : () async {
+                  setStateDialog(() => isSaving = true);
+                  final tpVal = tpCtrl.text.trim().isEmpty ? '0' : tpCtrl.text.trim();
+                  final slVal = slCtrl.text.trim().isEmpty ? '0' : slCtrl.text.trim();
+                  final res = await this.context.read<ApiService>().postEndpoint('trade.php?action=update_tpsl', {'id': p['id'], 'tp_percent': tpVal, 'sl_percent': slVal});
+                  if (this.mounted) {
+                    Navigator.pop(ctx);
+                    _showFloatingSnackbar(res['message'] ?? 'Updated', isError: res['status'] != 'success');
+                    _fetchDashboardData(silent: true);
+                  }
+                },
+                child: isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _goLive(Map<String, dynamic> p) async {
+    final theme = Theme.of(context);
+    final chainName = (p['chain'] ?? 'solana').toString().toUpperCase();
+    final defaultAmount = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? '20.00';
+    
+    final amountCtrl = TextEditingController(text: defaultAmount);
+    bool removeLimits = false;
+    bool isSubmitting = false;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(children: [Icon(PhosphorIcons.lightningFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Go Live on $chainName?', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold))]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Execute a REAL trade mirroring this token.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+                const SizedBox(height: 16),
+                Text('TRADE AMOUNT (\$)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(PhosphorIcons.currencyDollar, color: theme.colorScheme.onSurfaceVariant, size: 18),
+                    filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [5, 10, 20, 50, 100].map((amt) => InkWell(
+                    onTap: () => setStateDialog(() => amountCtrl.text = amt.toStringAsFixed(2)),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                      child: Text('\$$amt', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  )).toList(),
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: () => setStateDialog(() => removeLimits = !removeLimits),
+                  child: Row(
+                    children: [
+                      Icon(removeLimits ? PhosphorIcons.checkSquareFill : PhosphorIcons.square, color: removeLimits ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Remove all limits (No TP/SL)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger(context), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), 
+                onPressed: isSubmitting ? null : () async {
+                  setStateDialog(() => isSubmitting = true);
+                  final payload = {
+                    'id': p['id'],
+                    'trade_usd': amountCtrl.text.trim(),
+                  };
+                  if (removeLimits) {
+                    payload['tp_percent'] = '0';
+                    payload['sl_percent'] = '0';
+                  }
+                  final res = await this.context.read<ApiService>().postEndpoint('trade.php?action=mirror_real', payload);
+                  if (this.mounted) {
+                    Navigator.pop(ctx, true);
+                    final ok = res['status'] == 'success' || res['status'] == 'ok';
+                    _showFloatingSnackbar(res['message'] ?? (ok ? 'Live trade executed.' : 'Failed to go live.'), isError: !ok);
+                    _fetchDashboardData(silent: true);
+                  }
+                }, 
+                child: isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Go Live', style: TextStyle(fontWeight: FontWeight.bold))
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
+    final url = Uri.parse('https://dexscreener.com/$chain/$address');
+    try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
+  }
+
   void _showActionMenu(bool canTrade) {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -309,6 +472,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (addr == '-') return '-';
     if (addr.length <= 6) return addr;
     return '${addr.substring(0, 3)}...${addr.substring(addr.length - 3)}';
+  }
+
+  String _formatFullAddress(String addr) {
+    if (addr.length <= 12) return addr;
+    return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
   }
 
   Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, ThemeData theme) {
@@ -722,6 +890,157 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ]
           ),
+          const SizedBox(height: 32),
+
+          if (_openPositions.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('LIVE OPEN POSITIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
+                InkWell(
+                  onTap: _isRefreshing ? null : _manualRefresh,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
+                    child: _isRefreshing 
+                        ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSurfaceVariant))
+                        : Icon(PhosphorIcons.arrowsClockwiseBold, size: 14, color: theme.colorScheme.onSurface),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GlassCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: _openPositions.asMap().entries.map((entry) {
+                  int idx = entry.key;
+                  var p = entry.value;
+                  
+                  final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
+                  final bool cpIsProfit = (cpnl ?? 0) >= 0;
+                  final pId = int.tryParse(p['id'].toString()) ?? 0;
+                  final bool isClosing = _closingIds.contains(pId);
+                  final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
+                  
+                  String botName = p['display_name'] ?? 'Manual';
+                  if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
+
+                  final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
+                  final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
+                  final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
+                  
+                  final bool isReal = p['is_real'] == 1 || p['is_real'] == '1';
+                  final double tp = double.tryParse(p['tp_percent']?.toString() ?? '0') ?? 0.0;
+                  final double sl = double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0.0;
+                  final double size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
+                  final double pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
+
+                  return Column(
+                    children: [
+                      if (idx > 0) Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: isClosing
+                            ? const SizedBox(width: double.infinity, height: 0)
+                            : AnimatedOpacity(
+                                duration: const Duration(milliseconds: 250),
+                                opacity: isClosing ? 0.0 : 1.0,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          GestureDetector(
+                                            onTap: () => _toggleLock(p),
+                                            child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(4), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                            child: Text(chainLabel, style: TextStyle(fontSize: 8, color: chainColor, fontWeight: FontWeight.bold)),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)), 
+                                              child: Text(botName, style: TextStyle(fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Text(isReal ? 'LIVE' : '📄', style: TextStyle(color: isReal ? AppTheme.danger(context) : theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      
+                                      Text(
+                                        cpnl != null ? '${cpIsProfit && cpnl > 0 ? '+' : ''}\$${cpnl.toStringAsFixed(2)} (${cpIsProfit && cpnl > 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)' : '-',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cpIsProfit ? AppTheme.success(context) : AppTheme.danger(context)),
+                                      ),
+                                      if (currency.isNaira && cpnl != null)
+                                        Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
+                                      const SizedBox(height: 8),
+
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                const SizedBox(height: 2),
+                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () => _editLimits(p),
+                                                child: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 20),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              GestureDetector(
+                                                onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'),
+                                                child: Icon(PhosphorIcons.arrowSquareOutBold, color: theme.colorScheme.onSurface, size: 20),
+                                              ),
+                                              if (!isReal) ...[
+                                                const SizedBox(width: 16),
+                                                GestureDetector(
+                                                  onTap: () => _goLive(p),
+                                                  child: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 22),
+                                                ),
+                                              ],
+                                              const SizedBox(width: 16),
+                                              GestureDetector(
+                                                onTap: () => _quickClosePosition(p),
+                                                child: Icon(PhosphorIcons.xCircleFill, color: AppTheme.danger(context), size: 24),
+                                              ),
+                                            ],
+                                          )
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );
