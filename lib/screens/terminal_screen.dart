@@ -31,13 +31,19 @@ class _TerminalScreenState extends State<TerminalScreen> {
   String? _tokenError;
   Timer? _debounceTimer;
 
-  // Static chain list matching the chains seeded server-side.
   static const List<Map<String, String>> _chains = [
     {'id': 'solana', 'name': 'Solana', 'placeholder': 'Paste Solana Token Address'},
     {'id': 'bsc', 'name': 'BSC', 'placeholder': 'Paste BSC Token Address (0x...)'},
-    {'id': 'robinhood', 'name': 'Robinhood', 'placeholder': 'Paste Robinhood Chain Token Address (0x...)'},
+    {'id': 'robinhood', 'name': 'Robinhood', 'placeholder': 'Paste Robinhood Token (0x...)'},
   ];
+  
   String _selectedChain = 'solana';
+
+  static final Map<String, Color> _chainColors = {
+    'solana': AppTheme.kainuwaPurple,
+    'bsc': const Color(0xFFF0B90B),
+    'robinhood': const Color(0xFF00C805),
+  };
 
   bool _isValidAddressForChain(String address) {
     if (_selectedChain == 'solana') {
@@ -52,7 +58,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
       _tokenData = null;
       _tokenError = null;
     });
-    // Re-validate whatever address is already typed against the new chain
     if (_tokenController.text.trim().isNotEmpty) _onAddressChanged();
   }
 
@@ -78,8 +83,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   void _updateCalc() {
-    final tp = double.tryParse(_tpController.text) ?? 0;
-    final size = double.tryParse(_usdController.text) ?? 0;
+    final tp = double.tryParse(_tpController.text.trim()) ?? 0;
+    final size = double.tryParse(_usdController.text.trim()) ?? 0;
     setState(() => _expectedProfit = size * (tp / 100));
   }
 
@@ -141,20 +146,29 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   Future<void> _executeTrade() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    final tradeUsd = double.tryParse(_usdController.text.trim()) ?? 0.0;
+    if (tradeUsd <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Enter a valid trade amount', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: AppTheme.danger(context)));
+      return;
+    }
+
     setState(() => _isLoading = true);
     final api = context.read<ApiService>();
+    
+    // Pass strictly sanitized numbers to bypass Node.js sanity check failures
     final res = await api.postEndpoint('trade.php?action=manual_snipe', {
       'chain': _selectedChain,
       'token_address': _tokenController.text.trim(),
-      'trade_usd': _usdController.text,
-      'tp_percent': _tpController.text,
-      'sl_percent': _slController.text,
+      'trade_usd': tradeUsd.toString(),
+      'tp_percent': (double.tryParse(_tpController.text.trim()) ?? 0.0).toString(),
+      'sl_percent': (double.tryParse(_slController.text.trim()) ?? 0.0).toString(),
     });
 
     if (mounted) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res['message'] ?? 'Trade submitted!'),
+        content: Text(res['message'] ?? 'Trade submitted!', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
       ));
       if (res['status'] == 'success') {
@@ -163,7 +177,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           _tokenData = null;
           _tokenError = null;
         });
-        Navigator.pop(context); // Return to dashboard after successful manual snipe
+        Navigator.pop(context);
       }
     }
   }
@@ -180,6 +194,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
+    final activeChainColor = _chainColors[_selectedChain] ?? theme.primaryColor;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -199,32 +214,36 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(PhosphorIcons.coinsFill, color: theme.primaryColor),
+                          Icon(PhosphorIcons.coinsFill, color: activeChainColor),
                           const SizedBox(width: 12),
                           Text('Token Target', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: _chains.map((c) {
-                          final selected = c['id'] == _selectedChain;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: InkWell(
-                              onTap: () => _onChainSelected(c['id']!),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: selected ? theme.primaryColor.withOpacity(0.12) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: selected ? theme.primaryColor : theme.dividerColor.withOpacity(0.3)),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _chains.map((c) {
+                            final selected = c['id'] == _selectedChain;
+                            final cColor = _chainColors[c['id']] ?? theme.primaryColor;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: InkWell(
+                                onTap: () => _onChainSelected(c['id']!),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: selected ? cColor.withOpacity(0.12) : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: selected ? cColor.withOpacity(0.5) : Colors.transparent),
+                                  ),
+                                  child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? cColor : theme.colorScheme.onSurfaceVariant)),
                                 ),
-                                child: Text(c['name']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: selected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant)),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -232,9 +251,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontSize: 14),
                         decoration: InputDecoration(
                           labelText: _chains.firstWhere((c) => c['id'] == _selectedChain)['placeholder'],
-                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                           suffixIcon: IconButton(
-                            icon: Icon(PhosphorIcons.clipboard, color: theme.primaryColor),
+                            icon: Icon(PhosphorIcons.clipboard, color: activeChainColor),
                             onPressed: _pasteFromClipboard,
                           ),
                           filled: true,
@@ -254,7 +273,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor)),
+                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: activeChainColor)),
                         const SizedBox(width: 12),
                         Text('Fetching live token metrics...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
                       ],
@@ -275,15 +294,27 @@ class _TerminalScreenState extends State<TerminalScreen> {
                                   if (_tokenData!['image_url'] != null && _tokenData!['image_url'].toString().isNotEmpty)
                                     ClipOval(child: Image.network(_tokenData!['image_url'], width: 40, height: 40, fit: BoxFit.cover))
                                   else
-                                    Container(width: 40, height: 40, decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.12), shape: BoxShape.circle), child: Center(child: Text(_tokenData!['symbol']?.toString().substring(0, 1).toUpperCase() ?? '?', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18)))),
+                                    Container(width: 40, height: 40, decoration: BoxDecoration(color: activeChainColor.withOpacity(0.12), shape: BoxShape.circle), child: Center(child: Text(_tokenData!['symbol']?.toString().substring(0, 1).toUpperCase() ?? '?', style: TextStyle(color: activeChainColor, fontWeight: FontWeight.bold, fontSize: 18)))),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('${_tokenData!['name']} (${_tokenData!['symbol']})', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            Text('${_tokenData!['name']} (${_tokenData!['symbol']})', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(color: activeChainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: activeChainColor.withOpacity(0.3))),
+                                              child: Text(_selectedChain.toUpperCase(), style: TextStyle(fontSize: 9, color: activeChainColor, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
                                         const SizedBox(height: 4),
-                                        Text('DEX: ${_tokenData!['dex']}', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        Text('DEX: ${_tokenData!['dex']}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
                                       ],
                                     ),
                                   ),
@@ -331,36 +362,43 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     children: [
                       Text('TRADE EXECUTION SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
                       const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _usdController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
-                              decoration: InputDecoration(labelText: 'Trade Size (\$) — executes via ${_selectedChain == 'solana' ? 'Jupiter' : 'Uniswap router'}', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _tpController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 16),
-                              decoration: InputDecoration(labelText: 'Take Profit (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
-                            ),
-                          ),
-                        ],
+                      
+                      // Full width Trade Size input to fix UI squeeze
+                      TextFormField(
+                        controller: _usdController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
+                        decoration: InputDecoration(
+                          labelText: 'Trade Size (\$)',
+                          labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                          filled: true, 
+                          fillColor: theme.colorScheme.surfaceContainerHighest, 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)
+                        ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 4),
+                        child: Text('Executes instantly via ${_selectedChain == 'solana' ? 'Jupiter' : 'Uniswap router'}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8), fontSize: 11)),
+                      ),
+                      
                       const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
                             child: TextFormField(
+                              controller: _tpController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 16),
+                              decoration: InputDecoration(labelText: 'Take Profit (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
                               controller: _slController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 16),
-                              decoration: InputDecoration(labelText: 'Stop Loss (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+                              decoration: InputDecoration(labelText: 'Stop Loss (%)', labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12), filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
                             ),
                           ),
                         ],
@@ -393,7 +431,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _executeTrade,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor,
+                      backgroundColor: activeChainColor,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 20),
