@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'terminal_screen.dart';
 import 'copy_bots_screen.dart';
 import 'history_screen.dart';
+import 'hidden_positions_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -377,7 +378,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
@@ -418,6 +419,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () {
                     Navigator.pop(ctx);
                     showDialog(context: context, builder: (ctx) => const CurrencyCalculatorDialog());
+                  },
+                ),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
+                    child: Icon(PhosphorIcons.archiveTrayFill, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  title: Text('Hidden Positions', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
+                  subtitle: Text('View or restore archived trades', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HiddenPositionsScreen()));
                   },
                 ),
               ],
@@ -964,7 +979,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
                                                 Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                               ],
@@ -989,6 +1004,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                   child: Icon(PhosphorIcons.lightningFill, color: AppTheme.success(context), size: 22),
                                                 ),
                                               ],
+                                              const SizedBox(width: 16),
+                                              GestureDetector(
+                                                onTap: () async {
+                                                  final pId = int.tryParse(p['id'].toString()) ?? 0;
+                                                  if (pId <= 0) return;
+                                                  setState(() => _closingIds.add(pId));
+                                                  await Future.delayed(const Duration(milliseconds: 350));
+                                                  final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
+                                                  if (mounted) {
+                                                    if (res['status'] != 'success') {
+                                                      _showFloatingSnackbar(res['message'] ?? 'Failed to hide', isError: true);
+                                                      setState(() => _closingIds.remove(pId));
+                                                    }
+                                                    _fetchDashboardData(silent: true);
+                                                  }
+                                                },
+                                                child: Icon(PhosphorIcons.eyeSlashFill, color: theme.colorScheme.onSurfaceVariant, size: 22),
+                                              ),
                                               const SizedBox(width: 16),
                                               GestureDetector(
                                                 onTap: () => _quickClosePosition(p),

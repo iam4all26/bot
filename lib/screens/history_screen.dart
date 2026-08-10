@@ -30,6 +30,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   List<Map<String, dynamic>> _flattenedHistory = [];
   Map<String, double> _winRates = {};
+  final Set<int> _hidingIds = {};
   
   int _statsToday = 0, _statsWeek = 0, _statsMonth = 0, _statsAll = 0;
   double _profToday = 0, _profWeek = 0, _profMonth = 0, _profAll = 0;
@@ -69,6 +70,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _processData(); 
       }
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _hidePosition(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (pId <= 0) return;
+
+    setState(() => _hidingIds.add(pId));
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
+    if (mounted) {
+      if (res['status'] != 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to hide', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+        setState(() => _hidingIds.remove(pId));
+      }
+      _fetchPositions(silent: true);
     }
   }
 
@@ -517,6 +535,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               }
 
                               final p = item['data'];
+                              final pId = int.tryParse(p['id'].toString()) ?? 0;
+                              final isHiding = _hidingIds.contains(pId);
+                              
                               final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
                               final size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
                               final pct = size > 0 ? (pnl / size) * 100 : 0.0;
@@ -577,144 +598,179 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   winRateText = ' • ${_winRates[mainTitle]!.toStringAsFixed(1)}%';
                               }
 
-                              return Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                                child: GlassCard(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
+                              return AnimatedSize(
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeOutCubic,
+                                child: isHiding
+                                    ? const SizedBox(width: double.infinity, height: 0)
+                                    : AnimatedOpacity(
+                                        duration: const Duration(milliseconds: 250),
+                                        opacity: isHiding ? 0.0 : 1.0,
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                                          child: GlassCard(
+                                            padding: const EdgeInsets.all(20),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Wrap(
-                                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                                  spacing: 6,
-                                                  runSpacing: 6,
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                      decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
-                                                      child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
-                                                    ),
-                                                    if (subTitle.isNotEmpty)
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
-                                                        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
-                                                        child: Text(subTitle, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Wrap(
+                                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                                            spacing: 6,
+                                                            runSpacing: 6,
+                                                            children: [
+                                                              Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                                                              Container(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                                decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),
+                                                                child: Text(chainLabel, style: TextStyle(fontSize: 9, color: chainColor, fontWeight: FontWeight.bold)),
+                                                              ),
+                                                              if (subTitle.isNotEmpty)
+                                                                Container(
+                                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), 
+                                                                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)), 
+                                                                  child: Text(subTitle, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold))
+                                                                ),
+                                                            ],
+                                                          ),
+                                                          Padding(
+                                                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                                                            child: Row(
+                                                              children: [
+                                                                Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                                                if (winRateText.isNotEmpty)
+                                                                  Text(winRateText, style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 12)),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        InkWell(
+                                                          onTap: () => _hidePosition(p),
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          child: Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                            decoration: BoxDecoration(
+                                                              color: theme.colorScheme.surfaceContainerHighest,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(PhosphorIcons.eyeSlashFill, color: theme.colorScheme.onSurfaceVariant, size: 14), 
+                                                                const SizedBox(width: 4), 
+                                                                Text('Hide', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        InkWell(
+                                                          onTap: () {
+                                                            showDialog(
+                                                              context: context,
+                                                              builder: (_) => PnlShareDialog(tradeData: p, isAdmin: isAdmin),
+                                                            );
+                                                          },
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          child: Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                            decoration: BoxDecoration(
+                                                              color: theme.primaryColor.withOpacity(0.12),
+                                                              borderRadius: BorderRadius.circular(8),
+                                                              border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
+                                                                const SizedBox(width: 4), 
+                                                                Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ],
                                                 ),
-                                                Padding(
-                                                  padding: const EdgeInsets.only(top: 8, bottom: 4),
-                                                  child: Row(
-                                                    children: [
-                                                      Flexible(child: Text(mainTitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                                                      if (winRateText.isNotEmpty)
-                                                        Text(winRateText, style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 12)),
-                                                    ],
-                                                  ),
+                                                const SizedBox(height: 12),
+
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    InkWell(
+                                                      onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'), 
+                                                      child: Row(children: [Text('View Chart', style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 12)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowSquareOutBold, color: AppTheme.info(context), size: 14)])
+                                                    ),
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          margin: const EdgeInsets.only(right: 8),
+                                                          decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))),
+                                                          child: isReal
+                                                              ? Text('LIVE', style: GoogleFonts.spaceGrotesk(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
+                                                              : const Text('📄', style: TextStyle(fontSize: 12)),
+                                                        ),
+                                                        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: closeReasonColor.withOpacity(0.15), border: Border.all(color: closeReasonColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(6)), child: Text(closeReasonBadge, style: GoogleFonts.spaceGrotesk(color: closeReasonColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                                                      ],
+                                                    )
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 20),
+                                                
+                                                Row(
+                                                  children: [
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('EXIT MCAP', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['close_mcap']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 20),
+
+                                                Row(
+                                                  children: [
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                      Text('REALIZED P&L', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), 
+                                                      Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: GoogleFonts.spaceGrotesk(color: pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)), 
+                                                      if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: GoogleFonts.spaceGrotesk(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 12))
+                                                    ])),
+                                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                      Text('TRADE SIZE', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), 
+                                                      Text('\$${size.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), 
+                                                      if (currency.isNaira) Text('≈ ${currency.format(size)}', style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold))
+                                                    ])),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 20),
+                                                Container(height: 1, color: theme.colorScheme.outlineVariant),
+                                                const SizedBox(height: 16),
+
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14), const SizedBox(width: 6), Text(formatLagosTime(p['closed_at']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500))]),
+                                                    Row(children: [Icon(PhosphorIcons.hourglassHigh, color: AppTheme.warning(context), size: 14), const SizedBox(width: 6), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: GoogleFonts.spaceGrotesk(color: AppTheme.warning(context), fontWeight: FontWeight.bold, fontSize: 12))]),
+                                                  ],
                                                 ),
                                               ],
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          InkWell(
-                                            onTap: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (_) => PnlShareDialog(tradeData: p, isAdmin: isAdmin),
-                                              );
-                                            },
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: theme.primaryColor.withOpacity(0.12),
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
-                                                  const SizedBox(width: 4), 
-                                                  Text('Share', style: GoogleFonts.spaceGrotesk(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 12),
-
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          InkWell(
-                                            onTap: () => _launchDexScreener(p['token_address'] ?? '', chain: p['chain'] ?? 'solana'), 
-                                            child: Row(children: [Text('View Chart', style: GoogleFonts.spaceGrotesk(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 12)), const SizedBox(width: 4), Icon(PhosphorIcons.arrowSquareOutBold, color: AppTheme.info(context), size: 14)])
-                                          ),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                margin: const EdgeInsets.only(right: 8),
-                                                decoration: BoxDecoration(color: isReal ? AppTheme.danger(context).withOpacity(0.15) : AppTheme.warning(context).withOpacity(0.15), borderRadius: BorderRadius.circular(6), border: Border.all(color: isReal ? AppTheme.danger(context).withOpacity(0.3) : AppTheme.warning(context).withOpacity(0.3))),
-                                                child: isReal
-                                                    ? Text('LIVE', style: GoogleFonts.spaceGrotesk(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))
-                                                    : const Text('📄', style: TextStyle(fontSize: 12)),
-                                              ),
-                                              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: closeReasonColor.withOpacity(0.15), border: Border.all(color: closeReasonColor.withOpacity(0.3)), borderRadius: BorderRadius.circular(6)), child: Text(closeReasonBadge, style: GoogleFonts.spaceGrotesk(color: closeReasonColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
-                                            ],
-                                          )
-                                        ],
-                                      ),
-                                      const SizedBox(height: 20),
-                                      
-                                      Row(
-                                        children: [
-                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('ENTRY MCAP', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['entry_mcap']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
-                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('EXIT MCAP', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatMcap(p['close_mcap']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 20),
-
-                                      Row(
-                                        children: [
-                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            Text('REALIZED P&L', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), 
-                                            Text('${pnl >= 0 ? '+' : ''}\$${pnl.toStringAsFixed(2)} (${pnl >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)', style: GoogleFonts.spaceGrotesk(color: pnl >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 15)), 
-                                            if (currency.isNaira) Text('≈ ${pnl > 0 ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: GoogleFonts.spaceGrotesk(color: pnl >= 0 ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 12))
-                                          ])),
-                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            Text('TRADE SIZE', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), 
-                                            Text('\$${size.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), 
-                                            if (currency.isNaira) Text('≈ ${currency.format(size)}', style: GoogleFonts.spaceGrotesk(color: AppTheme.success(context).withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold))
-                                          ])),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 20),
-                                      Container(height: 1, color: theme.colorScheme.outlineVariant),
-                                      const SizedBox(height: 16),
-
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(children: [Icon(PhosphorIcons.clock, color: theme.colorScheme.onSurfaceVariant, size: 14), const SizedBox(width: 6), Text(formatLagosTime(p['closed_at']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500))]),
-                                          Row(children: [Icon(PhosphorIcons.hourglassHigh, color: AppTheme.warning(context), size: 14), const SizedBox(width: 6), Text(calculateTimeInTrade(p['opened_at'], p['closed_at']), style: GoogleFonts.spaceGrotesk(color: AppTheme.warning(context), fontWeight: FontWeight.bold, fontSize: 12))]),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                                    );
                             },
                             childCount: _flattenedHistory.length,
                           ),

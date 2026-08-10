@@ -140,6 +140,23 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
   }
 
+  Future<void> _hidePosition(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (pId <= 0) return;
+
+    setState(() => _closingIds.add(pId));
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
+    if (mounted) {
+      if (res['status'] != 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to hide', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
+        setState(() => _closingIds.remove(pId));
+      }
+      _fetchPositions(silent: true);
+    }
+  }
+
   Future<void> _quickClosePosition(dynamic p) async {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (p['is_locked'] == 1 || p['is_locked'] == '1') {
@@ -669,7 +686,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                     if (currency.isNaira && cpnl != null)
                                                       Text('≈ ${cpIsProfit && cpnl > 0 ? '+' : ''}${currency.format(cpnl).replaceFirst('₦-', '-₦').replaceFirst('\$-', '-\$')}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: cpIsProfit ? AppTheme.success(context).withOpacity(0.8) : AppTheme.danger(context).withOpacity(0.8))),
                                                     const SizedBox(height: 6),
-                                                    Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                    Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                     const SizedBox(height: 2),
                                                     Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                   ],
@@ -678,6 +695,11 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
+                                                  GestureDetector(
+                                                    onTap: () => _hidePosition(p),
+                                                    child: Icon(PhosphorIcons.eyeSlashFill, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                                                  ),
+                                                  const SizedBox(width: 16),
                                                   GestureDetector(
                                                     onTap: () => _editLimits(p),
                                                     child: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 20),
