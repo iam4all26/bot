@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../services/api_service.dart';
+import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/bot_engine_tab.dart';
@@ -16,12 +17,25 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  int _activeView = 0; // 0: Grid Dashboard, 1: Users, 2: Engine, 3: Wallets
+  int _activeView = 0; // 0: Grid Dashboard, 1: Users, 2: Engine, 3: Wallets, 4: Exchange Rate
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    return PopScope(
+      canPop: _activeView == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_activeView != 0) {
+          setState(() => _activeView = 0);
+        }
+      },
+      child: _buildCurrentView(theme),
+    );
+  }
+
+  Widget _buildCurrentView(ThemeData theme) {
     if (_activeView == 1) {
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -46,6 +60,14 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
+    if (_activeView == 4) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildSubAppBar('EXCHANGE RATE CONTROL', theme),
+        body: const ExchangeRateTab(),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -58,7 +80,7 @@ class _AdminScreenState extends State<AdminScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.85, // Makes the cards taller to prevent text squishing
+            childAspectRatio: 0.85,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
@@ -84,6 +106,14 @@ class _AdminScreenState extends State<AdminScreen> {
                 icon: PhosphorIcons.robotFill,
                 color: AppTheme.info(context),
                 onTap: () => setState(() => _activeView = 3),
+                theme: theme,
+              ),
+              _buildControlTile(
+                title: 'Exchange Rate',
+                subtitle: 'USD / NGN Currency Rate',
+                icon: PhosphorIcons.currencyCircleDollarFill,
+                color: AppTheme.success(context),
+                onTap: () => setState(() => _activeView = 4),
                 theme: theme,
               ),
               _buildControlTile(
@@ -127,7 +157,7 @@ class _AdminScreenState extends State<AdminScreen> {
     required ThemeData theme,
   }) {
     return GlassCard(
-      padding: EdgeInsets.zero, // Eliminates double padding
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
@@ -171,9 +201,6 @@ class UsersTab extends StatefulWidget {
 class _UsersTabState extends State<UsersTab> {
   bool _isLoadingUsers = true;
   List<dynamic> _users = [];
-  
-  final _rateCtrl = TextEditingController();
-  bool _isSavingRate = false;
 
   @override
   void initState() {
@@ -191,28 +218,6 @@ class _UsersTabState extends State<UsersTab> {
         }
         _isLoadingUsers = false;
       });
-    }
-  }
-
-  Future<void> _saveCustomRate() async {
-    final val = _rateCtrl.text.trim();
-    if (val.isEmpty) return;
-    
-    setState(() => _isSavingRate = true);
-    FocusScope.of(context).unfocus();
-    
-    final res = await context.read<ApiService>().postEndpoint(
-      'admin.php?action=set_exchange_rate', 
-      {'custom_ngn_rate': val}
-    );
-    
-    if (mounted) {
-      setState(() => _isSavingRate = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res['message'] ?? ''),
-        backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
-      ));
-      _rateCtrl.clear();
     }
   }
 
@@ -448,56 +453,6 @@ class _UsersTabState extends State<UsersTab> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(PhosphorIcons.currencyCircleDollarFill, color: AppTheme.success(context)),
-                    const SizedBox(width: 12),
-                    Text('Global Exchange Rate (₦/USD)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text('Set to 0 to automatically fetch the live market rate.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _rateCtrl,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 1600 or 0',
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.success(context).withOpacity(0.12), 
-                        foregroundColor: AppTheme.success(context), 
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24)
-                      ),
-                      onPressed: _isSavingRate ? null : _saveCustomRate,
-                      child: _isSavingRate 
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Set Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -513,7 +468,7 @@ class _UsersTabState extends State<UsersTab> {
               label: const Text('Create New User Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           Text('SYSTEM USERS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
           const SizedBox(height: 16),
           
@@ -603,6 +558,114 @@ class _UsersTabState extends State<UsersTab> {
           }),
         ],
       ),
+    );
+  }
+}
+
+class ExchangeRateTab extends StatefulWidget {
+  const ExchangeRateTab({super.key});
+
+  @override
+  State<ExchangeRateTab> createState() => _ExchangeRateTabState();
+}
+
+class _ExchangeRateTabState extends State<ExchangeRateTab> {
+  final _rateCtrl = TextEditingController();
+  bool _isSavingRate = false;
+
+  Future<void> _saveCustomRate() async {
+    final val = _rateCtrl.text.trim();
+    if (val.isEmpty) return;
+
+    setState(() => _isSavingRate = true);
+    FocusScope.of(context).unfocus();
+
+    final res = await context.read<ApiService>().postEndpoint(
+      'admin.php?action=set_exchange_rate', 
+      {'custom_ngn_rate': val}
+    );
+
+    if (mounted) {
+      setState(() => _isSavingRate = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] ?? ''),
+        backgroundColor: res['status'] == 'success' ? AppTheme.success(context) : AppTheme.danger(context),
+      ));
+      _rateCtrl.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final currency = context.watch<CurrencyProvider>();
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(PhosphorIcons.currencyCircleDollarFill, color: AppTheme.success(context), size: 24),
+                  const SizedBox(width: 12),
+                  Text('Global Exchange Rate (₦/USD)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text('Set to 0 to automatically fetch the live market rate.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+              const SizedBox(height: 20),
+              
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Active Rate in System:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(currency.format(1), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.black, fontSize: 16)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              TextField(
+                controller: _rateCtrl,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16),
+                decoration: InputDecoration(
+                  labelText: 'Custom NGN Rate',
+                  hintText: 'e.g. 1600 or 0 for Auto-API',
+                  prefixIcon: Icon(PhosphorIcons.currencyNgn, color: theme.primaryColor),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success(context),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 18)
+                  ),
+                  onPressed: _isSavingRate ? null : _saveCustomRate,
+                  icon: _isSavingRate ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(PhosphorIcons.floppyDiskFill),
+                  label: const Text('Save Custom Exchange Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
