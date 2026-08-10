@@ -58,6 +58,7 @@ class _AdminScreenState extends State<AdminScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
+            childAspectRatio: 0.85, // Makes the cards taller to prevent text squishing
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
@@ -126,26 +127,32 @@ class _AdminScreenState extends State<AdminScreen> {
     required ThemeData theme,
   }) {
     return GlassCard(
+      padding: EdgeInsets.zero, // Eliminates double padding
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: color, size: 22),
+                child: Icon(icon, color: color, size: 24),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle, 
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, height: 1.3),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ],
