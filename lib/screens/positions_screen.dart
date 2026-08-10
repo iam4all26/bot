@@ -70,39 +70,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
   }
 
-  String formatLagosTime(String? utcString) {
-    if (utcString == null || utcString.isEmpty) return '-';
-    try {
-      String formattedStr = utcString.replaceAll(' ', 'T');
-      if (!formattedStr.endsWith('Z')) formattedStr += 'Z';
-      final dt = DateTime.parse(formattedStr).add(const Duration(hours: 1)); 
-      final hour12 = (dt.hour % 12 == 0) ? 12 : dt.hour % 12;
-      final period = dt.hour >= 12 ? 'PM' : 'AM';
-      final min = dt.minute.toString().padLeft(2, '0');
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '$hour12:$min $period, ${months[dt.month - 1]} ${dt.day}';
-    } catch (_) { return utcString; }
-  }
-
-  String calculateTimeInTrade(String? openedAtStr) {
-    if (openedAtStr == null || openedAtStr.isEmpty) return '-';
-    try {
-      String startStr = openedAtStr.replaceAll(' ', 'T');
-      if (!startStr.endsWith('Z')) startStr += 'Z';
-      final start = DateTime.parse(startStr);
-      DateTime end = DateTime.now().toUtc();
-
-      final diff = end.difference(start);
-      if (diff.inMinutes < 1) return '< 1m';
-
-      List<String> parts = [];
-      if (diff.inDays > 0) parts.add('${diff.inDays}d');
-      if (diff.inHours % 24 > 0) parts.add('${diff.inHours % 24}h');
-      if (diff.inMinutes % 60 > 0) parts.add('${diff.inMinutes % 60}m');
-      return parts.join(' ');
-    } catch (_) { return '-'; }
-  }
-
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = double.tryParse(v.toString()) ?? 0.0;
