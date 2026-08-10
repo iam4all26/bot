@@ -625,7 +625,7 @@ class _ExchangeRateTabState extends State<ExchangeRateTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Active Rate in System:', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.bold)),
-                    Text(currency.format(1), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.black, fontSize: 16)),
+                    Text(currency.format(1), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.w900, fontSize: 16)),
                   ],
                 ),
               ),
