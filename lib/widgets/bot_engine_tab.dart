@@ -17,18 +17,27 @@ class _BotEngineTabState extends State<BotEngineTab> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  // Toggles
+  // Live Toggles
   bool _liveMode = false;
   bool _bscLiveMode = false;
   bool _robinhoodLiveMode = false;
-  bool _paperMode = true;
+
+  // Per-Chain Paper Toggles
+  bool _solanaPaperMode = true;
+  bool _bscPaperMode = true;
+  bool _robinhoodPaperMode = true;
   bool _telegramAlerts = true;
 
   // Text Controllers
   final _pollMinsCtrl = TextEditingController();
   final _liqFloorCtrl = TextEditingController();
   final _maxAlertsCtrl = TextEditingController();
-  final _paperSizeCtrl = TextEditingController();
+
+  // Per-Chain Paper Sizes
+  final _solanaPaperSizeCtrl = TextEditingController();
+  final _bscPaperSizeCtrl = TextEditingController();
+  final _robinhoodPaperSizeCtrl = TextEditingController();
+
   final _tpCtrl = TextEditingController();
   final _slCtrl = TextEditingController();
   final _realBaseSizeCtrl = TextEditingController();
@@ -47,7 +56,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
   Future<void> _fetchSettings() async {
     setState(() => _isLoading = true);
     final api = context.read<ApiService>();
-    final res = await api.getEndpoint('admin_settings.php?action=fetch');
+    final res = await api.getEndpoint('admin.php?action=fetch_settings');
 
     if (mounted && res['status'] == 'success') {
       final data = res['data'] ?? {};
@@ -55,7 +64,10 @@ class _BotEngineTabState extends State<BotEngineTab> {
         _liveMode = data['live_trading_enabled'] == '1';
         _bscLiveMode = data['bsc_live_trading_enabled'] == '1';
         _robinhoodLiveMode = data['robinhood_live_trading_enabled'] == '1';
-        _paperMode = data['paper_trading_enabled'] == '1';
+
+        _solanaPaperMode = data['solana_paper_trading_enabled'] == '1';
+        _bscPaperMode = data['bsc_paper_trading_enabled'] == '1';
+        _robinhoodPaperMode = data['robinhood_paper_trading_enabled'] == '1';
         _telegramAlerts = data['telegram_enabled'] == '1';
 
         final pollSecs = int.tryParse(data['poll_interval_seconds'] ?? '60') ?? 60;
@@ -63,7 +75,11 @@ class _BotEngineTabState extends State<BotEngineTab> {
         
         _liqFloorCtrl.text = data['liquidity_floor'] ?? '15000';
         _maxAlertsCtrl.text = data['max_alerts_per_cycle'] ?? '5';
-        _paperSizeCtrl.text = data['copy_trade_virtual_usd'] ?? '100';
+
+        _solanaPaperSizeCtrl.text = data['solana_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+        _bscPaperSizeCtrl.text = data['bsc_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+        _robinhoodPaperSizeCtrl.text = data['robinhood_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+
         _tpCtrl.text = data['default_tp_percent'] ?? '50';
         _slCtrl.text = data['default_sl_percent'] ?? '20';
         _realBaseSizeCtrl.text = data['real_trade_usd_amount'] ?? '5';
@@ -91,7 +107,11 @@ class _BotEngineTabState extends State<BotEngineTab> {
       'poll_interval_seconds': pollSecs.toString(),
       'liquidity_floor': _liqFloorCtrl.text,
       'max_alerts_per_cycle': _maxAlertsCtrl.text,
-      'copy_trade_virtual_usd': _paperSizeCtrl.text,
+
+      'solana_copy_trade_virtual_usd': _solanaPaperSizeCtrl.text,
+      'bsc_copy_trade_virtual_usd': _bscPaperSizeCtrl.text,
+      'robinhood_copy_trade_virtual_usd': _robinhoodPaperSizeCtrl.text,
+
       'default_tp_percent': _tpCtrl.text,
       'default_sl_percent': _slCtrl.text,
       'real_trade_usd_amount': _realBaseSizeCtrl.text,
@@ -100,15 +120,20 @@ class _BotEngineTabState extends State<BotEngineTab> {
       'max_daily_real_spend_usd': _realDailyCapCtrl.text,
       'stablecoin_mints': _stablecoinsCtrl.text,
       'telegram_bot_username': _botUsernameCtrl.text, 
+
       'telegram_enabled': _telegramAlerts ? '1' : '0',
-      'paper_trading_enabled': _paperMode ? '1' : '0',
+
+      'solana_paper_trading_enabled': _solanaPaperMode ? '1' : '0',
+      'bsc_paper_trading_enabled': _bscPaperMode ? '1' : '0',
+      'robinhood_paper_trading_enabled': _robinhoodPaperMode ? '1' : '0',
+
       'live_trading_enabled': _liveMode ? '1' : '0',
       'bsc_live_trading_enabled': _bscLiveMode ? '1' : '0',
       'robinhood_live_trading_enabled': _robinhoodLiveMode ? '1' : '0',
     };
 
     final api = context.read<ApiService>();
-    final res = await api.postEndpoint('admin_settings.php?action=save', payload);
+    final res = await api.postEndpoint('admin.php?action=save_settings', payload);
 
     if (mounted) {
       setState(() => _isSaving = false);
@@ -165,27 +190,49 @@ class _BotEngineTabState extends State<BotEngineTab> {
     return ListView(
       padding: const EdgeInsets.all(24.0),
       children: [
+        // Per-Chain Paper Trading Controls
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [Icon(PhosphorIcons.toggleLeftFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Master Engine Controls', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
-              const SizedBox(height: 24),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.warning(context), title: Text('Paper Trading (Simulated)', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), subtitle: Text('Open virtual positions automatically', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _paperMode, onChanged: (val) => setState(() => _paperMode = val)),
+              Row(children: [Icon(PhosphorIcons.stackFill, color: AppTheme.info(context)), const SizedBox(width: 8), Text('Per-Chain Paper Trading', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+              const SizedBox(height: 16),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.kainuwaPurple, title: Text('Solana Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _solanaPaperMode, onChanged: (val) => setState(() => _solanaPaperMode = val)),
+              _buildTextField('SOLANA PAPER SIZE (\$)', _solanaPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+              
               Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.danger(context), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — Solana', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via Jupiter', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _liveMode, onChanged: (val) => setState(() => _liveMode = val)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Text('BSC Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _bscPaperMode, onChanged: (val) => setState(() => _bscPaperMode = val)),
+              _buildTextField('BSC PAPER SIZE (\$)', _bscPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+
               Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: const Color(0xFFF0B90B), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — BSC', style: TextStyle(color: const Color(0xFFF0B90B), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via PancakeSwap', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _bscLiveMode, onChanged: (val) => setState(() => _bscLiveMode = val)),
-              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Row(children: [Icon(PhosphorIcons.warningCircleFill, color: const Color(0xFF00C805), size: 16), const SizedBox(width: 6), Text('Live REAL Trading — Robinhood', style: TextStyle(color: const Color(0xFF00C805), fontWeight: FontWeight.bold, fontSize: 14))]), subtitle: Text('Use real master wallet funds via Uniswap — verify router address first', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _robinhoodLiveMode, onChanged: (val) => setState(() => _robinhoodLiveMode = val)),
-              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.info(context), title: Text('Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), subtitle: Text('Broadcast updates to designated channel', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)), value: _telegramAlerts, onChanged: (val) => setState(() => _telegramAlerts = val)),
-              const SizedBox(height: 24),
-              _buildTextField('OFFICIAL BOT USERNAME (@)', _botUsernameCtrl, PhosphorIcons.robot, isMultiLine: false),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Text('Robinhood Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _robinhoodPaperMode, onChanged: (val) => setState(() => _robinhoodPaperMode = val)),
+              _buildTextField('ROBINHOOD PAPER SIZE (\$)', _robinhoodPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
             ],
           ),
         ),
         const SizedBox(height: 24),
+
+        // Live Real Trading Controls
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context)), const SizedBox(width: 8), Text('Live REAL Trading Controls', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 16))]),
+              const SizedBox(height: 16),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.danger(context), title: Text('Live REAL Trading — Solana', style: TextStyle(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14)), value: _liveMode, onChanged: (val) => setState(() => _liveMode = val)),
+              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Text('Live REAL Trading — BSC', style: TextStyle(color: const Color(0xFFF0B90B), fontWeight: FontWeight.bold, fontSize: 14)), value: _bscLiveMode, onChanged: (val) => setState(() => _bscLiveMode = val)),
+              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Text('Live REAL Trading — Robinhood', style: TextStyle(color: const Color(0xFF00C805), fontWeight: FontWeight.bold, fontSize: 14)), value: _robinhoodLiveMode, onChanged: (val) => setState(() => _robinhoodLiveMode = val)),
+              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.info(context), title: Text('Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _telegramAlerts, onChanged: (val) => setState(() => _telegramAlerts = val)),
+              const SizedBox(height: 16),
+              _buildTextField('OFFICIAL BOT USERNAME (@)', _botUsernameCtrl, PhosphorIcons.robot),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,11 +247,12 @@ class _BotEngineTabState extends State<BotEngineTab> {
           ),
         ),
         const SizedBox(height: 24),
+
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [Icon(PhosphorIcons.scanFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Scanning & Parameters', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+              Row(children: [Icon(PhosphorIcons.scanFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Scanning & Target Defaults', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
               const SizedBox(height: 24),
               _buildTextField('POLL INTERVAL (MINS)', _pollMinsCtrl, PhosphorIcons.timer),
               _buildTextField('LIQUIDITY FLOOR (USD)', _liqFloorCtrl, PhosphorIcons.drop, isUsd: true),
@@ -212,12 +260,12 @@ class _BotEngineTabState extends State<BotEngineTab> {
               const SizedBox(height: 16),
               Container(height: 1, color: theme.colorScheme.outlineVariant),
               const SizedBox(height: 24),
-              _buildTextField('VIRTUAL PAPER SIZE (\$)', _paperSizeCtrl, PhosphorIcons.stack, isUsd: true),
               Row(children: [Expanded(child: _buildTextField('DEFAULT TP (%)', _tpCtrl, PhosphorIcons.trendUp)), const SizedBox(width: 16), Expanded(child: _buildTextField('DEFAULT SL (%)', _slCtrl, PhosphorIcons.trendDown))]),
             ],
           ),
         ),
         const SizedBox(height: 24),
+
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,6 +279,7 @@ class _BotEngineTabState extends State<BotEngineTab> {
           ),
         ),
         const SizedBox(height: 32),
+
         SizedBox(
           width: double.infinity, 
           child: ElevatedButton.icon(
