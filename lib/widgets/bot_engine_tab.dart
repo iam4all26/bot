@@ -33,13 +33,19 @@ class _BotEngineTabState extends State<BotEngineTab> {
   final _liqFloorCtrl = TextEditingController();
   final _maxAlertsCtrl = TextEditingController();
 
-  // Per-Chain Paper Sizes
+  // Per-Chain Paper Settings (Size, TP %, SL %)
   final _solanaPaperSizeCtrl = TextEditingController();
-  final _bscPaperSizeCtrl = TextEditingController();
-  final _robinhoodPaperSizeCtrl = TextEditingController();
+  final _solanaTpCtrl = TextEditingController();
+  final _solanaSlCtrl = TextEditingController();
 
-  final _tpCtrl = TextEditingController();
-  final _slCtrl = TextEditingController();
+  final _bscPaperSizeCtrl = TextEditingController();
+  final _bscTpCtrl = TextEditingController();
+  final _bscSlCtrl = TextEditingController();
+
+  final _robinhoodPaperSizeCtrl = TextEditingController();
+  final _robinhoodTpCtrl = TextEditingController();
+  final _robinhoodSlCtrl = TextEditingController();
+
   final _realBaseSizeCtrl = TextEditingController();
   final _realMinTradeCtrl = TextEditingController();
   final _realMaxTradeCtrl = TextEditingController();
@@ -76,12 +82,21 @@ class _BotEngineTabState extends State<BotEngineTab> {
         _liqFloorCtrl.text = data['liquidity_floor'] ?? '15000';
         _maxAlertsCtrl.text = data['max_alerts_per_cycle'] ?? '5';
 
+        // Solana Paper Defaults
         _solanaPaperSizeCtrl.text = data['solana_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
-        _bscPaperSizeCtrl.text = data['bsc_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
-        _robinhoodPaperSizeCtrl.text = data['robinhood_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+        _solanaTpCtrl.text = data['solana_default_tp_percent'] ?? data['default_tp_percent'] ?? '50';
+        _solanaSlCtrl.text = data['solana_default_sl_percent'] ?? data['default_sl_percent'] ?? '20';
 
-        _tpCtrl.text = data['default_tp_percent'] ?? '50';
-        _slCtrl.text = data['default_sl_percent'] ?? '20';
+        // BSC Paper Defaults
+        _bscPaperSizeCtrl.text = data['bsc_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+        _bscTpCtrl.text = data['bsc_default_tp_percent'] ?? data['default_tp_percent'] ?? '200';
+        _bscSlCtrl.text = data['bsc_default_sl_percent'] ?? data['default_sl_percent'] ?? '20';
+
+        // Robinhood Paper Defaults
+        _robinhoodPaperSizeCtrl.text = data['robinhood_copy_trade_virtual_usd'] ?? data['copy_trade_virtual_usd'] ?? '20';
+        _robinhoodTpCtrl.text = data['robinhood_default_tp_percent'] ?? '0';
+        _robinhoodSlCtrl.text = data['robinhood_default_sl_percent'] ?? '0';
+
         _realBaseSizeCtrl.text = data['real_trade_usd_amount'] ?? '5';
         _realMinTradeCtrl.text = data['min_real_trade_usd'] ?? '20';
         _realMaxTradeCtrl.text = data['max_real_trade_usd'] ?? '25';
@@ -109,11 +124,17 @@ class _BotEngineTabState extends State<BotEngineTab> {
       'max_alerts_per_cycle': _maxAlertsCtrl.text,
 
       'solana_copy_trade_virtual_usd': _solanaPaperSizeCtrl.text,
-      'bsc_copy_trade_virtual_usd': _bscPaperSizeCtrl.text,
-      'robinhood_copy_trade_virtual_usd': _robinhoodPaperSizeCtrl.text,
+      'solana_default_tp_percent': _solanaTpCtrl.text,
+      'solana_default_sl_percent': _solanaSlCtrl.text,
 
-      'default_tp_percent': _tpCtrl.text,
-      'default_sl_percent': _slCtrl.text,
+      'bsc_copy_trade_virtual_usd': _bscPaperSizeCtrl.text,
+      'bsc_default_tp_percent': _bscTpCtrl.text,
+      'bsc_default_sl_percent': _bscSlCtrl.text,
+
+      'robinhood_copy_trade_virtual_usd': _robinhoodPaperSizeCtrl.text,
+      'robinhood_default_tp_percent': _robinhoodTpCtrl.text,
+      'robinhood_default_sl_percent': _robinhoodSlCtrl.text,
+
       'real_trade_usd_amount': _realBaseSizeCtrl.text,
       'min_real_trade_usd': _realMinTradeCtrl.text,
       'max_real_trade_usd': _realMaxTradeCtrl.text,
@@ -190,23 +211,61 @@ class _BotEngineTabState extends State<BotEngineTab> {
     return ListView(
       padding: const EdgeInsets.all(24.0),
       children: [
-        // Per-Chain Paper Trading Controls
+        // Solana Paper Settings Card
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [Icon(PhosphorIcons.stackFill, color: AppTheme.info(context)), const SizedBox(width: 8), Text('Per-Chain Paper Trading', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.kainuwaPurple, title: Text('Solana Paper Trading', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)), value: _solanaPaperMode, onChanged: (val) => setState(() => _solanaPaperMode = val)),
               const SizedBox(height: 16),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: AppTheme.kainuwaPurple, title: Text('Solana Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _solanaPaperMode, onChanged: (val) => setState(() => _solanaPaperMode = val)),
               _buildTextField('SOLANA PAPER SIZE (\$)', _solanaPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
-              
-              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Text('BSC Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _bscPaperMode, onChanged: (val) => setState(() => _bscPaperMode = val)),
-              _buildTextField('BSC PAPER SIZE (\$)', _bscPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField('DEFAULT TP (%)', _solanaTpCtrl, PhosphorIcons.trendUp)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('DEFAULT SL (%)', _solanaSlCtrl, PhosphorIcons.trendDown)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
 
-              Container(height: 1, color: theme.colorScheme.outlineVariant, margin: const EdgeInsets.symmetric(vertical: 8)),
-              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Text('Robinhood Paper Mode', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)), value: _robinhoodPaperMode, onChanged: (val) => setState(() => _robinhoodPaperMode = val)),
+        // BSC Paper Settings Card
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFFF0B90B), title: Text('BSC Paper Trading', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)), value: _bscPaperMode, onChanged: (val) => setState(() => _bscPaperMode = val)),
+              const SizedBox(height: 16),
+              _buildTextField('BSC PAPER SIZE (\$)', _bscPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField('DEFAULT TP (%)', _bscTpCtrl, PhosphorIcons.trendUp)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('DEFAULT SL (%)', _bscSlCtrl, PhosphorIcons.trendDown)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Robinhood Paper Settings Card
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile(contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF00C805), title: Text('Robinhood Paper Trading', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16)), value: _robinhoodPaperMode, onChanged: (val) => setState(() => _robinhoodPaperMode = val)),
+              const SizedBox(height: 16),
               _buildTextField('ROBINHOOD PAPER SIZE (\$)', _robinhoodPaperSizeCtrl, PhosphorIcons.currencyDollar, isUsd: true),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField('DEFAULT TP (0 = No limit)', _robinhoodTpCtrl, PhosphorIcons.trendUp)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('DEFAULT SL (0 = No limit)', _robinhoodSlCtrl, PhosphorIcons.trendDown)),
+                ],
+              ),
             ],
           ),
         ),
@@ -252,15 +311,11 @@ class _BotEngineTabState extends State<BotEngineTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [Icon(PhosphorIcons.scanFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Scanning & Target Defaults', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
+              Row(children: [Icon(PhosphorIcons.scanFill, color: theme.primaryColor), const SizedBox(width: 8), Text('Scanning & Parameters', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 16))]),
               const SizedBox(height: 24),
               _buildTextField('POLL INTERVAL (MINS)', _pollMinsCtrl, PhosphorIcons.timer),
               _buildTextField('LIQUIDITY FLOOR (USD)', _liqFloorCtrl, PhosphorIcons.drop, isUsd: true),
               _buildTextField('MAX ALERTS PER CYCLE', _maxAlertsCtrl, PhosphorIcons.bellRinging),
-              const SizedBox(height: 16),
-              Container(height: 1, color: theme.colorScheme.outlineVariant),
-              const SizedBox(height: 24),
-              Row(children: [Expanded(child: _buildTextField('DEFAULT TP (%)', _tpCtrl, PhosphorIcons.trendUp)), const SizedBox(width: 16), Expanded(child: _buildTextField('DEFAULT SL (%)', _slCtrl, PhosphorIcons.trendDown))]),
             ],
           ),
         ),
