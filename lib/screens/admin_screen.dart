@@ -8,55 +8,149 @@ import '../widgets/bot_engine_tab.dart';
 import '../widgets/broadcast_dialog.dart';
 import '../widgets/tracked_wallets_tab.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
+
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  int _activeView = 0; // 0: Grid Dashboard, 1: Users, 2: Engine, 3: Wallets
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DefaultTabController(
-      length: 3,
+
+    if (_activeView == 1) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildSubAppBar('USER MANAGEMENT', theme),
+        body: const UsersTab(),
+      );
+    }
+
+    if (_activeView == 2) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildSubAppBar('BOT ENGINE CONTROLS', theme),
+        body: const BotEngineTab(),
+      );
+    }
+
+    if (_activeView == 3) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildSubAppBar('TRACKED WALLETS & SHARKS', theme),
+        body: const TrackedWalletsTab(),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('ADMIN CONTROL CENTER', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
           const SizedBox(height: 16),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            height: 52,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest, 
-              borderRadius: BorderRadius.circular(24), 
-              border: Border.all(color: theme.colorScheme.outlineVariant)
-            ),
-            child: TabBar(
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              indicator: BoxDecoration(
-                borderRadius: BorderRadius.circular(24), 
-                gradient: LinearGradient(colors: [theme.primaryColor, const Color(0xFFC026D3)])
+          
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildControlTile(
+                title: 'User Manager',
+                subtitle: 'Quotas, Access & Limits',
+                icon: PhosphorIcons.usersFill,
+                color: theme.primaryColor,
+                onTap: () => setState(() => _activeView = 1),
+                theme: theme,
               ),
-              labelColor: Colors.white,
-              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
-              tabs: const [
-                Tab(text: 'Users'), 
-                Tab(text: 'Bot Engine'), 
-                Tab(text: 'Tracked Wallets')
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Expanded(
-            child: TabBarView(
-              children: [
-                UsersTab(), 
-                BotEngineTab(), 
-                TrackedWalletsTab() 
-              ]
-            )
+              _buildControlTile(
+                title: 'Bot Engine',
+                subtitle: 'Chains, Paper & Live',
+                icon: PhosphorIcons.gearSixFill,
+                color: const Color(0xFFC026D3),
+                onTap: () => setState(() => _activeView = 2),
+                theme: theme,
+              ),
+              _buildControlTile(
+                title: 'Tracked Sharks',
+                subtitle: 'Wallets & Webhooks',
+                icon: PhosphorIcons.robotFill,
+                color: AppTheme.info(context),
+                onTap: () => setState(() => _activeView = 3),
+                theme: theme,
+              ),
+              _buildControlTile(
+                title: 'Push Broadcast',
+                subtitle: 'Send Alert to Users',
+                icon: PhosphorIcons.megaphoneFill,
+                color: AppTheme.warning(context),
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const BroadcastPushDialog(),
+                  );
+                },
+                theme: theme,
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildSubAppBar(String title, ThemeData theme) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(PhosphorIcons.arrowLeftBold, color: theme.colorScheme.onSurface),
+        onPressed: () => setState(() => _activeView = 0),
+      ),
+      title: Text(title, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)),
+    );
+  }
+
+  Widget _buildControlTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return GlassCard(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -156,7 +250,6 @@ class _UsersTabState extends State<UsersTab> {
                     labelText: 'Username',
                     labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     hintText: 'e.g. trader_john',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -171,7 +264,6 @@ class _UsersTabState extends State<UsersTab> {
                     labelText: 'Temporary Password',
                     labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     hintText: 'Min 8 characters',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                     filled: true,
                     fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -243,116 +335,55 @@ class _UsersTabState extends State<UsersTab> {
             ),
             content: SingleChildScrollView(
               child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Leave any field blank to remove that limit and use the system default.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                const SizedBox(height: 16),
-                Text('TRADE COUNT ALLOCATIONS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: dailyCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Daily Limit',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: '∞',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: dailyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => dailyCtrl.clear())) : null,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Leave blank to use system defaults.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: dailyCtrl,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: 'Daily Limit',
+                      filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: monthlyCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Monthly Limit',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: '∞',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: monthlyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => monthlyCtrl.clear())) : null,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: monthlyCtrl,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: 'Monthly Limit',
+                      filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: yearlyCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Yearly Limit',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: '∞',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: yearlyCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => yearlyCtrl.clear())) : null,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: yearlyCtrl,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: 'Yearly Limit',
+                      filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Container(height: 1, color: theme.colorScheme.outlineVariant),
-                const SizedBox(height: 16),
-                Text('DOLLAR SIZE LIMITS (all chains)', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: maxPerTradeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Max Per Trade (\$)',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: 'System default',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: maxPerTradeCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => maxPerTradeCtrl.clear())) : null,
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: maxPerTradeCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: 'Max Per Trade (\$)',
+                      filled: true, fillColor: theme.colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: minPerTradeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Min Per Trade (\$)',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: 'System floor (e.g. \$20)',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    helperText: 'Grants this user a lower minimum than the global floor. Leave blank to keep the system floor.',
-                    helperMaxLines: 2,
-                    helperStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 10),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: minPerTradeCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => minPerTradeCtrl.clear())) : null,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: dailyCapCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    labelText: 'Daily Spend Cap (\$)',
-                    labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    hintText: 'System default',
-                    hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    suffixIcon: dailyCapCtrl.text.isNotEmpty ? IconButton(icon: const Icon(PhosphorIcons.x, size: 16), onPressed: () => setStateDialog(() => dailyCapCtrl.clear())) : null,
-                  ),
-                ),
-              ],
+                ],
               ),
             ),
             actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -388,7 +419,7 @@ class _UsersTabState extends State<UsersTab> {
                 },
                 child: isSaving 
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                  : const Text('Save Allocations', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : const Text('Save Limits', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -410,7 +441,6 @@ class _UsersTabState extends State<UsersTab> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          // 1. EXCHANGE RATE CONTROL CARD
           GlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,11 +464,9 @@ class _UsersTabState extends State<UsersTab> {
                         style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15),
                         decoration: InputDecoration(
                           hintText: 'e.g. 1600 or 0',
-                          hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
                           filled: true,
                           fillColor: theme.colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)
                         ),
                       ),
                     ),
@@ -463,7 +491,6 @@ class _UsersTabState extends State<UsersTab> {
           ),
           const SizedBox(height: 24),
 
-          // 2. CREATE USER BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -479,42 +506,15 @@ class _UsersTabState extends State<UsersTab> {
               label: const Text('Create New User Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
           ),
-          const SizedBox(height: 12),
-          
-          // 3. BROADCAST PUSH NOTIFICATION BUTTON
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.warning(context).withOpacity(0.12),
-                foregroundColor: AppTheme.warning(context),
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0
-              ),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const BroadcastPushDialog(),
-                );
-              },
-              icon: const Icon(PhosphorIcons.megaphoneFill, size: 20),
-              label: const Text('Send Push Broadcast', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            ),
-          ),
           const SizedBox(height: 32),
           Text('SYSTEM USERS', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
           const SizedBox(height: 16),
           
-          // 4. USERS LIST
           ..._users.map((u) {
             final bool isActive = (u['is_active'] == 1 || u['is_active'] == '1' || u['is_active'] == true);
             final bool allowManual = (u['allow_manual_trade'] == 1 || u['allow_manual_trade'] == '1' || u['allow_manual_trade'] == true);
+            final bool allowPaper = (u['allow_paper_trade'] == 1 || u['allow_paper_trade'] == '1' || u['allow_paper_trade'] == true);
             final bool allowTelegram = (u['allow_telegram_alerts'] == 1 || u['allow_telegram_alerts'] == '1' || u['allow_telegram_alerts'] == true);
-            
-            final String daily = u['quotas']?['daily']?.toString() ?? '∞';
-            final String monthly = u['quotas']?['monthly']?.toString() ?? '∞';
-            final String yearly = u['quotas']?['yearly']?.toString() ?? '∞';
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -546,80 +546,54 @@ class _UsersTabState extends State<UsersTab> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text('Limits:  $daily/day  •  $monthly/mo  •  $yearly/yr', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 20),
                     Container(height: 1, color: theme.colorScheme.outlineVariant),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(PhosphorIcons.shieldCheckFill, color: isActive ? AppTheme.success(context) : AppTheme.danger(context), size: 18),
-                            const SizedBox(width: 12),
-                            Text('Account Access', style: TextStyle(color: isActive ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        Switch(
-                          value: isActive,
-                          activeColor: AppTheme.success(context),
-                          inactiveThumbColor: AppTheme.danger(context),
-                          onChanged: (val) {
-                            setState(() => u['is_active'] = val);
-                            _toggleSetting('toggle_active', u['id'], {'user_id': u['id'], 'is_active': val ? 1 : 0});
-                          },
-                        ),
-                      ],
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Account Access', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                      value: isActive,
+                      activeColor: AppTheme.success(context),
+                      onChanged: (val) {
+                        setState(() => u['is_active'] = val);
+                        _toggleSetting('toggle_active', u['id'], {'user_id': u['id'], 'is_active': val ? 1 : 0});
+                      },
                     ),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(PhosphorIcons.rocketLaunchFill, color: Color(0xFFC026D3), size: 18),
-                            const SizedBox(width: 12),
-                            Text('Allow Manual Snipe', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                        Switch(
-                          value: allowManual,
-                          activeColor: theme.primaryColor,
-                          onChanged: (val) {
-                            setState(() => u['allow_manual_trade'] = val);
-                            _toggleSetting('toggle_manual', u['id'], {'user_id': u['id'], 'allow_manual_trade': val ? 1 : 0});
-                          },
-                        ),
-                      ],
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Allow Paper Trade', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                      value: allowPaper,
+                      activeColor: AppTheme.info(context),
+                      onChanged: (val) {
+                        setState(() => u['allow_paper_trade'] = val);
+                        _toggleSetting('toggle_paper', u['id'], {'user_id': u['id'], 'allow_paper_trade': val ? 1 : 0});
+                      },
                     ),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(PhosphorIcons.paperPlaneTiltFill, color: AppTheme.info(context), size: 18),
-                            const SizedBox(width: 12),
-                            Text('Allow Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                        Switch(
-                          value: allowTelegram,
-                          activeColor: AppTheme.info(context),
-                          onChanged: (val) {
-                            setState(() => u['allow_telegram_alerts'] = val);
-                            _toggleSetting('toggle_telegram', u['id'], {'user_id': u['id'], 'allow_telegram_alerts': val ? 1 : 0});
-                          },
-                        ),
-                      ],
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Allow Manual Snipe', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                      value: allowManual,
+                      activeColor: theme.primaryColor,
+                      onChanged: (val) {
+                        setState(() => u['allow_manual_trade'] = val);
+                        _toggleSetting('toggle_manual', u['id'], {'user_id': u['id'], 'allow_manual_trade': val ? 1 : 0});
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Allow Telegram Alerts', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                      value: allowTelegram,
+                      activeColor: AppTheme.warning(context),
+                      onChanged: (val) {
+                        setState(() => u['allow_telegram_alerts'] = val);
+                        _toggleSetting('toggle_telegram', u['id'], {'user_id': u['id'], 'allow_telegram_alerts': val ? 1 : 0});
+                      },
                     ),
                   ],
                 ),
               ),
             );
           }),
-          const SizedBox(height: 48),
         ],
       ),
     );
