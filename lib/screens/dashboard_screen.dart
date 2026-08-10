@@ -167,6 +167,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _formatMcap(dynamic v) {
+    if (v == null) return '-';
+    double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
+    if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
+    return '\$${val.round()}';
+  }
+
+  String _formatFullAddress(String addr) {
+    if (addr.length <= 12) return addr;
+    return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
+  }
+
   Future<void> _toggleLock(dynamic p) async {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (pId <= 0) return;
@@ -181,6 +194,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted && res['status'] != 'success') {
       setState(() { p['is_locked'] = isCurrentlyLocked ? 1 : 0; });
       _showFloatingSnackbar(res['message'] ?? 'Failed to sync lock status', isError: true);
+    }
+  }
+
+  Future<void> _hidePosition(dynamic p) async {
+    final pId = int.tryParse(p['id'].toString()) ?? 0;
+    if (pId <= 0) return;
+
+    setState(() => _closingIds.add(pId));
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
+    if (mounted) {
+      if (res['status'] != 'success') {
+        _showFloatingSnackbar(res['message'] ?? 'Failed to hide', isError: true);
+        setState(() => _closingIds.remove(pId));
+      }
+      _fetchDashboardData(silent: true);
     }
   }
 
@@ -468,23 +498,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  String _formatMcap(dynamic v) {
-    if (v == null) return '-';
-    double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
-    if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
-    if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
-    return '\$${val.round()}';
-  }
-
   String _formatShortAddress(String addr) {
     if (addr == '-') return '-';
     if (addr.length <= 6) return addr;
     return '${addr.substring(0, 3)}...${addr.substring(addr.length - 3)}';
-  }
-
-  String _formatFullAddress(String addr) {
-    if (addr.length <= 12) return addr;
-    return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
   }
 
   Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, ThemeData theme) {
@@ -1013,6 +1030,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
+                                              GestureDetector(
+                                                onTap: () => _hidePosition(p),
+                                                child: Icon(PhosphorIcons.eyeSlashFill, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                                              ),
+                                              const SizedBox(width: 16),
                                               GestureDetector(
                                                 onTap: () => _editLimits(p),
                                                 child: Icon(PhosphorIcons.slidersHorizontalBold, color: theme.colorScheme.onSurface, size: 20),
