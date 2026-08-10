@@ -79,6 +79,7 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
     final minMcapCtrl = TextEditingController(text: b['min_mcap']?.toString() ?? '');
     final maxMcapCtrl = TextEditingController(text: b['max_mcap']?.toString() ?? '');
     bool enabled = b['enabled'] == true;
+    String executionMode = b['execution_mode'] == 'paper' ? 'paper' : 'real';
     bool isSaving = false;
 
     await showDialog(
@@ -93,7 +94,27 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('EXECUTION MODE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'real', label: Text('REAL FUNDS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)), icon: Icon(PhosphorIcons.currencyCircleDollarFill, size: 16)),
+                      ButtonSegment(value: 'paper', label: Text('PAPER PORTFOLIO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)), icon: Icon(PhosphorIcons.paperPlaneTiltFill, size: 16)),
+                    ],
+                    selected: {executionMode},
+                    onSelectionChanged: (val) => setStateDialog(() => executionMode = val.first),
+                    style: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return executionMode == 'real' ? AppTheme.danger(context).withOpacity(0.2) : AppTheme.info(context).withOpacity(0.2);
+                        }
+                        return theme.colorScheme.surfaceContainerHighest;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   TextField(controller: tradeCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Trade Size (\$)', filled: true, fillColor: theme.colorScheme.surfaceContainerHighest, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none))),
                   const SizedBox(height: 12),
                   Row(
@@ -132,6 +153,7 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
                   final res = await this.context.read<ApiService>().postEndpoint('copy_bots.php?action=save', {
                     'bot_id': b['bot_id'],
                     'enabled': enabled,
+                    'execution_mode': executionMode,
                     'trade_usd_amount': tradeCtrl.text.trim(),
                     'tp_percent': tpCtrl.text.trim(),
                     'sl_percent': slCtrl.text.trim(),
@@ -190,6 +212,7 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
                     final bool isSelected = _selectedBotIds.contains(botId);
                     final String chain = (b['chain'] ?? 'solana').toString().toLowerCase();
                     final Color chainColor = _chainColors[chain] ?? theme.primaryColor;
+                    final bool isPaper = b['execution_mode'] == 'paper';
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -213,6 +236,16 @@ class _CopyBotsScreenState extends State<CopyBotsScreen> {
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(4), border: Border.all(color: chainColor.withOpacity(0.3))),
                                 child: Text(chain.toUpperCase(), style: TextStyle(fontSize: 8, color: chainColor, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isPaper ? AppTheme.info(context).withOpacity(0.12) : AppTheme.danger(context).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: isPaper ? AppTheme.info(context).withOpacity(0.3) : AppTheme.danger(context).withOpacity(0.3)),
+                                ),
+                                child: Text(isPaper ? 'PAPER' : 'REAL', style: TextStyle(fontSize: 8, color: isPaper ? AppTheme.info(context) : AppTheme.danger(context), fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
