@@ -403,7 +403,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
@@ -466,6 +466,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
+  }
+
+  String _formatMcap(dynamic v) {
+    if (v == null) return '-';
+    double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
+    if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
+    return '\$${val.round()}';
   }
 
   String _formatShortAddress(String addr) {
@@ -996,7 +1004,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('Size: \$${size.toStringAsFixed(2)} • MCAP: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
                                                 Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                               ],
