@@ -45,13 +45,30 @@ class _PositionsScreenState extends State<PositionsScreen> {
     super.dispose();
   }
 
+  // Prevents ghost trades by instantly updating local state
+  void _markAsClosingOrHiding(Iterable<int> ids) {
+    setState(() {
+      _closingIds.addAll(ids);
+      _openPositions.removeWhere((p) {
+        int pid = int.tryParse(p['id'].toString()) ?? 0;
+        return ids.contains(pid);
+      });
+    });
+  }
+
   Future<void> _fetchPositions({bool silent = false}) async {
     if (!silent && mounted) setState(() => _isLoading = true);
     final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
     if (mounted) {
       setState(() {
         if (res['status'] == 'success') {
-          _openPositions = res['open_positions'] ?? [];
+          List<dynamic> rawOpen = res['open_positions'] ?? [];
+          
+          // Strictly filter out any trades we are currently closing/hiding locally
+          _openPositions = rawOpen.where((p) {
+            int id = int.tryParse(p['id'].toString()) ?? 0;
+            return !_closingIds.contains(id);
+          }).toList();
         }
         _isLoading = false;
       });
@@ -68,6 +85,39 @@ class _PositionsScreenState extends State<PositionsScreen> {
   Future<void> _launchDexScreener(String address, {String chain = 'solana'}) async {
     final url = Uri.parse('https://dexscreener.com/$chain/$address');
     try { await launchUrl(url, mode: LaunchMode.inAppWebView); } catch (_) {}
+  }
+
+  String formatLagosTime(String? utcString) {
+    if (utcString == null || utcString.isEmpty) return '-';
+    try {
+      String formattedStr = utcString.replaceAll(' ', 'T');
+      if (!formattedStr.endsWith('Z')) formattedStr += 'Z';
+      final dt = DateTime.parse(formattedStr).add(const Duration(hours: 1)); 
+      final hour12 = (dt.hour % 12 == 0) ? 12 : dt.hour % 12;
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '$hour12:$min $period, ${months[dt.month - 1]} ${dt.day}';
+    } catch (_) { return utcString; }
+  }
+
+  String calculateTimeInTrade(String? openedAtStr) {
+    if (openedAtStr == null || openedAtStr.isEmpty) return '-';
+    try {
+      String startStr = openedAtStr.replaceAll(' ', 'T');
+      if (!startStr.endsWith('Z')) startStr += 'Z';
+      final start = DateTime.parse(startStr);
+      DateTime end = DateTime.now().toUtc();
+
+      final diff = end.difference(start);
+      if (diff.inMinutes < 1) return '< 1m';
+
+      List<String> parts = [];
+      if (diff.inDays > 0) parts.add('${diff.inDays}d');
+      if (diff.inHours % 24 > 0) parts.add('${diff.inHours % 24}h');
+      if (diff.inMinutes % 60 > 0) parts.add('${diff.inMinutes % 60}m');
+      return parts.join(' ');
+    } catch (_) { return '-'; }
   }
 
   String _formatMcap(dynamic v) {
@@ -111,7 +161,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (pId <= 0) return;
 
-    setState(() => _closingIds.add(pId));
+    _markAsClosingOrHiding([pId]);
     await Future.delayed(const Duration(milliseconds: 350));
 
     final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
@@ -131,7 +181,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
       return;
     }
     
-    setState(() => _closingIds.add(pId));
+    _markAsClosingOrHiding([pId]);
     await Future.delayed(const Duration(milliseconds: 350));
 
     final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': pId});
@@ -291,7 +341,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                     Navigator.pop(ctx, true);
                     final ok = res['status'] == 'success' || res['status'] == 'ok';
                     ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                      content: Text(res['message'] ?? (ok ? 'Live trade executed.' : 'Failed to go live.')),
+                      content: Text(res['message'] ?? (ok ? 'Live trade executed.' : 'Failed to go live.'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                       backgroundColor: ok ? AppTheme.success(this.context) : AppTheme.danger(this.context),
                     ));
                     _fetchPositions(silent: true);
@@ -336,7 +386,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
     if (confirm != true || !mounted) return;
     
-    setState(() => _closingIds.addAll(unlockedIds));
+    _markAsClosingOrHiding(unlockedIds);
     await Future.delayed(const Duration(milliseconds: 350));
 
     int successCount = 0;
@@ -350,7 +400,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.'), backgroundColor: AppTheme.success(context)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.success(context)));
       _fetchPositions(silent: true);
     }
   }
