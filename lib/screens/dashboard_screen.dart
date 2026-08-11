@@ -34,6 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _usdValue = "0.00";
   
   Map<String, String> _wallets = {'solana': '-', 'bsc': '-', 'robinhood': '-'};
+  Map<String, bool> _copiedStates = {'solana': false, 'bsc': false, 'robinhood': false};
   
   Map<String, Map<String, dynamic>> _chainBalances = {
     'solana': {'balance': '0.00000', 'usd': 0.0, 'symbol': 'SOL'},
@@ -64,6 +65,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _pollingTimer?.cancel();
     super.dispose();
+  }
+
+  // Prevents ghost trades by instantly updating local state
+  void _markAsClosingOrHiding(Iterable<int> ids) {
+    setState(() {
+      _closingIds.addAll(ids);
+      _openPositions.removeWhere((p) {
+        int pid = int.tryParse(p['id'].toString()) ?? 0;
+        return ids.contains(pid);
+      });
+      _stats['open_count'] = _openPositions.length;
+    });
   }
 
   Future<void> _fetchDashboardData({bool silent = false}) async {
@@ -112,7 +125,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
         if (responses[1]['status'] == 'success') {
           _stats = responses[1]['stats'] ?? _stats;
-          _openPositions = responses[1]['open_positions'] ?? [];
+          
+          List<dynamic> rawOpen = responses[1]['open_positions'] ?? [];
+          
+          // Strictly filter out any trades we are currently closing/hiding locally
+          _openPositions = rawOpen.where((p) {
+            int id = int.tryParse(p['id'].toString()) ?? 0;
+            return !_closingIds.contains(id);
+          }).toList();
+          
+          _stats['open_count'] = _openPositions.length;
           _closedPositions = responses[1]['closed_positions'] ?? [];
         }
 
@@ -138,31 +160,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         margin: const EdgeInsets.only(bottom: 100, left: 24, right: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _showTopChainSnackbar(String message, Color chainColor) {
-    final size = MediaQuery.of(context).size;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(PhosphorIcons.checkCircleFill, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14))),
-          ],
-        ),
-        backgroundColor: chainColor,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          bottom: size.height - 140, 
-          left: 24,
-          right: 24,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        duration: const Duration(seconds: 2),
-        elevation: 10,
       ),
     );
   }
@@ -201,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (pId <= 0) return;
 
-    setState(() => _closingIds.add(pId));
+    _markAsClosingOrHiding([pId]);
     await Future.delayed(const Duration(milliseconds: 350));
 
     final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 1});
@@ -221,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    setState(() => _closingIds.add(pId));
+    _markAsClosingOrHiding([pId]);
     await Future.delayed(const Duration(milliseconds: 350)); 
 
     final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': pId});
@@ -254,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    setState(() => _closingIds.addAll(toClose));
+    _markAsClosingOrHiding(toClose);
     await Future.delayed(const Duration(milliseconds: 350));
 
     for (int id in toClose) {
@@ -695,6 +692,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               String addr = _wallets[chain] ?? '-';
               String display = _formatShortAddress(addr);
               Color cColor = _chainColors[chain] ?? theme.primaryColor;
+              bool isCopied = _copiedStates[chain] ?? false;
               
               return Expanded(
                 child: Padding(
@@ -703,30 +701,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       if (addr != '-') {
                         Clipboard.setData(ClipboardData(text: addr));
-                        _showTopChainSnackbar('${chain.toUpperCase()} wallet copied!', cColor);
+                        setState(() => _copiedStates[chain] = true);
+                        Future.delayed(const Duration(milliseconds: 1500), () {
+                          if (mounted) setState(() => _copiedStates[chain] = false);
+                        });
                       }
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
+                        color: isCopied ? cColor.withOpacity(0.15) : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                        border: Border.all(color: isCopied ? cColor.withOpacity(0.5) : theme.colorScheme.outlineVariant),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 14, height: 14,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(color: cColor.withOpacity(0.15), shape: BoxShape.circle),
-                            child: chain == 'solana' 
-                                ? const SolanaIcon(size: 8, color: AppTheme.kainuwaPurple)
-                                : Text(chain == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: cColor)),
+                          if (!isCopied)
+                            Container(
+                              width: 14, height: 14,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: cColor.withOpacity(0.15), shape: BoxShape.circle),
+                              child: chain == 'solana' 
+                                  ? const SolanaIcon(size: 8, color: AppTheme.kainuwaPurple)
+                                  : Text(chain == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: cColor)),
+                            ),
+                          if (!isCopied) const SizedBox(width: 6),
+                          if (isCopied) Icon(PhosphorIcons.checkCircleFill, size: 14, color: cColor),
+                          if (isCopied) const SizedBox(width: 4),
+                          Text(
+                            isCopied ? 'Copied!' : display, 
+                            style: TextStyle(
+                              fontFamily: isCopied ? null : 'monospace', 
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold, 
+                              color: isCopied ? cColor : theme.colorScheme.onSurface
+                            )
                           ),
-                          const SizedBox(width: 6),
-                          Text(display, style: TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                         ],
                       ),
                     ),
@@ -1021,9 +1033,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
-                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                               ],
                                             ),
                                           ),
