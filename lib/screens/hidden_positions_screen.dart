@@ -43,13 +43,31 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
     super.dispose();
   }
 
+  void _markAsAnimatingOrClosing(Iterable<int> ids, {bool isRestore = false}) {
+    setState(() {
+      if (isRestore) {
+        _animatingIds.addAll(ids);
+      } else {
+        _closingIds.addAll(ids);
+      }
+      _hiddenPositions.removeWhere((p) {
+        int pid = int.tryParse(p['id'].toString()) ?? 0;
+        return ids.contains(pid);
+      });
+    });
+  }
+
   Future<void> _fetchHiddenPositions({bool silent = false}) async {
     if (!silent && mounted) setState(() => _isLoading = true);
     final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch_hidden');
     if (mounted) {
       setState(() {
         if (res['status'] == 'success') {
-          _hiddenPositions = res['data'] ?? [];
+          List<dynamic> rawHidden = res['data'] ?? [];
+          _hiddenPositions = rawHidden.where((p) {
+            int id = int.tryParse(p['id'].toString()) ?? 0;
+            return !_animatingIds.contains(id) && !_closingIds.contains(id);
+          }).toList();
         }
         _isLoading = false;
       });
@@ -109,7 +127,7 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (pId <= 0) return;
 
-    setState(() => _animatingIds.add(pId));
+    _markAsAnimatingOrClosing([pId], isRestore: true);
     await Future.delayed(const Duration(milliseconds: 350));
 
     final res = await context.read<ApiService>().postEndpoint('positions.php?action=toggle_hide', {'id': pId, 'is_hidden': 0});
@@ -129,7 +147,7 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
       return;
     }
 
-    setState(() => _closingIds.add(pId));
+    _markAsAnimatingOrClosing([pId], isRestore: false);
     await Future.delayed(const Duration(milliseconds: 350)); 
 
     final res = await context.read<ApiService>().postEndpoint('trade.php?action=close_position', {'id': pId});
