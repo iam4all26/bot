@@ -31,6 +31,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
   String? _tokenError;
   Timer? _debounceTimer;
 
+  bool _startLocked = false;
+  bool _startHidden = false;
+
   static const List<Map<String, String>> _chains = [
     {'id': 'solana', 'name': 'Solana', 'placeholder': 'Paste Solana Token Address'},
     {'id': 'bsc', 'name': 'BSC', 'placeholder': 'Paste BSC Token Address (0x...)'},
@@ -156,13 +159,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     setState(() => _isLoading = true);
     final api = context.read<ApiService>();
     
-    // Pass strictly sanitized numbers to bypass Node.js sanity check failures
     final res = await api.postEndpoint('trade.php?action=manual_snipe', {
       'chain': _selectedChain,
       'token_address': _tokenController.text.trim(),
       'trade_usd': tradeUsd.toString(),
       'tp_percent': (double.tryParse(_tpController.text.trim()) ?? 0.0).toString(),
       'sl_percent': (double.tryParse(_slController.text.trim()) ?? 0.0).toString(),
+      'is_locked': _startLocked ? 1 : 0,
+      'is_hidden': _startHidden ? 1 : 0,
     });
 
     if (mounted) {
@@ -176,6 +180,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
         setState(() {
           _tokenData = null;
           _tokenError = null;
+          _startLocked = false;
+          _startHidden = false;
         });
         Navigator.pop(context);
       }
@@ -275,7 +281,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       children: [
                         SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: activeChainColor)),
                         const SizedBox(width: 12),
-                        Text('Fetching live token metrics...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
+                        Text('Fetching live token telemetry...', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14)),
                       ],
                     ),
                   ),
@@ -328,13 +334,33 @@ class _TerminalScreenState extends State<TerminalScreen> {
                             )
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         Container(height: 1, color: theme.colorScheme.outlineVariant),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
+                        
+                        // Expanded Token Telemetry Row 1
                         Row(
                           children: [
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('MARKET CAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15))])),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIQUIDITY', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['liquidity']), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 15))])),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIVE PRICE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text('\$${double.tryParse(_tokenData!['price_usd']?.toString() ?? '0')?.toStringAsFixed(6) ?? '0.00'}', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('24H CHANGE', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text('${(_tokenData!['price_change_24h'] ?? 0) >= 0 ? '+' : ''}${(_tokenData!['price_change_24h'] ?? 0).toStringAsFixed(2)}%', style: TextStyle(color: (_tokenData!['price_change_24h'] ?? 0) >= 0 ? AppTheme.success(context) : AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 14))])),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Expanded Token Telemetry Row 2
+                        Row(
+                          children: [
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('MARKET CAP', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['mcap']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('LIQUIDITY', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['liquidity']), style: TextStyle(color: AppTheme.success(context), fontWeight: FontWeight.bold, fontSize: 14))])),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Expanded Token Telemetry Row 3
+                        Row(
+                          children: [
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('24H VOLUME', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_formatCurrency(_tokenData!['volume_24h']), style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14))])),
+                            const Spacer(),
                           ],
                         ),
                       ],
@@ -363,7 +389,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       Text('TRADE EXECUTION SETTINGS', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
                       const SizedBox(height: 24),
                       
-                      // Full width Trade Size input to fix UI squeeze
                       TextFormField(
                         controller: _usdController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -404,6 +429,28 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
+
+                      // Start Trade Locked Switch
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        activeColor: AppTheme.warning(context),
+                        title: Text('Start Trade Locked 🔒', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold)),
+                        subtitle: Text('Prevents accidental manual closing', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                        value: _startLocked,
+                        onChanged: (val) => setState(() => _startLocked = val),
+                      ),
+
+                      // Start Trade Hidden Switch
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        activeColor: theme.primaryColor,
+                        title: Text('Start Trade Hidden 🙈', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.bold)),
+                        subtitle: Text('Sends position directly to Hidden Positions archive', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                        value: _startHidden,
+                        onChanged: (val) => setState(() => _startHidden = val),
+                      ),
+
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
