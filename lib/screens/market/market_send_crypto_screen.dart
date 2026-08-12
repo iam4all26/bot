@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/currency_provider.dart';
@@ -30,6 +29,16 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
   List<dynamic> _assets = [];
   Map<String, dynamic> _balances = {};
   double _usdtSellRate = 1600.0;
+
+  Color _getAssetColor(String symbol) {
+    switch (symbol.toUpperCase()) {
+      case 'SOL': return const Color(0xFF10B981);
+      case 'BNB': return const Color(0xFFF59E0B);
+      case 'ETH': return const Color(0xFF3B82F6);
+      case 'USDT': return const Color(0xFF14B8A6);
+      default: return const Color(0xFF8B5CF6);
+    }
+  }
 
   @override
   void initState() {
@@ -111,9 +120,9 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
     if (!_hasPin) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             'Please set up a withdrawal PIN first.',
-            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: AppTheme.warning(context),
         ),
@@ -133,9 +142,9 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
     if (!_validateAddressFormat(address)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             'Invalid wallet address format for this network.',
-            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: AppTheme.danger(context),
         ),
@@ -149,9 +158,9 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
     if (amount <= 0 || amount > balance) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             'Amount exceeds available balance.',
-            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: AppTheme.danger(context),
         ),
@@ -185,7 +194,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
         SnackBar(
           content: Text(
             res['message'] ?? (isSuccess ? 'Crypto dispatched!' : 'Send failed'),
-            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: isSuccess ? AppTheme.success(context) : AppTheme.danger(context),
         ),
@@ -218,7 +227,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
         elevation: 0,
         title: Text(
           'SEND CRYPTO ON-CHAIN',
-          style: GoogleFonts.spaceGrotesk(
+          style: TextStyle(
             color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w900,
             fontSize: 16,
@@ -237,7 +246,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                   children: [
                     Text(
                       'SELECT ASSET TO SEND',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: TextStyle(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -256,6 +265,8 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           final String? chain = a['chain'];
                           final bool isSelected = symbol == _selectedAssetKey;
                           final bool isUsdt = chain == null || symbol == 'USDT';
+
+                          final Color assetColor = _getAssetColor(symbol);
 
                           final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
                           final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
@@ -283,9 +294,36 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                                         size: 22,
                                       ),
                                       const SizedBox(width: 14),
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: assetColor.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: assetColor.withOpacity(0.2)),
+                                        ),
+                                        child: Image.network(
+                                          'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Center(
+                                              child: Text(
+                                                symbol.substring(0, 1).toUpperCase(),
+                                                style: TextStyle(
+                                                  color: assetColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
                                       Text(
                                         symbol,
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 15,
@@ -294,7 +332,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                                       const Spacer(),
                                       Text(
                                         '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
@@ -321,7 +359,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                             children: [
                               Text(
                                 'AVAILABLE BALANCE',
-                                style: GoogleFonts.spaceGrotesk(
+                                style: TextStyle(
                                   color: theme.colorScheme.onSurfaceVariant,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -339,7 +377,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                                 onPressed: _setMaxAmount,
                                 child: Text(
                                   'USE MAX',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     color: theme.primaryColor,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -351,7 +389,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           const SizedBox(height: 8),
                           Text(
                             '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -362,14 +400,14 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           TextFormField(
                             controller: _amountController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                             decoration: InputDecoration(
                               labelText: 'Amount ($_selectedAssetKey)',
-                              labelStyle: GoogleFonts.spaceGrotesk(
+                              labelStyle: TextStyle(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
@@ -396,7 +434,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                             const SizedBox(height: 12),
                             Text(
                               '≈ ${currency.format(estimatedNaira / _usdtSellRate)} (Estimated Value)',
-                              style: GoogleFonts.spaceGrotesk(
+                              style: TextStyle(
                                 color: AppTheme.success(context),
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -415,7 +453,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                             decoration: InputDecoration(
                               labelText: 'Recipient Address',
                               hintText: 'Paste destination wallet address',
-                              labelStyle: GoogleFonts.spaceGrotesk(
+                              labelStyle: TextStyle(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
@@ -463,7 +501,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                             : const Icon(PhosphorIcons.paperPlaneTiltFill, size: 20),
                         label: Text(
                           _isSubmitting ? 'DISPATCHING...' : 'AUTHORIZE & SEND',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             letterSpacing: 1,
