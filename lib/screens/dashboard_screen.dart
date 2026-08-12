@@ -18,6 +18,7 @@ import 'terminal_screen.dart';
 import 'copy_bots_screen.dart';
 import 'history_screen.dart';
 import 'hidden_positions_screen.dart';
+import 'market/market_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -67,7 +68,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  // Prevents ghost trades by instantly updating local state
   void _markAsClosingOrHiding(Iterable<int> ids) {
     setState(() {
       _closingIds.addAll(ids);
@@ -128,7 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           
           List<dynamic> rawOpen = responses[1]['open_positions'] ?? [];
           
-          // Strictly filter out any trades we are currently closing/hiding locally
           _openPositions = rawOpen.where((p) {
             int id = int.tryParse(p['id'].toString()) ?? 0;
             return !_closingIds.contains(id);
@@ -444,6 +443,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text('New Action', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), shape: BoxShape.circle),
+                    child: Icon(PhosphorIcons.storefrontFill, color: AppTheme.success(context)),
+                  ),
+                  title: Text('Fiat & Crypto Market', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
+                  subtitle: Text('Buy, Send, Receive and Cash Out', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketDashboardScreen()));
+                  },
+                ),
                 if (canTrade)
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -463,8 +476,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), shape: BoxShape.circle),
-                    child: Icon(PhosphorIcons.calculatorFill, color: AppTheme.success(context)),
+                    decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), shape: BoxShape.circle),
+                    child: Icon(PhosphorIcons.calculatorFill, color: AppTheme.info(context)),
                   ),
                   title: Text('Exchange Calculator', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold)),
                   subtitle: Text('Calculate USD to Naira dynamically', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
@@ -580,7 +593,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (bool didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_currentIndex != 0) {
           setState(() => _currentIndex = 0);

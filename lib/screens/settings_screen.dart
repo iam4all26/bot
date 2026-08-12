@@ -8,6 +8,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
+import 'market/set_pin_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -31,8 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _dailyCapCtrl = TextEditingController();
   final _slippageCtrl = TextEditingController();
 
-  // Static chain list matching the chains seeded server-side. Each chain
-  // has its own wallet row now — switching tabs re-fetches that chain's key.
   static const List<Map<String, String>> _chains = [
     {'id': 'solana', 'name': 'Solana', 'placeholder': 'Paste Solana Base58 Private Key'},
     {'id': 'bsc', 'name': 'BSC', 'placeholder': 'Paste EVM Private Key (0x...)'},
@@ -281,6 +280,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Row(children: [Icon(PhosphorIcons.fingerprint, color: theme.colorScheme.onSurfaceVariant, size: 20), const SizedBox(width: 8), Text('Biometric Quick-Lock', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold))]),
                         Switch(value: _biometricEnabled, activeColor: theme.primaryColor, onChanged: (v) => setState(() => _biometricEnabled = v)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [Icon(PhosphorIcons.numpad, color: theme.colorScheme.onSurfaceVariant, size: 20), const SizedBox(width: 8), Text('Withdrawal PIN', style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold))]),
+                        IconButton(icon: Icon(PhosphorIcons.caretRightBold, color: theme.colorScheme.onSurfaceVariant), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetPinScreen()))),
                       ],
                     ),
                     const SizedBox(height: 16),
