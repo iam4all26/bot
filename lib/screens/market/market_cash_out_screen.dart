@@ -39,7 +39,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
   List<dynamic> _banks = [];
   Timer? _debounceTimer;
 
-  static const double _nairaWithdrawalFee = 30.0; // Flat processing fee
+  static const double _nairaWithdrawalFee = 30.0; 
 
   @override
   void initState() {
@@ -301,8 +301,11 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     final String amountInWords = _numberToWords(typedFiat);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(
           'CASH OUT TO BANK',
           style: GoogleFonts.spaceGrotesk(
@@ -312,451 +315,445 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
             letterSpacing: 1,
           ),
         ),
-        leading: IconButton(
-          icon: Icon(PhosphorIcons.caretLeftBold, color: theme.colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
-      body: AnimatedCryptoBackground(
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SELECT ASSET TO SELL',
-                        style: GoogleFonts.spaceGrotesk(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SELECT ASSET TO SELL',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
                       ),
-                      const SizedBox(height: 12),
-                      GlassCard(
-                        padding: EdgeInsets.zero,
-                        child: Column(
-                          children: _assets.asMap().entries.map((entry) {
-                            int idx = entry.key;
-                            var a = entry.value;
+                    ),
+                    const SizedBox(height: 12),
+                    GlassCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: _assets.asMap().entries.map((entry) {
+                          int idx = entry.key;
+                          var a = entry.value;
 
-                            final String symbol = a['symbol'] ?? 'USDT';
-                            final String? chain = a['chain'];
-                            final bool isSelected = symbol == _selectedAssetKey;
-                            final bool isUsdt = chain == null || symbol == 'USDT';
+                          final String symbol = a['symbol'] ?? 'USDT';
+                          final String? chain = a['chain'];
+                          final bool isSelected = symbol == _selectedAssetKey;
+                          final bool isUsdt = chain == null || symbol == 'USDT';
 
-                            final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
-                            final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
-                            final double balance = isUsdt
-                                ? usdtTotal
-                                : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
+                          final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
+                          final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
+                          final double balance = isUsdt
+                              ? usdtTotal
+                              : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
 
-                            return Column(
-                              children: [
-                                if (idx > 0)
-                                  Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                                InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedAssetKey = symbol;
-                                      _cryptoAmountController.clear();
-                                      _fiatAmountController.clear();
-                                    });
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isSelected ? PhosphorIcons.checkCircleFill : PhosphorIcons.circle,
-                                          color: isSelected ? theme.primaryColor : theme.colorScheme.outline,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 14),
-                                        Text(
-                                          symbol,
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      GlassCard(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'AVAILABLE BALANCE',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    side: BorderSide(color: theme.primaryColor),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  onPressed: _setMaxAmount,
-                                  child: Text(
-                                    'USE MAX',
-                                    style: GoogleFonts.spaceGrotesk(
-                                      color: theme.primaryColor,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
-                              style: GoogleFonts.spaceGrotesk(
-                                color: theme.colorScheme.onSurface,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _cryptoAmountController,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    style: GoogleFonts.spaceGrotesk(
-                                      color: theme.colorScheme.onSurface,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Amount ($_selectedAssetKey)',
-                                      labelStyle: GoogleFonts.spaceGrotesk(
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                        fontSize: 11,
+                          return Column(
+                            children: [
+                              if (idx > 0)
+                                Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedAssetKey = symbol;
+                                    _cryptoAmountController.clear();
+                                    _fiatAmountController.clear();
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSelected ? PhosphorIcons.checkCircleFill : PhosphorIcons.circle,
+                                        color: isSelected ? theme.primaryColor : theme.colorScheme.outline,
+                                        size: 22,
                                       ),
-                                      filled: true,
-                                      fillColor: theme.colorScheme.surfaceContainerHighest,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    onChanged: _onCryptoInputChanged,
-                                    validator: (val) {
-                                      final amt = double.tryParse(val?.trim() ?? '');
-                                      if (amt == null || amt <= 0) return 'Enter amount';
-                                      if (amt > availableBalance) return 'Exceeds balance';
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _fiatAmountController,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    style: GoogleFonts.spaceGrotesk(
-                                      color: AppTheme.success(context),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                    decoration: InputDecoration(
-                                      labelText: 'Amount (₦)',
-                                      labelStyle: GoogleFonts.spaceGrotesk(
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                        fontSize: 11,
-                                      ),
-                                      filled: true,
-                                      fillColor: theme.colorScheme.surfaceContainerHighest,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    onChanged: _onFiatInputChanged,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            if (amountInWords.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.success(context).withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppTheme.success(context).withOpacity(0.2)),
-                                ),
-                                child: Text(
-                                  amountInWords,
-                                  style: GoogleFonts.spaceGrotesk(
-                                    color: AppTheme.success(context),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Processing Fee:',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  '₦${_nairaWithdrawalFee.toStringAsFixed(2)}',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    color: theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Bank Details Section
-                      GlassCard(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'BANK ACCOUNT DETAILS',
-                              style: GoogleFonts.spaceGrotesk(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            DropdownButtonFormField<String>(
-                              value: _selectedBankCode,
-                              dropdownColor: theme.colorScheme.surface,
-                              style: GoogleFonts.spaceGrotesk(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'Select Destination Bank',
-                                labelStyle: GoogleFonts.spaceGrotesk(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                                filled: true,
-                                fillColor: theme.colorScheme.surfaceContainerHighest,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              items: _banks.map<DropdownMenuItem<String>>((b) {
-                                return DropdownMenuItem<String>(
-                                  value: b['code']?.toString(),
-                                  child: Text(
-                                    b['name']?.toString() ?? 'Bank',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedBankCode = val;
-                                  _resolvedAccountName = null;
-                                });
-                                if (_accountNumberController.text.trim().length == 10) {
-                                  _resolveAccount(_accountNumberController.text.trim(), val!);
-                                }
-                              },
-                              validator: (val) {
-                                if (val == null || val.isEmpty) return 'Bank selection required';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _accountNumberController,
-                              keyboardType: TextInputType.number,
-                              maxLength: 10,
-                              style: GoogleFonts.spaceGrotesk(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                letterSpacing: 2,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: '10-Digit NUBAN Account Number',
-                                counterText: '',
-                                labelStyle: GoogleFonts.spaceGrotesk(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                                filled: true,
-                                fillColor: theme.colorScheme.surfaceContainerHighest,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              onChanged: _onAccountNumberChanged,
-                              validator: (val) {
-                                if (val == null || val.trim().length != 10) {
-                                  return 'Enter 10 digits';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            if (_isResolvingAccount) ...[
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: theme.primaryColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Resolving account details...',
-                                    style: GoogleFonts.spaceGrotesk(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else if (_resolvedAccountName != null) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.success(context).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppTheme.success(context).withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(PhosphorIcons.checkCircleFill, color: AppTheme.success(context), size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _resolvedAccountName!,
+                                      const SizedBox(width: 14),
+                                      Text(
+                                        symbol,
                                         style: GoogleFonts.spaceGrotesk(
-                                          color: AppTheme.success(context),
-                                          fontSize: 13,
+                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
+                                        style: GoogleFonts.spaceGrotesk(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ] else if (_accountResolutionError != null) ...[
-                              Text(
-                                _accountResolutionError!,
-                                style: GoogleFonts.spaceGrotesk(
-                                  color: AppTheme.danger(context),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
-                          ],
-                        ),
+                          );
+                        }).toList(),
                       ),
-                      const SizedBox(height: 24),
+                    ),
+                    const SizedBox(height: 24),
 
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: _isSubmitting ? null : _handleCashOutClick,
-                          icon: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                    GlassCard(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'AVAILABLE BALANCE',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  side: BorderSide(color: theme.primaryColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                )
-                              : const Icon(PhosphorIcons.bankFill, size: 20),
-                          label: Text(
-                            _isSubmitting ? 'PROCESSING CASH OUT...' : 'AUTHORIZE & CASH OUT',
+                                ),
+                                onPressed: _setMaxAmount,
+                                child: Text(
+                                  'USE MAX',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: theme.primaryColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
                             style: GoogleFonts.spaceGrotesk(
+                              color: theme.colorScheme.onSurface,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _cryptoAmountController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Amount ($_selectedAssetKey)',
+                                    labelStyle: GoogleFonts.spaceGrotesk(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                                    filled: true,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  onChanged: _onCryptoInputChanged,
+                                  validator: (val) {
+                                    final amt = double.tryParse(val?.trim() ?? '');
+                                    if (amt == null || amt <= 0) return 'Enter amount';
+                                    if (amt > availableBalance) return 'Exceeds balance';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _fiatAmountController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: AppTheme.success(context),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Amount (₦)',
+                                    labelStyle: GoogleFonts.spaceGrotesk(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                                    filled: true,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  onChanged: _onFiatInputChanged,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          if (amountInWords.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.success(context).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.success(context).withOpacity(0.2)),
+                              ),
+                              child: Text(
+                                amountInWords,
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: AppTheme.success(context),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Processing Fee:',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              Text(
+                                '₦${_nairaWithdrawalFee.toStringAsFixed(2)}',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Bank Details Section
+                    GlassCard(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'BANK ACCOUNT DETAILS',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                               letterSpacing: 1,
                             ),
                           ),
+                          const SizedBox(height: 20),
+                          DropdownButtonFormField<String>(
+                            value: _selectedBankCode,
+                            dropdownColor: theme.colorScheme.surface,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Select Destination Bank',
+                              labelStyle: GoogleFonts.spaceGrotesk(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 12,
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            items: _banks.map<DropdownMenuItem<String>>((b) {
+                              return DropdownMenuItem<String>(
+                                value: b['code']?.toString(),
+                                child: Text(
+                                  b['name']?.toString() ?? 'Bank',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedBankCode = val;
+                                _resolvedAccountName = null;
+                              });
+                              if (_accountNumberController.text.trim().length == 10) {
+                                _resolveAccount(_accountNumberController.text.trim(), val!);
+                              }
+                            },
+                            validator: (val) {
+                              if (val == null || val.isEmpty) return 'Bank selection required';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _accountNumberController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 10,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              letterSpacing: 2,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: '10-Digit NUBAN Account Number',
+                              counterText: '',
+                              labelStyle: GoogleFonts.spaceGrotesk(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 12,
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            onChanged: _onAccountNumberChanged,
+                            validator: (val) {
+                              if (val == null || val.trim().length != 10) {
+                                return 'Enter 10 digits';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+
+                          if (_isResolvingAccount) ...[
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.primaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Resolving account details...',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else if (_resolvedAccountName != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.success(context).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.success(context).withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(PhosphorIcons.checkCircleFill, color: AppTheme.success(context), size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _resolvedAccountName!,
+                                      style: GoogleFonts.spaceGrotesk(
+                                        color: AppTheme.success(context),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (_accountResolutionError != null) ...[
+                            Text(
+                              _accountResolutionError!,
+                              style: GoogleFonts.spaceGrotesk(
+                                color: AppTheme.danger(context),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: _isSubmitting ? null : _handleCashOutClick,
+                        icon: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(PhosphorIcons.bankFill, size: 20),
+                        label: Text(
+                          _isSubmitting ? 'PROCESSING CASH OUT...' : 'AUTHORIZE & CASH OUT',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-      ),
+            ),
     );
   }
 }
