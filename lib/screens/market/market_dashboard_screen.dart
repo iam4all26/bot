@@ -8,6 +8,10 @@ import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
 import 'set_pin_screen.dart';
+import 'market_buy_screen.dart';
+import 'market_receive_screen.dart';
+import 'market_send_crypto_screen.dart';
+import 'market_cash_out_screen.dart';
 
 class MarketDashboardScreen extends StatefulWidget {
   const MarketDashboardScreen({super.key});
@@ -192,7 +196,7 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '≈ ${currency.format(_totalPortfolioUsdt)}',
+                            '≈ ${currency.format(_totalPortfolioNaira / (currency.isNaira ? 1 : _usdtSellRate))}',
                             style: GoogleFonts.spaceGrotesk(
                               color: AppTheme.success(context),
                               fontSize: 15,
@@ -207,12 +211,10 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                                 label: 'BUY',
                                 icon: PhosphorIcons.plusBold,
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Opening Buy Crypto...', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold)),
-                                      backgroundColor: theme.primaryColor,
-                                    ),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const MarketBuyScreen()),
+                                  ).then((_) => _fetchHubData(silent: true));
                                 },
                                 theme: theme,
                               ),
@@ -220,12 +222,10 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                                 label: 'RECEIVE',
                                 icon: PhosphorIcons.qrCodeBold,
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Opening Receive Crypto...', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold)),
-                                      backgroundColor: theme.primaryColor,
-                                    ),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const MarketReceiveScreen()),
+                                  ).then((_) => _fetchHubData(silent: true));
                                 },
                                 theme: theme,
                               ),
@@ -233,12 +233,10 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                                 label: 'SEND',
                                 icon: PhosphorIcons.paperPlaneTiltBold,
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Opening Send Crypto...', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold)),
-                                      backgroundColor: theme.primaryColor,
-                                    ),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const MarketSendCryptoScreen()),
+                                  ).then((_) => _fetchHubData(silent: true));
                                 },
                                 theme: theme,
                               ),
@@ -246,12 +244,10 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                                 label: 'CASH OUT',
                                 icon: PhosphorIcons.bankBold,
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Opening Cash Out to Bank...', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold)),
-                                      backgroundColor: theme.primaryColor,
-                                    ),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const MarketCashOutScreen()),
+                                  ).then((_) => _fetchHubData(silent: true));
                                 },
                                 theme: theme,
                               ),
@@ -273,132 +269,145 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    GlassCard(
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        children: _assets.asMap().entries.map((entry) {
-                          int idx = entry.key;
-                          var a = entry.value;
+                    if (_assets.isEmpty)
+                      GlassCard(
+                        padding: const EdgeInsets.all(32),
+                        child: Center(
+                          child: Text(
+                            'No assets available.',
+                            style: GoogleFonts.spaceGrotesk(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      GlassCard(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          children: _assets.asMap().entries.map((entry) {
+                            int idx = entry.key;
+                            var a = entry.value;
 
-                          final String symbol = a['symbol'] ?? 'USDT';
-                          final String? chain = a['chain'];
-                          final String? chainName = a['chain_name'];
-                          final bool isUsdt = chain == null || symbol == 'USDT';
+                            final String symbol = a['symbol'] ?? 'USDT';
+                            final String? chain = a['chain'];
+                            final String? chainName = a['chain_name'];
+                            final bool isUsdt = chain == null || symbol == 'USDT';
 
-                          final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
-                          final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
-                          final double balance = isUsdt
-                              ? usdtTotal
-                              : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
+                            final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
+                            final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
+                            final double balance = isUsdt
+                                ? usdtTotal
+                                : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
 
-                          final double sellRate = double.tryParse(a['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
-                          final double nairaVal = balance * sellRate;
-                          final double usdVal = _usdtSellRate > 0 ? nairaVal / _usdtSellRate : 0.0;
+                            final double sellRate = double.tryParse(a['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
+                            final double nairaVal = balance * sellRate;
+                            final double usdVal = _usdtSellRate > 0 ? nairaVal / _usdtSellRate : 0.0;
 
-                          return Column(
-                            children: [
-                              if (idx > 0)
-                                Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: theme.primaryColor.withOpacity(0.12),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          symbol.substring(0, 1).toUpperCase(),
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.primaryColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 18,
+                            return Column(
+                              children: [
+                                if (idx > 0)
+                                  Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          color: theme.primaryColor.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            symbol.substring(0, 1).toUpperCase(),
+                                            style: GoogleFonts.spaceGrotesk(
+                                              color: theme.primaryColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Text(
-                                                symbol,
-                                                style: GoogleFonts.spaceGrotesk(
-                                                  color: theme.colorScheme.onSurface,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15,
-                                                ),
-                                              ),
-                                              if (chainName != null) ...[
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: theme.colorScheme.surfaceContainerHighest,
-                                                    borderRadius: BorderRadius.circular(6),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  symbol,
+                                                  style: GoogleFonts.spaceGrotesk(
+                                                    color: theme.colorScheme.onSurface,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
                                                   ),
-                                                  child: Text(
-                                                    chainName,
-                                                    style: GoogleFonts.spaceGrotesk(
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: theme.colorScheme.onSurfaceVariant,
+                                                ),
+                                                if (chainName != null) ...[
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: theme.colorScheme.surfaceContainerHighest,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      chainName,
+                                                      style: GoogleFonts.spaceGrotesk(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: theme.colorScheme.onSurfaceVariant,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
+                                                ],
                                               ],
-                                            ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              sellRate > 0
+                                                  ? 'Rate: ₦${sellRate.toStringAsFixed(2)}'
+                                                  : 'Rate Unavailable',
+                                              style: GoogleFonts.spaceGrotesk(
+                                                color: theme.colorScheme.onSurfaceVariant,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '\$${usdVal.toStringAsFixed(2)}',
+                                            style: GoogleFonts.spaceGrotesk(
+                                              color: theme.colorScheme.onSurface,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            sellRate > 0
-                                                ? 'Rate: ₦${sellRate.toStringAsFixed(2)}'
-                                                : 'Rate Unavailable',
+                                            '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
                                             style: GoogleFonts.spaceGrotesk(
                                               color: theme.colorScheme.onSurfaceVariant,
                                               fontSize: 11,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '\$${usdVal.toStringAsFixed(2)}',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 28),
 
                     // Recent Activity Section
