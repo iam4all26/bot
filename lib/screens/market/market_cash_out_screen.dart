@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/currency_provider.dart';
@@ -40,6 +39,16 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
   Timer? _debounceTimer;
 
   static const double _nairaWithdrawalFee = 30.0; 
+
+  Color _getAssetColor(String symbol) {
+    switch (symbol.toUpperCase()) {
+      case 'SOL': return const Color(0xFF10B981);
+      case 'BNB': return const Color(0xFFF59E0B);
+      case 'ETH': return const Color(0xFF3B82F6);
+      case 'USDT': return const Color(0xFF14B8A6);
+      default: return const Color(0xFF8B5CF6);
+    }
+  }
 
   @override
   void initState() {
@@ -207,7 +216,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     if (!_hasPin) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please set up a withdrawal PIN first.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: const Text('Please set up a withdrawal PIN first.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           backgroundColor: AppTheme.warning(context),
         ),
       );
@@ -225,7 +234,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     if (_resolvedAccountName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please resolve a valid bank account name first.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: const Text('Please resolve a valid bank account name first.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           backgroundColor: AppTheme.danger(context),
         ),
       );
@@ -238,7 +247,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     if (amount <= 0 || amount > balance) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Amount exceeds available balance.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: const Text('Amount exceeds available balance.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           backgroundColor: AppTheme.danger(context),
         ),
       );
@@ -273,7 +282,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
         SnackBar(
           content: Text(
             res['message'] ?? (isSuccess ? 'Cash out initiated!' : 'Withdrawal failed'),
-            style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white),
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: isSuccess ? AppTheme.success(context) : AppTheme.danger(context),
         ),
@@ -308,7 +317,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
         elevation: 0,
         title: Text(
           'CASH OUT TO BANK',
-          style: GoogleFonts.spaceGrotesk(
+          style: TextStyle(
             color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w900,
             fontSize: 16,
@@ -327,7 +336,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                   children: [
                     Text(
                       'SELECT ASSET TO SELL',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: TextStyle(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -346,6 +355,8 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                           final String? chain = a['chain'];
                           final bool isSelected = symbol == _selectedAssetKey;
                           final bool isUsdt = chain == null || symbol == 'USDT';
+
+                          final Color assetColor = _getAssetColor(symbol);
 
                           final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
                           final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
@@ -375,9 +386,36 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                         size: 22,
                                       ),
                                       const SizedBox(width: 14),
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: assetColor.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: assetColor.withOpacity(0.2)),
+                                        ),
+                                        child: Image.network(
+                                          'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Center(
+                                              child: Text(
+                                                symbol.substring(0, 1).toUpperCase(),
+                                                style: TextStyle(
+                                                  color: assetColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
                                       Text(
                                         symbol,
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 15,
@@ -386,7 +424,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                       const Spacer(),
                                       Text(
                                         '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
@@ -413,7 +451,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             children: [
                               Text(
                                 'AVAILABLE BALANCE',
-                                style: GoogleFonts.spaceGrotesk(
+                                style: TextStyle(
                                   color: theme.colorScheme.onSurfaceVariant,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -431,7 +469,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 onPressed: _setMaxAmount,
                                 child: Text(
                                   'USE MAX',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     color: theme.primaryColor,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -443,7 +481,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                           const SizedBox(height: 8),
                           Text(
                             '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -457,14 +495,14 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 child: TextFormField(
                                   controller: _cryptoAmountController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     color: theme.colorScheme.onSurface,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'Amount ($_selectedAssetKey)',
-                                    labelStyle: GoogleFonts.spaceGrotesk(
+                                    labelStyle: TextStyle(
                                       color: theme.colorScheme.onSurfaceVariant,
                                       fontSize: 11,
                                     ),
@@ -489,14 +527,14 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 child: TextFormField(
                                   controller: _fiatAmountController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     color: AppTheme.success(context),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'Amount (₦)',
-                                    labelStyle: GoogleFonts.spaceGrotesk(
+                                    labelStyle: TextStyle(
                                       color: theme.colorScheme.onSurfaceVariant,
                                       fontSize: 11,
                                     ),
@@ -525,7 +563,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                               ),
                               child: Text(
                                 amountInWords,
-                                style: GoogleFonts.spaceGrotesk(
+                                style: TextStyle(
                                   color: AppTheme.success(context),
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -540,14 +578,14 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             children: [
                               Text(
                                 'Processing Fee:',
-                                style: GoogleFonts.spaceGrotesk(
+                                style: TextStyle(
                                   color: theme.colorScheme.onSurfaceVariant,
                                   fontSize: 11,
                                 ),
                               ),
                               Text(
                                 '₦${_nairaWithdrawalFee.toStringAsFixed(2)}',
-                                style: GoogleFonts.spaceGrotesk(
+                                style: TextStyle(
                                   color: theme.colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 11,
@@ -568,7 +606,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                         children: [
                           Text(
                             'BANK ACCOUNT DETAILS',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -579,14 +617,14 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                           DropdownButtonFormField<String>(
                             value: _selectedBankCode,
                             dropdownColor: theme.colorScheme.surface,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
                             decoration: InputDecoration(
                               labelText: 'Select Destination Bank',
-                              labelStyle: GoogleFonts.spaceGrotesk(
+                              labelStyle: TextStyle(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
@@ -625,7 +663,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             controller: _accountNumberController,
                             keyboardType: TextInputType.number,
                             maxLength: 10,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -634,7 +672,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             decoration: InputDecoration(
                               labelText: '10-Digit NUBAN Account Number',
                               counterText: '',
-                              labelStyle: GoogleFonts.spaceGrotesk(
+                              labelStyle: TextStyle(
                                 color: theme.colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
@@ -669,7 +707,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 const SizedBox(width: 8),
                                 Text(
                                   'Resolving account details...',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: TextStyle(
                                     color: theme.colorScheme.onSurfaceVariant,
                                     fontSize: 12,
                                   ),
@@ -692,7 +730,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                   Expanded(
                                     child: Text(
                                       _resolvedAccountName!,
-                                      style: GoogleFonts.spaceGrotesk(
+                                      style: TextStyle(
                                         color: AppTheme.success(context),
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
@@ -705,7 +743,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                           ] else if (_accountResolutionError != null) ...[
                             Text(
                               _accountResolutionError!,
-                              style: GoogleFonts.spaceGrotesk(
+                              style: TextStyle(
                                 color: AppTheme.danger(context),
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -742,7 +780,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             : const Icon(PhosphorIcons.bankFill, size: 20),
                         label: Text(
                           _isSubmitting ? 'PROCESSING CASH OUT...' : 'AUTHORIZE & CASH OUT',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             letterSpacing: 1,
