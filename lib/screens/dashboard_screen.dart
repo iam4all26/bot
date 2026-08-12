@@ -19,6 +19,9 @@ import 'copy_bots_screen.dart';
 import 'history_screen.dart';
 import 'hidden_positions_screen.dart';
 import 'market/market_dashboard_screen.dart';
+import 'market/market_receive_screen.dart';
+import 'market/market_send_crypto_screen.dart';
+import 'market/market_cash_out_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -28,7 +31,11 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _currentIndex = 0;
+  // Dual-Mode Architecture State
+  bool _isMarketMode = false;
+  int _botTabIndex = 0;
+  int _marketTabIndex = 0;
+
   bool _isLoading = true;
   bool _isRefreshing = false;
   String _solBalance = "0.00000";
@@ -440,7 +447,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('New Action', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Text('Actions', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
@@ -454,7 +461,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   subtitle: Text('Buy, Send, Receive and Cash Out', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(ctx);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MarketDashboardScreen()));
+                    setState(() {
+                      _isMarketMode = true;
+                      _marketTabIndex = 0;
+                    });
                   },
                 ),
                 if (canTrade)
@@ -514,10 +524,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '${addr.substring(0, 3)}...${addr.substring(addr.length - 3)}';
   }
 
-  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, ThemeData theme) {
-    final isSelected = _currentIndex == index;
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, ThemeData theme, bool isMarketMode) {
+    final isSelected = (isMarketMode ? _marketTabIndex : _botTabIndex) == index;
+    final activeColor = isMarketMode ? AppTheme.success(context) : theme.primaryColor;
+
     return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() {
+          if (isMarketMode) {
+            _marketTabIndex = index;
+          } else {
+            _botTabIndex = index;
+          }
+        });
+      },
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       child: Column(
@@ -529,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: EdgeInsets.only(bottom: isSelected ? 2 : 0),
             child: Icon(
               isSelected ? activeIcon : icon, 
-              color: isSelected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
+              color: isSelected ? activeColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
               size: 26
             ),
           ),
@@ -537,7 +557,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text(
             label, 
             style: TextStyle(
-              color: isSelected ? theme.primaryColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
+              color: isSelected ? activeColor : theme.colorScheme.onSurfaceVariant.withOpacity(0.7), 
               fontSize: 10, 
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500
             )
@@ -547,9 +567,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildActionNavItem(ThemeData theme, bool canTrade) {
+  Widget _buildActionNavItem(ThemeData theme) {
     return InkWell(
-      onTap: () => _showActionMenu(canTrade),
+      onTap: () {
+        setState(() {
+          _isMarketMode = !_isMarketMode;
+        });
+      },
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       child: Column(
@@ -557,19 +581,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [AppTheme.kainuwaPurple, AppTheme.kainuwaGold],
-                stops: [0.75, 1.0], 
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [BoxShadow(color: theme.primaryColor.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 2))],
+              color: _isMarketMode ? theme.primaryColor : AppTheme.success(context),
+              boxShadow: [
+                BoxShadow(
+                  color: (_isMarketMode ? theme.primaryColor : AppTheme.success(context)).withOpacity(0.4), 
+                  blurRadius: 8, 
+                  offset: const Offset(0, 2)
+                )
+              ],
+              border: Border.all(color: theme.colorScheme.surface, width: 4),
             ),
-            child: const Icon(PhosphorIcons.arrowsLeftRightBold, color: Colors.white, size: 22),
+            child: Icon(
+              _isMarketMode ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
+              color: Colors.white, 
+              size: 22
+            ),
           ),
         ],
       ),
@@ -584,20 +614,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final List<Widget> pages = [
-      _buildPremiumHome(theme),
+    final List<Widget> botPages = [
+      _buildPremiumHome(theme, canTrade),
       const PositionsScreen(),
       const CopyBotsScreen(),
       isAdmin ? const AdminScreen() : const SettingsScreen(),
+    ];
+
+    final List<Widget> marketPages = [
+      MarketDashboardScreen(onNavigate: (idx) => setState(() => _marketTabIndex = idx)),
+      const MarketReceiveScreen(),
+      const MarketSendCryptoScreen(),
+      const MarketCashOutScreen(),
     ];
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (_currentIndex != 0) {
-          setState(() => _currentIndex = 0);
+        if (_isMarketMode) {
+          if (_marketTabIndex != 0) {
+            setState(() => _marketTabIndex = 0);
+          } else {
+            setState(() => _isMarketMode = false);
+          }
           return;
+        } else {
+          if (_botTabIndex != 0) {
+            setState(() => _botTabIndex = 0);
+            return;
+          }
         }
         SystemNavigator.pop();
       },
@@ -606,7 +652,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         extendBody: true, 
         resizeToAvoidBottomInset: false,
         body: AnimatedCryptoBackground(
-          child: SafeArea(bottom: false, child: pages[_currentIndex > pages.length - 1 ? 0 : _currentIndex]),
+          child: SafeArea(
+            bottom: false, 
+            child: _isMarketMode 
+                ? IndexedStack(index: _marketTabIndex, children: marketPages)
+                : IndexedStack(index: _botTabIndex, children: botPages),
+          ),
         ),
         bottomNavigationBar: BottomAppBar(
           color: theme.colorScheme.surface,
@@ -616,16 +667,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme),
-                _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Positions', 1, theme),
-                _buildActionNavItem(theme, canTrade),
-                _buildNavItem(PhosphorIcons.robot, PhosphorIcons.robotFill, 'Bots', 2, theme),
-                if (isAdmin) 
-                  _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 3, theme)
-                else 
-                  _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', 3, theme),
-              ],
+              children: _isMarketMode 
+                  ? [
+                      _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Hub', 0, theme, true),
+                      _buildNavItem(PhosphorIcons.qrCode, PhosphorIcons.qrCodeFill, 'Receive', 1, theme, true),
+                      _buildActionNavItem(theme),
+                      _buildNavItem(PhosphorIcons.paperPlaneTilt, PhosphorIcons.paperPlaneTiltFill, 'Send', 2, theme, true),
+                      _buildNavItem(PhosphorIcons.bank, PhosphorIcons.bankFill, 'Cash Out', 3, theme, true),
+                    ]
+                  : [
+                      _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Home', 0, theme, false),
+                      _buildNavItem(PhosphorIcons.chartLineUp, PhosphorIcons.chartLineUpFill, 'Trades', 1, theme, false),
+                      _buildActionNavItem(theme),
+                      _buildNavItem(PhosphorIcons.robot, PhosphorIcons.robotFill, 'Bots', 2, theme, false),
+                      if (isAdmin) 
+                        _buildNavItem(PhosphorIcons.shieldCheck, PhosphorIcons.shieldCheckFill, 'Admin', 3, theme, false)
+                      else 
+                        _buildNavItem(PhosphorIcons.gear, PhosphorIcons.gearFill, 'Settings', 3, theme, false),
+                    ],
             ),
           ),
         ),
@@ -633,7 +692,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPremiumHome(ThemeData theme) {
+  Widget _buildPremiumHome(ThemeData theme, bool canTrade) {
     final currency = context.watch<CurrencyProvider>(); 
     final isDark = theme.brightness == Brightness.dark;
     final isAdmin = context.read<ApiService>().role == 'admin';
@@ -661,7 +720,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               InkWell(
-                onTap: () => setState(() => _currentIndex = isAdmin ? 3 : 2),
+                onTap: () => setState(() => _botTabIndex = isAdmin ? 3 : 2),
                 borderRadius: BorderRadius.circular(12),
                 child: Row(
                   children: [
@@ -687,8 +746,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(PhosphorIcons.gearFill, color: theme.colorScheme.onSurfaceVariant), 
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    icon: Icon(PhosphorIcons.dotsThreeCircleFill, color: theme.colorScheme.onSurfaceVariant), 
+                    onPressed: () => _showActionMenu(canTrade),
                   ),
                   IconButton(
                     icon: Icon(isDark ? PhosphorIcons.sunFill : PhosphorIcons.moonFill, color: theme.colorScheme.onSurfaceVariant), 
