@@ -409,7 +409,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
 
                             TextFormField(
                               controller: _addressController,
-                              style: GoogleFonts.spaceGrotesk(
+                              style: TextStyle(
                                 color: theme.colorScheme.onSurface,
                                 fontFamily: 'monospace',
                                 fontSize: 13,

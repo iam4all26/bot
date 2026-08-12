@@ -269,7 +269,6 @@ class _MarketReceiveScreenState extends State<MarketReceiveScreen> {
                       const SizedBox(height: 24),
                     ],
 
-                    // QR & Address Display Card
                     GlassCard(
                       padding: const EdgeInsets.all(24),
                       child: Column(
@@ -335,7 +334,7 @@ class _MarketReceiveScreenState extends State<MarketReceiveScreen> {
                             child: SelectableText(
                               currentAddress,
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.spaceGrotesk(
+                              style: TextStyle(
                                 color: theme.colorScheme.onSurface,
                                 fontFamily: 'monospace',
                                 fontSize: 13,
@@ -373,7 +372,6 @@ class _MarketReceiveScreenState extends State<MarketReceiveScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Warning Banner
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
