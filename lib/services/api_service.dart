@@ -111,4 +111,86 @@ class ApiService extends ChangeNotifier {
       return {'status': 'error', 'message': 'API Error: $e'};
     }
   }
+
+  // ==========================================
+  // MARKET FEATURE ENDPOINTS
+  // ==========================================
+
+  Future<Map<String, dynamic>> fetchMarketHub() async {
+    return getEndpoint('market.php?action=fetch_hub');
+  }
+
+  Future<Map<String, dynamic>> fetchDepositAddresses() async {
+    return getEndpoint('market.php?action=fetch_deposit_addresses');
+  }
+
+  Future<Map<String, dynamic>> buyCryptoInitiate({
+    required String asset,
+    required double ngnAmount,
+  }) async {
+    return postEndpoint('market.php?action=buy_initiate', {
+      'asset': asset,
+      'ngn_amount': ngnAmount,
+    });
+  }
+
+  Future<Map<String, dynamic>> getNigerianBanks() async {
+    return getEndpoint('market.php?action=get_banks');
+  }
+
+  Future<Map<String, dynamic>> resolveBankAccount({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    return postEndpoint('market.php?action=resolve_bank', {
+      'account_number': accountNumber,
+      'bank_code': bankCode,
+    });
+  }
+
+  Future<Map<String, dynamic>> checkPinStatus() async {
+    return getEndpoint('market.php?action=check_pin_status');
+  }
+
+  Future<Map<String, dynamic>> setWithdrawalPin({
+    required String password,
+    required String pin,
+  }) async {
+    return postEndpoint('market.php?action=set_pin', {
+      'password': password,
+      'pin': pin,
+    });
+  }
+
+  Future<Map<String, dynamic>> withdrawCrypto({
+    required String asset,
+    required double amount,
+    required String destinationAddress,
+    required String pin,
+  }) async {
+    return postEndpoint('market.php?action=withdraw_crypto', {
+      'asset': asset,
+      'amount': amount,
+      'destination_address': destinationAddress,
+      'withdrawal_pin': pin,
+    });
+  }
+
+  Future<Map<String, dynamic>> withdrawNaira({
+    required String asset,
+    required double amount,
+    required String bankCode,
+    required String accountNumber,
+    required String accountName,
+    required String pin,
+  }) async {
+    return postEndpoint('market.php?action=withdraw_naira', {
+      'asset': asset,
+      'amount': amount,
+      'bank_code': bankCode,
+      'account_number': accountNumber,
+      'account_name': accountName,
+      'withdrawal_pin': pin,
+    });
+  }
 }
