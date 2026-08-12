@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,6 +23,16 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
 
   String _selectedAssetKey = 'USDT';
   List<dynamic> _assets = [];
+
+  Color _getAssetColor(String symbol) {
+    switch (symbol.toUpperCase()) {
+      case 'SOL': return const Color(0xFF10B981);
+      case 'BNB': return const Color(0xFFF59E0B);
+      case 'ETH': return const Color(0xFF3B82F6);
+      case 'USDT': return const Color(0xFF14B8A6);
+      default: return const Color(0xFF8B5CF6);
+    }
+  }
 
   @override
   void initState() {
@@ -66,7 +75,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
     if (ngnAmount < 500) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Minimum purchase amount is ₦500.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: const Text('Minimum purchase amount is ₦500.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           backgroundColor: AppTheme.danger(context),
         ),
       );
@@ -91,14 +100,14 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
           await launchUrl(url, mode: LaunchMode.externalApplication);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Redirecting to secure gateway checkout...', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+              content: const Text('Redirecting to secure gateway checkout...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
               backgroundColor: AppTheme.success(context),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Could not launch payment gateway URL.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+              content: const Text('Could not launch payment gateway URL.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
               backgroundColor: AppTheme.danger(context),
             ),
           );
@@ -106,7 +115,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res['message'] ?? 'Could not initialize payment checkout.', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+            content: Text(res['message'] ?? 'Could not initialize payment checkout.', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             backgroundColor: AppTheme.danger(context),
           ),
         );
@@ -128,7 +137,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
       appBar: AppBar(
         title: Text(
           'BUY CRYPTO WITH NAIRA',
-          style: GoogleFonts.spaceGrotesk(
+          style: TextStyle(
             color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w900,
             fontSize: 16,
@@ -152,7 +161,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                     children: [
                       Text(
                         'SELECT ASSET TO BUY',
-                        style: GoogleFonts.spaceGrotesk(
+                        style: TextStyle(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -171,6 +180,8 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                             final String? chainName = a['chain_name'];
                             final bool isSelected = symbol == _selectedAssetKey;
                             final double rate = double.tryParse(a['ngn_buy_rate']?.toString() ?? '0') ?? 0.0;
+
+                            final Color assetColor = _getAssetColor(symbol);
 
                             return Column(
                               children: [
@@ -192,9 +203,36 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                           size: 22,
                                         ),
                                         const SizedBox(width: 14),
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: assetColor.withOpacity(0.12),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: assetColor.withOpacity(0.2)),
+                                          ),
+                                          child: Image.network(
+                                            'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Center(
+                                                child: Text(
+                                                  symbol.substring(0, 1).toUpperCase(),
+                                                  style: TextStyle(
+                                                    color: assetColor,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
                                         Text(
                                           symbol,
-                                          style: GoogleFonts.spaceGrotesk(
+                                          style: TextStyle(
                                             color: theme.colorScheme.onSurface,
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,
@@ -210,7 +248,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                             ),
                                             child: Text(
                                               chainName,
-                                              style: GoogleFonts.spaceGrotesk(
+                                              style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.bold,
                                                 color: theme.colorScheme.onSurfaceVariant,
@@ -221,7 +259,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                         const Spacer(),
                                         Text(
                                           rate > 0 ? '₦${rate.toStringAsFixed(2)}' : 'Unavailable',
-                                          style: GoogleFonts.spaceGrotesk(
+                                          style: TextStyle(
                                             color: theme.colorScheme.onSurfaceVariant,
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
@@ -246,7 +284,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                             TextFormField(
                               controller: _ngnAmountController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              style: GoogleFonts.spaceGrotesk(
+                              style: TextStyle(
                                 color: theme.colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -254,7 +292,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                               decoration: InputDecoration(
                                 labelText: 'Purchase Amount in Naira (₦)',
                                 hintText: 'e.g. 5000',
-                                labelStyle: GoogleFonts.spaceGrotesk(
+                                labelStyle: TextStyle(
                                   color: theme.colorScheme.onSurfaceVariant,
                                   fontSize: 12,
                                 ),
@@ -288,14 +326,14 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                     children: [
                                       Text(
                                         'Estimated Asset Credit:',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 12,
                                         ),
                                       ),
                                       Text(
                                         '${estimatedCrypto.toStringAsFixed(6)} $_selectedAssetKey',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: AppTheme.success(context),
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
@@ -309,14 +347,14 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                     children: [
                                       Text(
                                         'Settlement Rate:',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 11,
                                         ),
                                       ),
                                       Text(
                                         '₦${buyRate.toStringAsFixed(2)} / $_selectedAssetKey',
-                                        style: GoogleFonts.spaceGrotesk(
+                                        style: TextStyle(
                                           color: theme.colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 11,
@@ -357,7 +395,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                               : const Icon(PhosphorIcons.creditCardFill, size: 20),
                           label: Text(
                             _isSubmitting ? 'INITIALIZING...' : 'PROCEED TO CHECKOUT',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                               letterSpacing: 1,
