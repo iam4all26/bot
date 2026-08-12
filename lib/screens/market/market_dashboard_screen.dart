@@ -328,20 +328,27 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                                     Container(
                                       width: 44,
                                       height: 44,
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: assetColor.withOpacity(0.12),
                                         shape: BoxShape.circle,
                                         border: Border.all(color: assetColor.withOpacity(0.2)),
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          symbol.substring(0, 1).toUpperCase(),
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: assetColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 18,
-                                          ),
-                                        ),
+                                      child: Image.network(
+                                        'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Center(
+                                            child: Text(
+                                              symbol.substring(0, 1).toUpperCase(),
+                                              style: GoogleFonts.spaceGrotesk(
+                                                color: assetColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ),
                                     const SizedBox(width: 14),
