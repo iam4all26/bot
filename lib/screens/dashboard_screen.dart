@@ -580,7 +580,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             width: 48,
             height: 48,
             decoration: BoxDecoration(
@@ -595,10 +596,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
               border: Border.all(color: theme.colorScheme.surface, width: 4),
             ),
-            child: Icon(
-              _isMarketMode ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
-              color: Colors.white, 
-              size: 22
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => ScaleTransition(
+                scale: animation,
+                child: FadeTransition(opacity: animation, child: child),
+              ),
+              child: Icon(
+                _isMarketMode ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
+                key: ValueKey<bool>(_isMarketMode),
+                color: Colors.white, 
+                size: 22
+              ),
             ),
           ),
         ],
@@ -654,9 +663,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         body: AnimatedCryptoBackground(
           child: SafeArea(
             bottom: false, 
-            child: _isMarketMode 
-                ? IndexedStack(index: _marketTabIndex, children: marketPages)
-                : IndexedStack(index: _botTabIndex, children: botPages),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.0, 0.05),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: _isMarketMode 
+                  ? IndexedStack(key: const ValueKey('market_mode'), index: _marketTabIndex, children: marketPages)
+                  : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
+            ),
           ),
         ),
         bottomNavigationBar: BottomAppBar(
@@ -720,7 +746,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               InkWell(
-                onTap: () => setState(() => _botTabIndex = isAdmin ? 3 : 2),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 borderRadius: BorderRadius.circular(12),
                 child: Row(
                   children: [
