@@ -55,9 +55,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'robinhood': const Color(0xFF00C805),
   };
   
-  Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
+  Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'today_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
-  List<dynamic> _closedPositions = [];
   Timer? _pollingTimer;
   final Set<int> _closingIds = {};
 
@@ -140,7 +139,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }).toList();
           
           _stats['open_count'] = _openPositions.length;
-          _closedPositions = responses[1]['closed_positions'] ?? [];
         }
 
         if (responses[2]['status'] == 'success') _wallets['solana'] = responses[2]['data']['has_wallet'] == true ? responses[2]['data']['public_address'] : '-';
@@ -735,16 +733,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final isAdmin = context.read<ApiService>().role == 'admin';
 
-    double dailyPnl = 0.0;
-    final now = DateTime.now();
-    for (var p in _closedPositions) {
-      try {
-        DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
-        if (now.difference(dt).inDays == 0 && now.day == dt.day) {
-          dailyPnl += double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
-        }
-      } catch (_) {}
-    }
+    final double dailyPnl = double.tryParse(_stats['today_pnl']?.toString() ?? '0') ?? 0.0;
     final bool isProfit = dailyPnl >= 0;
 
     return RefreshIndicator(
