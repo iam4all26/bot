@@ -13,7 +13,6 @@ import '../widgets/pnl_share_dialog.dart';
 import 'pnl_calendar_screen.dart';
 
 enum ClosedFilterType { all, profit, loss, copy, manual }
-enum DateRangeFilter { allTime, today, last7Days, last30Days }
 enum TradeEnvironment { all, real, paper }
 
 class HistoryScreen extends StatefulWidget {
@@ -25,13 +24,17 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   List<dynamic> _closedPositions = [];
+  bool _hasMore = false;
+  int _totalCount = 0;
   Timer? _pollingTimer;
+  Timer? _searchDebounce;
 
   List<Map<String, dynamic>> _flattenedHistory = [];
   Map<String, double> _winRates = {};
   final Set<int> _hidingIds = {};
-  
+
   int _statsToday = 0, _statsWeek = 0, _statsMonth = 0, _statsAll = 0;
   double _profToday = 0, _profWeek = 0, _profMonth = 0, _profAll = 0;
   double _lossToday = 0, _lossWeek = 0, _lossMonth = 0, _lossAll = 0;
@@ -39,8 +42,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
   String _closedSearchQuery = '';
   ClosedFilterType _selectedClosedType = ClosedFilterType.all;
-  String? _selectedClosedBot; 
+  String? _selectedClosedBot;
   String _selectedChainFilter = 'All Chains';
+
+  static const int _pageSize = 40;
 
   static final Map<String, Color> _chainColors = {
     'solana': AppTheme.kainuwaPurple,
@@ -51,26 +56,110 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPositions();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchPositions(silent: true));
+    _refetchAll();
+    // Closed trades don't move like open ones do — this just catches newly
+    // closed trades while the screen is open. Far lighter than before:
+    // paginated + trimmed payload, and only every 20s instead of every 5s.
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refetchAll(silent: true));
   }
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _fetchPositions({bool silent = false}) async {
-    if (!silent && mounted) setState(() => _isLoading = true);
-    final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
+  Map<String, String> _currentFilterParams() {
+    return {
+      'search': _closedSearchQuery,
+      'type': _selectedClosedType.name,
+      'bot': _selectedClosedBot ?? 'all',
+      'chain': _selectedChainFilter,
+      'env': _selectedEnv.name,
+    };
+  }
+
+  String _buildQuery(Map<String, String> params) {
+    return params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+  }
+
+  Future<void> _fetchHistoryPage({bool reset = true, bool silent = false}) async {
+    if (reset && !silent && mounted) setState(() => _isLoading = true);
+    if (!reset) setState(() => _isLoadingMore = true);
+
+    final offset = reset ? 0 : _closedPositions.length;
+    final limit = reset ? _pageSize : _pageSize;
+    final params = _currentFilterParams()
+      ..addAll({'offset': '$offset', 'limit': '$limit'});
+
+    final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch_history&${_buildQuery(params)}');
+
     if (mounted) {
       if (res['status'] == 'success') {
-        _closedPositions = res['closed_positions'] ?? [];
-        _processData(); 
+        final List<dynamic> rows = res['data'] ?? [];
+        setState(() {
+          if (reset) {
+            _closedPositions = rows;
+          } else {
+            _closedPositions = [..._closedPositions, ...rows];
+          }
+          _hasMore = res['has_more'] == true;
+          _totalCount = (res['total_count'] as num?)?.toInt() ?? _closedPositions.length;
+        });
+        _processData();
       }
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
     }
+  }
+
+  Future<void> _fetchHistoryStats() async {
+    final params = _currentFilterParams();
+    final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch_history_stats&${_buildQuery(params)}');
+    if (mounted && res['status'] == 'success') {
+      final periods = res['periods'] ?? {};
+      setState(() {
+        _statsToday = (periods['today']?['count'] as num?)?.toInt() ?? 0;
+        _profToday = (periods['today']?['profit'] as num?)?.toDouble() ?? 0;
+        _lossToday = (periods['today']?['loss'] as num?)?.toDouble() ?? 0;
+
+        _statsWeek = (periods['week']?['count'] as num?)?.toInt() ?? 0;
+        _profWeek = (periods['week']?['profit'] as num?)?.toDouble() ?? 0;
+        _lossWeek = (periods['week']?['loss'] as num?)?.toDouble() ?? 0;
+
+        _statsMonth = (periods['month']?['count'] as num?)?.toInt() ?? 0;
+        _profMonth = (periods['month']?['profit'] as num?)?.toDouble() ?? 0;
+        _lossMonth = (periods['month']?['loss'] as num?)?.toDouble() ?? 0;
+
+        _statsAll = (periods['all']?['count'] as num?)?.toInt() ?? 0;
+        _profAll = (periods['all']?['profit'] as num?)?.toDouble() ?? 0;
+        _lossAll = (periods['all']?['loss'] as num?)?.toDouble() ?? 0;
+
+        _winRates = Map<String, double>.from(
+          (res['bot_win_rates'] ?? {}).map((k, v) => MapEntry(k.toString(), (v as num).toDouble())),
+        );
+      });
+    }
+  }
+
+  Future<void> _refetchAll({bool silent = false}) async {
+    await Future.wait([
+      _fetchHistoryPage(reset: true, silent: silent),
+      _fetchHistoryStats(),
+    ]);
+  }
+
+  void _onFilterChanged() {
+    _refetchAll();
+  }
+
+  void _onSearchChanged(String val) {
+    _closedSearchQuery = val;
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () => _refetchAll());
   }
 
   Future<void> _hidePosition(dynamic p) async {
@@ -85,102 +174,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (res['status'] != 'success') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to hide', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
         setState(() => _hidingIds.remove(pId));
+        return;
       }
-      _fetchPositions(silent: true);
+      // No need to hit the network again for this — just drop it locally.
+      setState(() {
+        _closedPositions.removeWhere((item) => (int.tryParse(item['id'].toString()) ?? 0) == pId);
+        _totalCount = _totalCount > 0 ? _totalCount - 1 : 0;
+        _hidingIds.remove(pId);
+      });
+      _processData();
     }
   }
 
+  // Groups the currently-loaded page(s) by month for display. Filtering and
+  // stats are already done server-side (see _fetchHistoryPage / _fetchHistoryStats) —
+  // this only handles presentation grouping.
   void _processData() {
-    final isAdmin = context.read<ApiService>().role == 'admin';
-    final now = DateTime.now();
-
-    Map<String, int> totals = {};
-    Map<String, int> wins = {};
-    for (var p in _closedPositions) {
-      String name = p['display_name'] ?? 'Manual';
-      if (isAdmin && name != 'Manual') name = name.toUpperCase();
-
-      final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
-      final isWin = pnl > 0 || p['close_reason'] == 'TP_HIT';
-
-      totals[name] = (totals[name] ?? 0) + 1;
-      if (isWin) wins[name] = (wins[name] ?? 0) + 1;
-    }
-    
-    _winRates.clear();
-    totals.forEach((k, v) => _winRates[k] = (wins[k] ?? 0) / v * 100);
-
-    _statsToday = _statsWeek = _statsMonth = _statsAll = 0;
-    _profToday = _profWeek = _profMonth = _profAll = 0;
-    _lossToday = _lossWeek = _lossMonth = _lossAll = 0;
     Map<String, List<dynamic>> grouped = {};
-
     for (var p in _closedPositions) {
-      final isReal = p['is_real'] == 1 || p['is_real'] == '1';
-      if (_selectedEnv == TradeEnvironment.real && !isReal) continue;
-      if (_selectedEnv == TradeEnvironment.paper && isReal) continue;
-
-      double pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
-      bool isToday = false, isWeek = false, isMonth = false;
-      
-      try {
-        DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
-        int days = now.difference(dt).inDays;
-        isToday = (days == 0 && now.day == dt.day);
-        isWeek = days < 7;
-        isMonth = days < 30;
-      } catch (_) {}
-
-      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual';
-      bool passSearch = true;
-      if (_closedSearchQuery.isNotEmpty) {
-        final query = _closedSearchQuery.toLowerCase();
-        final addr = (p['token_address'] ?? '').toString().toLowerCase();
-        final label = (p['wallet_label'] ?? '').toString().toLowerCase();
-        if (!addr.contains(query) && !label.contains(query)) passSearch = false;
-      }
-
-      bool passType = true;
-      if (_selectedClosedType == ClosedFilterType.profit && pnl <= 0) passType = false;
-      if (_selectedClosedType == ClosedFilterType.loss && pnl >= 0) passType = false;
-      if (_selectedClosedType == ClosedFilterType.copy && !isCopy) passType = false;
-      if (_selectedClosedType == ClosedFilterType.manual && isCopy) passType = false;
-
-      bool passBot = true;
-      if (_selectedClosedBot != null && _selectedClosedBot != 'All Bots') {
-        String rawDisplay = p['display_name'] ?? 'Manual';
-        if (isAdmin && rawDisplay != 'Manual') rawDisplay = rawDisplay.toUpperCase();
-        if (rawDisplay != _selectedClosedBot) passBot = false;
-      }
-
-      bool passChain = true;
-      if (_selectedChainFilter != 'All Chains') {
-        String pChain = (p['chain'] ?? 'solana').toString().toLowerCase();
-        String fChain = _selectedChainFilter.toLowerCase();
-        if (pChain != fChain) passChain = false;
-      }
-
-      if (passSearch && passType && passBot && passChain) {
-        _statsAll++;
-        if (isToday) _statsToday++;
-        if (isWeek) _statsWeek++;
-        if (isMonth) _statsMonth++;
-
-        if (pnl > 0) {
-          _profAll += pnl;
-          if (isToday) _profToday += pnl;
-          if (isWeek) _profWeek += pnl;
-          if (isMonth) _profMonth += pnl;
-        } else if (pnl < 0) {
-          _lossAll += pnl;
-          if (isToday) _lossToday += pnl;
-          if (isWeek) _lossWeek += pnl;
-          if (isMonth) _lossMonth += pnl;
-        }
-
-        String monthKey = _formatMonthYear(p['closed_at']);
-        grouped.putIfAbsent(monthKey, () => []).add(p);
-      }
+      String monthKey = _formatMonthYear(p['closed_at']);
+      grouped.putIfAbsent(monthKey, () => []).add(p);
     }
 
     _flattenedHistory.clear();
@@ -216,7 +229,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final period = dt.hour >= 12 ? 'PM' : 'AM';
       final min = dt.minute.toString().padLeft(2, '0');
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '$hour12:$min $period, ${months[dt.month - 1]} ${dt.day}';
+      return '$hour12:$min $period, ${months[dt.month - 1]}, ${dt.day}';
     } catch (_) { return utcString; }
   }
 
@@ -256,8 +269,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          _selectedEnv = env;
-          _processData();
+          setState(() => _selectedEnv = env);
+          _onFilterChanged();
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -340,15 +353,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final currency = context.watch<CurrencyProvider>();
     final isAdmin = context.read<ApiService>().role == 'admin';
 
-    final Set<String> uniqueBots = {'All Bots'};
-    for (var p in _closedPositions) {
-      final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
-      if (isCopy) {
-         String name = p['display_name'] ?? 'Bot';
-         if (isAdmin && name != 'Manual') name = name.toUpperCase();
-         uniqueBots.add(name);
-      }
-    }
+    // Built from server-computed win rates (global, always complete) instead
+    // of scanning whatever page happens to be loaded on the phone.
+    final Set<String> uniqueBots = {'All Bots', ..._winRates.keys};
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -377,7 +384,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Expanded(
               child: _isLoading && _flattenedHistory.isEmpty
                 ? Center(child: CircularProgressIndicator(color: theme.primaryColor)) 
-                : CustomScrollView(
+                : RefreshIndicator(
+                    onRefresh: () => _refetchAll(),
+                    color: theme.primaryColor,
+                    child: CustomScrollView(
                     slivers: [
                       SliverToBoxAdapter(
                         child: Padding(
@@ -412,10 +422,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                                     ),
-                                    onChanged: (val) {
-                                      _closedSearchQuery = val;
-                                      _processData();
-                                    },
+                                    onChanged: _onSearchChanged,
                                   ),
                                 ),
                               ),
@@ -447,8 +454,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                                   icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 14),
                                                   items: uniqueBots.map((bot) => DropdownMenuItem(value: bot, child: Text(bot, style: GoogleFonts.spaceGrotesk(), overflow: TextOverflow.ellipsis))).toList(),
                                                   onChanged: (val) {
-                                                    _selectedClosedBot = (val == 'All Bots') ? null : val;
-                                                    _processData();
+                                                    setState(() => _selectedClosedBot = (val == 'All Bots') ? null : val);
+                                                    _onFilterChanged();
                                                   },
                                                 ),
                                               ),
@@ -480,8 +487,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                                   icon: Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 14),
                                                   items: ['All Chains', 'Solana', 'BSC', 'Robinhood'].map((c) => DropdownMenuItem(value: c, child: Text(c, style: GoogleFonts.spaceGrotesk(), overflow: TextOverflow.ellipsis))).toList(),
                                                   onChanged: (val) {
-                                                    _selectedChainFilter = val ?? 'All Chains';
-                                                    _processData();
+                                                    setState(() => _selectedChainFilter = val ?? 'All Chains');
+                                                    _onFilterChanged();
                                                   },
                                                 ),
                                               ),
@@ -500,11 +507,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: Row(
                                   children: [
-                                    _buildFilterChip('All', _selectedClosedType == ClosedFilterType.all, () { _selectedClosedType = ClosedFilterType.all; _processData(); }, theme: theme), const SizedBox(width: 8),
-                                    _buildFilterChip('Profits', _selectedClosedType == ClosedFilterType.profit, () { _selectedClosedType = ClosedFilterType.profit; _processData(); }, color: AppTheme.success(context), theme: theme), const SizedBox(width: 8),
-                                    _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () { _selectedClosedType = ClosedFilterType.loss; _processData(); }, color: AppTheme.danger(context), theme: theme), const SizedBox(width: 8),
-                                    _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () { _selectedClosedType = ClosedFilterType.copy; _processData(); }, color: AppTheme.info(context), theme: theme), const SizedBox(width: 8),
-                                    _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () { _selectedClosedType = ClosedFilterType.manual; _processData(); }, color: const Color(0xFF9333EA), theme: theme),
+                                    _buildFilterChip('All', _selectedClosedType == ClosedFilterType.all, () { setState(() => _selectedClosedType = ClosedFilterType.all); _onFilterChanged(); }, theme: theme), const SizedBox(width: 8),
+                                    _buildFilterChip('Profits', _selectedClosedType == ClosedFilterType.profit, () { setState(() => _selectedClosedType = ClosedFilterType.profit); _onFilterChanged(); }, color: AppTheme.success(context), theme: theme), const SizedBox(width: 8),
+                                    _buildFilterChip('Losses', _selectedClosedType == ClosedFilterType.loss, () { setState(() => _selectedClosedType = ClosedFilterType.loss); _onFilterChanged(); }, color: AppTheme.danger(context), theme: theme), const SizedBox(width: 8),
+                                    _buildFilterChip('Copy', _selectedClosedType == ClosedFilterType.copy, () { setState(() => _selectedClosedType = ClosedFilterType.copy); _onFilterChanged(); }, color: AppTheme.info(context), theme: theme), const SizedBox(width: 8),
+                                    _buildFilterChip('Manual', _selectedClosedType == ClosedFilterType.manual, () { setState(() => _selectedClosedType = ClosedFilterType.manual); _onFilterChanged(); }, color: const Color(0xFF9333EA), theme: theme),
                                   ],
                                 ),
                               ),
@@ -770,12 +777,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           ),
                                         ),
                                       ),
-                                    );
+                              );
                             },
                             childCount: _flattenedHistory.length,
                           ),
                         ),
+
+                      if (_hasMore)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                            child: Center(
+                              child: _isLoadingMore
+                                  ? SizedBox(height: 44, child: Center(child: CircularProgressIndicator(color: theme.primaryColor, strokeWidth: 2)))
+                                  : OutlinedButton(
+                                      onPressed: () => _fetchHistoryPage(reset: false),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        side: BorderSide(color: theme.colorScheme.outlineVariant),
+                                      ),
+                                      child: Text(
+                                        'Load older trades (${_closedPositions.length} of $_totalCount)',
+                                        style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
                     ],
+                  ),
                   ),
             ),
           ],
