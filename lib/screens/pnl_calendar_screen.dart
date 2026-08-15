@@ -19,20 +19,25 @@ class PnlCalendarScreen extends StatefulWidget {
 
 class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
   bool _isLoading = true;
-  List<dynamic> _allClosedPositions = [];
+  Map<int, double> _dailyPnl = {};
   DateTime _currentMonth = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _fetchPositions();
+    _fetchMonth();
   }
 
-  Future<void> _fetchPositions() async {
-    final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
+  Future<void> _fetchMonth() async {
+    setState(() => _isLoading = true);
+    final res = await context.read<ApiService>().getEndpoint(
+        'positions.php?action=fetch_calendar&month=${_currentMonth.month}&year=${_currentMonth.year}');
     if (mounted) {
       if (res['status'] == 'success') {
-        _allClosedPositions = res['closed_positions'] ?? [];
+        final Map<String, dynamic> raw = Map<String, dynamic>.from(res['data'] ?? {});
+        _dailyPnl = raw.map((day, pnl) => MapEntry(int.parse(day), (pnl as num).toDouble()));
+      } else {
+        _dailyPnl = {};
       }
       setState(() => _isLoading = false);
     }
@@ -42,20 +47,7 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + offset, 1);
     });
-  }
-
-  Map<int, double> _calculateDailyPnl() {
-    Map<int, double> dailyMap = {};
-    for (var p in _allClosedPositions) {
-      try {
-        DateTime dt = DateTime.parse(p['closed_at'].toString().replaceAll(' ', 'T') + 'Z').toLocal();
-        if (dt.year == _currentMonth.year && dt.month == _currentMonth.month) {
-          double pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
-          dailyMap[dt.day] = (dailyMap[dt.day] ?? 0.0) + pnl;
-        }
-      } catch (_) {}
-    }
-    return dailyMap;
+    _fetchMonth();
   }
 
   void _shareStats(double total, int winDays, double winAmt, int lossDays, double lossAmt, CurrencyProvider currency) {
@@ -76,7 +68,7 @@ class _PnlCalendarScreenState extends State<PnlCalendarScreen> {
     final theme = Theme.of(context);
     final currency = context.watch<CurrencyProvider>();
 
-    final dailyPnl = _calculateDailyPnl();
+    final dailyPnl = _dailyPnl;
     
     double totalPnl = 0.0;
     int winDays = 0;
