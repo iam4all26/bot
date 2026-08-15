@@ -31,7 +31,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Dual-Mode Architecture State
   bool _isMarketMode = false;
   int _botTabIndex = 0;
   int _marketTabIndex = 0;
@@ -597,11 +596,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               border: Border.all(color: theme.colorScheme.surface, width: 4),
             ),
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => ScaleTransition(
-                scale: animation,
-                child: FadeTransition(opacity: animation, child: child),
-              ),
+              duration: const Duration(milliseconds: 400),
+              transitionBuilder: (child, animation) {
+                return RotationTransition(
+                  turns: Tween<double>(begin: 0.5, end: 1.0).animate(
+                    CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+                  ),
+                  child: ScaleTransition(
+                    scale: animation,
+                    child: child,
+                  ),
+                );
+              },
               child: Icon(
                 _isMarketMode ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
                 key: ValueKey<bool>(_isMarketMode),
@@ -664,17 +670,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: SafeArea(
             bottom: false, 
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
+              duration: const Duration(milliseconds: 600),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
               transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.0, 0.05),
-                      end: Offset.zero,
-                    ).animate(animation),
+                // Determines if this child is the incoming or outgoing Market screen
+                final bool isMarketChild = child.key == const ValueKey('market_mode');
+                
+                // If it is the Market, it drops from the top (-1.0). If Bot, it comes from the bottom (1.0).
+                final offsetTween = Tween<Offset>(
+                  begin: Offset(0.0, isMarketChild ? -1.0 : 1.0),
+                  end: Offset.zero,
+                );
+
+                return SlideTransition(
+                  position: offsetTween.animate(animation),
+                  child: FadeTransition(
+                    opacity: animation,
                     child: child,
                   ),
                 );
