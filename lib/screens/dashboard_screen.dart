@@ -45,6 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late final AnimationController _revealController;
   Offset? _revealOrigin;
   bool? _pendingMarketMode;
+  bool _contentSwapped = false;
 
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -75,6 +76,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _revealController = AnimationController(vsync: this, duration: const Duration(milliseconds: 3500));
+    _revealController.addListener(() {
+      // The wipe fully covers the screen at t=0.5 (see _revealCoverage).
+      // That's the one instant nothing is visible underneath it, so it's
+      // the only safe moment to swap which mode's content is mounted —
+      // swapping any earlier/later would let both layouts peek through
+      // together, which is what caused the overlapping/merging look.
+      if (!_contentSwapped && _pendingMarketMode != null && _revealController.value >= 0.5) {
+        _contentSwapped = true;
+        setState(() => _isMarketMode = _pendingMarketMode!);
+      }
+    });
     _fetchDashboardData();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchDashboardData(silent: true));
   }
@@ -87,9 +99,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.dispose();
   }
 
-  // Captures the switch button's on-screen center, then grows a colored
-  // circle from that point to reveal the other mode underneath — the same
-  // "portal" pattern used by Binance/Coinbase Wallet's Web2⇄Web3 switch.
+  // Captures the switch button's on-screen center, then wipes a solid
+  // colored circle out from that point to fully cover the screen, swaps
+  // the real content underneath while hidden, then shrinks the same
+  // circle back down to reveal it — the same "portal" pattern used by
+  // Binance/Coinbase Wallet's Web2⇄Web3 switch. The circle never contains
+  // live page content itself, so Market's and Bot mode's very different
+  // layouts never render on screen at the same time.
   void _triggerModeSwitch() {
     final renderBox = _switchButtonKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null && renderBox.attached) {
@@ -100,14 +116,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     HapticFeedback.mediumImpact();
+    _contentSwapped = false;
     setState(() => _pendingMarketMode = !_isMarketMode);
 
     _revealController.forward(from: 0).then((_) {
       if (!mounted) return;
-      setState(() {
-        _isMarketMode = _pendingMarketMode!;
-        _pendingMarketMode = null;
-      });
+      setState(() => _pendingMarketMode = null);
       _revealController.reset();
     });
   }
@@ -128,6 +142,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return maxDist;
   }
 
+  // 0 → 1 over the first half (circle grows to fully cover the screen),
+  // then 1 → 0 over the second half (circle shrinks away again). The
+  // content swap happens right at the t=0.5 peak, when this returns 1.0
+  // and the whole screen is hidden behind the solid wipe.
+  double _revealCoverage(double t) {
+    if (t < 0.5) return Curves.easeOutCubic.transform(t / 0.5);
+    return 1 - Curves.easeInCubic.transform((t - 0.5) / 0.5);
+  }
+
   // "SWITCHING TO MARKET/BOT" badge — rises up from below and fades in
   // over the first 25% of the transition, holds center-screen through the
   // middle, then rises further and fades out over the last 25% as the
@@ -138,15 +161,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
     double opacity;
     double dy;
-    if (t < 0.25) {
-      final p = Curves.easeOutCubic.transform(t / 0.25);
+    if (t < 0.20) {
+      final p = Curves.easeOutCubic.transform(t / 0.20);
       opacity = p;
       dy = 50 * (1 - p);
-    } else if (t < 0.75) {
+    } else if (t < 0.80) {
       opacity = 1.0;
       dy = 0.0;
     } else {
-      final p = Curves.easeInCubic.transform((t - 0.75) / 0.25);
+      final p = Curves.easeInCubic.transform((t - 0.80) / 0.20);
       opacity = 1 - p;
       dy = -40 * p;
     }
@@ -810,7 +833,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             bottom: false, 
             child: Stack(
               children: [
-                // Base layer: whatever mode is currently active.
+                // Base layer: whatever mode is currently active. This
+                // flips mid-transition (see the _revealController listener
+                // in initState) at the exact instant the wipe below fully
+                // covers the screen, so the swap itself is never visible.
                 IgnorePointer(
                   ignoring: _pendingMarketMode != null,
                   child: _isMarketMode 
@@ -818,43 +844,51 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
                 ),
 
-                // Portal layer: only present mid-transition. Grows a circle
-                // from the switch button outward, revealing the target mode.
+                // Wipe layer: only present mid-transition. A solid colored
+                // circle grows from the switch button to fully cover the
+                // screen, then shrinks away again — it never contains live
+                // page content, so Market's and Bot mode's very different
+                // layouts are never rendered on screen at the same time.
                 if (_pendingMarketMode != null)
                   AnimatedBuilder(
                     animation: _revealController,
                     builder: (context, _) {
                       final size = MediaQuery.of(context).size;
                       final maxRadius = _revealMaxRadius(size);
-                      final curved = Curves.easeOutCubic.transform(_revealController.value);
-                      final radius = maxRadius * curved;
+                      final coverage = _revealCoverage(_revealController.value);
+                      final radius = maxRadius * coverage;
                       final targetColor = _pendingMarketMode! ? theme.primaryColor : AppTheme.success(context);
 
-                      return Stack(
-                        children: [
-                          ClipPath(
-                            clipper: _CircleRevealClipper(center: _revealOrigin ?? Offset(size.width / 2, size.height), radius: radius),
-                            child: _pendingMarketMode!
-                                ? IndexedStack(key: const ValueKey('market_mode_reveal'), index: _marketTabIndex, children: marketPages)
-                                : IndexedStack(key: const ValueKey('bot_mode_reveal'), index: _botTabIndex, children: botPages),
-                          ),
-                          // Glowing ring riding the edge of the expanding circle.
-                          IgnorePointer(
-                            child: CustomPaint(
+                      return IgnorePointer(
+                        child: Stack(
+                          children: [
+                            ClipPath(
+                              clipper: _CircleRevealClipper(center: _revealOrigin ?? Offset(size.width / 2, size.height), radius: radius),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [targetColor.withOpacity(0.92), theme.scaffoldBackgroundColor],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Glowing ring riding the edge of the wipe circle.
+                            CustomPaint(
                               size: size,
                               painter: _RevealRingPainter(
                                 center: _revealOrigin ?? Offset(size.width / 2, size.height),
                                 radius: radius,
                                 color: targetColor,
-                                opacity: (1 - curved).clamp(0.0, 1.0),
+                                opacity: 1.0,
                               ),
                             ),
-                          ),
-                          // "Switching to X" announcement: rises in from below,
-                          // holds center-screen, then rises out and fades as
-                          // the portal finishes covering the screen.
-                          _buildModeAnnouncement(_pendingMarketMode!, targetColor, theme, size),
-                        ],
+                            // "Switching to X" announcement: rises in, holds
+                            // through the full-cover midpoint, rises out.
+                            _buildModeAnnouncement(_pendingMarketMode!, targetColor, theme, size),
+                          ],
+                        ),
                       );
                     },
                   ),
