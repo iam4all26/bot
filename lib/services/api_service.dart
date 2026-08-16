@@ -134,6 +134,10 @@ class ApiService extends ChangeNotifier {
     });
   }
 
+  Future<Map<String, dynamic>> checkTransactionStatus(String reference) async {
+    return getEndpoint('market.php?action=check_transaction_status&reference=$reference');
+  }
+
   Future<Map<String, dynamic>> getNigerianBanks() async {
     return getEndpoint('market.php?action=get_banks');
   }
