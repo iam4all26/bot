@@ -257,7 +257,7 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '≈ ${currency.format(_totalPortfolioNaira / (currency.isNaira ? 1 : _usdtSellRate))}',
+                          '≈ ${currency.format(_totalPortfolioUsdt)}',
                           style: GoogleFonts.spaceGrotesk(
                             color: AppTheme.success(context),
                             fontSize: 15,
