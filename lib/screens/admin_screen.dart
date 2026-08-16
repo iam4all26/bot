@@ -10,33 +10,35 @@ import '../widgets/broadcast_dialog.dart';
 import '../widgets/tracked_wallets_tab.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  final ValueNotifier<int> viewIndexNotifier;
+  const AdminScreen({super.key, required this.viewIndexNotifier});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  int _activeView = 0; // 0: Grid Dashboard, 1: Users, 2: Engine, 3: Wallets, 4: Exchange Rate
+  // Back-navigation for this screen is handled by DashboardScreen's single
+  // PopScope (which reads/resets widget.viewIndexNotifier) — see the note
+  // in dashboard_screen.dart. AdminScreen used to have its own PopScope
+  // here too, but since IndexedStack keeps every tab mounted at once, both
+  // PopScopes fired on a single back-press: this one correctly stepped back
+  // to the grid, but Dashboard's ALSO fired and reset the bottom-nav tab to
+  // Home — so one back-press jumped two levels instead of one. Only
+  // Dashboard's PopScope should exist now.
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PopScope(
-      canPop: _activeView == 0,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (_activeView != 0) {
-          setState(() => _activeView = 0);
-        }
-      },
-      child: _buildCurrentView(theme),
+    return ValueListenableBuilder<int>(
+      valueListenable: widget.viewIndexNotifier,
+      builder: (context, activeView, _) => _buildCurrentView(theme, activeView),
     );
   }
 
-  Widget _buildCurrentView(ThemeData theme) {
-    if (_activeView == 1) {
+  Widget _buildCurrentView(ThemeData theme, int activeView) {
+    if (activeView == 1) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: _buildSubAppBar('USER MANAGEMENT', theme),
@@ -44,7 +46,7 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_activeView == 2) {
+    if (activeView == 2) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: _buildSubAppBar('BOT ENGINE CONTROLS', theme),
@@ -52,7 +54,7 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_activeView == 3) {
+    if (activeView == 3) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: _buildSubAppBar('TRACKED WALLETS & SHARKS', theme),
@@ -60,11 +62,19 @@ class _AdminScreenState extends State<AdminScreen> {
       );
     }
 
-    if (_activeView == 4) {
+    if (activeView == 4) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: _buildSubAppBar('EXCHANGE RATE CONTROL', theme),
         body: const ExchangeRateTab(),
+      );
+    }
+
+    if (activeView == 5) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: _buildSubAppBar('MARKET SETTINGS', theme),
+        body: const MarketSettingsTab(),
       );
     }
 
@@ -89,7 +99,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 subtitle: 'Quotas, Access & Limits',
                 icon: PhosphorIcons.usersFill,
                 color: theme.primaryColor,
-                onTap: () => setState(() => _activeView = 1),
+                onTap: () => widget.viewIndexNotifier.value = 1,
                 theme: theme,
               ),
               _buildControlTile(
@@ -97,7 +107,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 subtitle: 'Chains, Paper & Live',
                 icon: PhosphorIcons.gearSixFill,
                 color: const Color(0xFFC026D3),
-                onTap: () => setState(() => _activeView = 2),
+                onTap: () => widget.viewIndexNotifier.value = 2,
                 theme: theme,
               ),
               _buildControlTile(
@@ -105,7 +115,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 subtitle: 'Wallets & Webhooks',
                 icon: PhosphorIcons.robotFill,
                 color: AppTheme.info(context),
-                onTap: () => setState(() => _activeView = 3),
+                onTap: () => widget.viewIndexNotifier.value = 3,
                 theme: theme,
               ),
               _buildControlTile(
@@ -113,7 +123,15 @@ class _AdminScreenState extends State<AdminScreen> {
                 subtitle: 'USD / NGN Currency Rate',
                 icon: PhosphorIcons.currencyCircleDollarFill,
                 color: AppTheme.success(context),
-                onTap: () => setState(() => _activeView = 4),
+                onTap: () => widget.viewIndexNotifier.value = 4,
+                theme: theme,
+              ),
+              _buildControlTile(
+                title: 'Market Settings',
+                subtitle: 'Rates, Fees & Providers',
+                icon: PhosphorIcons.storefrontFill,
+                color: const Color(0xFF7351FF),
+                onTap: () => widget.viewIndexNotifier.value = 5,
                 theme: theme,
               ),
               _buildControlTile(
@@ -142,7 +160,7 @@ class _AdminScreenState extends State<AdminScreen> {
       elevation: 0,
       leading: IconButton(
         icon: Icon(PhosphorIcons.arrowLeftBold, color: theme.colorScheme.onSurface),
-        onPressed: () => setState(() => _activeView = 0),
+        onPressed: () => widget.viewIndexNotifier.value = 0,
       ),
       title: Text(title, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)),
     );
