@@ -8,6 +8,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/bot_engine_tab.dart';
 import '../widgets/broadcast_dialog.dart';
 import '../widgets/tracked_wallets_tab.dart';
+import '../widgets/market_settings_tab.dart';
 
 class AdminScreen extends StatefulWidget {
   final ValueNotifier<int> viewIndexNotifier;
