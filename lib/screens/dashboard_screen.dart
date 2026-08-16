@@ -34,6 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isMarketMode = false;
   int _botTabIndex = 0;
   int _marketTabIndex = 0;
+  final ValueNotifier<int> _adminViewIndex = ValueNotifier<int>(0);
 
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -70,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _adminViewIndex.dispose();
     super.dispose();
   }
 
@@ -631,7 +633,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _buildPremiumHome(theme, canTrade),
       const PositionsScreen(),
       const CopyBotsScreen(),
-      isAdmin ? const AdminScreen() : const SettingsScreen(),
+      isAdmin ? AdminScreen(viewIndexNotifier: _adminViewIndex) : const SettingsScreen(),
     ];
 
     final List<Widget> marketPages = [
@@ -653,6 +655,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
           return;
         } else {
+          if (isAdmin && _botTabIndex == 3 && _adminViewIndex.value != 0) {
+            _adminViewIndex.value = 0;
+            return;
+          }
           if (_botTabIndex != 0) {
             setState(() => _botTabIndex = 0);
             return;
