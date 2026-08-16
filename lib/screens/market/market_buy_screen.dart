@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
@@ -7,6 +9,39 @@ import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
 import 'market_checkout_webview_screen.dart';
+
+// Live-formats a numeric field with thousands separators as the user
+// types (28000 -> 28,000). Cursor always lands at the end after a
+// reformat — the standard, low-risk approach banking/finance apps use for
+// amount fields, since people type/backspace from the end almost always.
+class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+
+    final raw = newValue.text.replaceAll(',', '');
+    final parts = raw.split('.');
+    String integerPart = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+    final String decimalPart = parts.length > 1 ? '.${parts[1].replaceAll(RegExp(r'[^0-9]'), '')}' : (raw.endsWith('.') ? '.' : '');
+
+    integerPart = integerPart.replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    if (integerPart.isEmpty) integerPart = '0';
+
+    final buffer = StringBuffer();
+    final reversedDigits = integerPart.split('').reversed.toList();
+    for (int i = 0; i < reversedDigits.length; i++) {
+      if (i != 0 && i % 3 == 0) buffer.write(',');
+      buffer.write(reversedDigits[i]);
+    }
+    final formattedInt = buffer.toString().split('').reversed.join();
+    final newText = formattedInt + decimalPart;
+
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
+}
 
 class MarketBuyScreen extends StatefulWidget {
   const MarketBuyScreen({super.key});
@@ -17,13 +52,20 @@ class MarketBuyScreen extends StatefulWidget {
 
 class _MarketBuyScreenState extends State<MarketBuyScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _ngnAmountController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
 
   String _selectedAssetKey = 'USDT';
   List<dynamic> _assets = [];
+
+  // false = user is typing a Naira amount. true = user is typing the
+  // asset's own amount (e.g. how much USDT/SOL/BNB/ETH they want).
+  bool _inputIsCrypto = false;
+
+  static final NumberFormat _ngnFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _cryptoFormat = NumberFormat('#,##0.######');
 
   Color _getAssetColor(String symbol) {
     switch (symbol.toUpperCase()) {
@@ -43,7 +85,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
 
   @override
   void dispose() {
-    _ngnAmountController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
@@ -69,10 +111,29 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
     return _assets.isNotEmpty ? _assets.first : null;
   }
 
+  double get _typedValue => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0.0;
+
+  // Whichever mode the user is in, this always resolves to the actual
+  // Naira amount that gets charged and sent to the backend.
+  double _ngnAmount(double buyRate) {
+    return _inputIsCrypto ? _typedValue * buyRate : _typedValue;
+  }
+
+  void _switchInputMode(bool toCrypto) {
+    if (_inputIsCrypto == toCrypto) return;
+    setState(() {
+      _inputIsCrypto = toCrypto;
+      _amountController.clear(); // a leftover number means something totally different in the other mode — don't carry it over
+    });
+  }
+
   Future<void> _handleBuyCheckout() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final ngnAmount = double.tryParse(_ngnAmountController.text.trim()) ?? 0.0;
+    final assetData = _getSelectedAssetData();
+    final buyRate = double.tryParse(assetData?['ngn_buy_rate']?.toString() ?? '0') ?? 0.0;
+    final ngnAmount = _ngnAmount(buyRate);
+
     if (ngnAmount < 500) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -175,14 +236,74 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
     }
   }
 
+  Widget _buildModeTab(String label, bool isCrypto, ThemeData theme) {
+    final isSelected = _inputIsCrypto == isCrypto;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _switchInputMode(isCrypto),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? theme.primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Stacked label-above-value layout — this is the fix for the old
+  // Row(spaceBetween) rows, where a long label sitting directly beside a
+  // long comma-formatted number had nowhere to go but overlap on
+  // narrower screens.
+  Widget _buildSummaryRow(String label, String value, {Color? valueColor, bool big = false}) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? theme.colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+              fontSize: big ? 18 : 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     final assetData = _getSelectedAssetData();
     final double buyRate = double.tryParse(assetData?['ngn_buy_rate']?.toString() ?? '0') ?? 0.0;
-    final double typedNgn = double.tryParse(_ngnAmountController.text.trim()) ?? 0.0;
-    final double estimatedCrypto = buyRate > 0 ? typedNgn / buyRate : 0.0;
+    final bool isUsdt = _selectedAssetKey == 'USDT';
+
+    final double ngnAmount = _ngnAmount(buyRate);
+    final double estimatedCrypto = buyRate > 0
+        ? (_inputIsCrypto ? _typedValue : ngnAmount / buyRate)
+        : 0.0;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -232,6 +353,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                             final String? chainName = a['chain_name'];
                             final bool isSelected = symbol == _selectedAssetKey;
                             final double rate = double.tryParse(a['ngn_buy_rate']?.toString() ?? '0') ?? 0.0;
+                            final String symbolInitial = symbol.isNotEmpty ? symbol.substring(0, 1).toUpperCase() : '?';
 
                             final Color assetColor = _getAssetColor(symbol);
 
@@ -243,11 +365,13 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                   onTap: () {
                                     setState(() {
                                       _selectedAssetKey = symbol;
+                                      _amountController.clear();
                                     });
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                                     child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         Icon(
                                           isSelected ? PhosphorIcons.checkCircleFill : PhosphorIcons.circle,
@@ -256,8 +380,8 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                         ),
                                         const SizedBox(width: 14),
                                         Container(
-                                          width: 32,
-                                          height: 32,
+                                          width: 36,
+                                          height: 36,
                                           padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color: assetColor.withOpacity(0.12),
@@ -270,51 +394,42 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                                             errorBuilder: (context, error, stackTrace) {
                                               return Center(
                                                 child: Text(
-                                                  symbol.substring(0, 1).toUpperCase(),
-                                                  style: TextStyle(
-                                                    color: assetColor,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
+                                                  symbolInitial,
+                                                  style: TextStyle(color: assetColor, fontWeight: FontWeight.bold, fontSize: 14),
                                                 ),
                                               );
                                             },
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          symbol,
-                                          style: TextStyle(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        if (chainName != null) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: theme.colorScheme.surfaceContainerHighest,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              chainName,
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: theme.colorScheme.onSurfaceVariant,
+                                        const SizedBox(width: 14),
+                                        // Symbol + chain badge on top, rate
+                                        // underneath — each on its own line
+                                        // so nothing has to compete for
+                                        // horizontal space with the rate.
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Wrap(
+                                                crossAxisAlignment: WrapCrossAlignment.center,
+                                                spacing: 6,
+                                                runSpacing: 4,
+                                                children: [
+                                                  Text(symbol, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                                                  if (chainName != null)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)),
+                                                      child: Text(chainName, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                                                    ),
+                                                ],
                                               ),
-                                            ),
-                                          ),
-                                        ],
-                                        const Spacer(),
-                                        Text(
-                                          rate > 0 ? '₦${rate.toStringAsFixed(2)}' : 'Unavailable',
-                                          style: TextStyle(
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                rate > 0 ? '₦${_ngnFormat.format(rate)} / $symbol' : 'Rate unavailable',
+                                                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -328,94 +443,93 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                       ),
                       const SizedBox(height: 24),
 
+                      Text(
+                        'ENTER AMOUNT',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
                       GlassCard(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Mode toggle: pay with Naira, or specify the
+                            // exact amount of the asset itself.
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildModeTab('Pay with ₦ Naira', false, theme),
+                                  _buildModeTab('Enter $_selectedAssetKey Amount', true, theme),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
                             TextFormField(
-                              controller: _ngnAmountController,
+                              controller: _amountController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [_ThousandsSeparatorInputFormatter()],
                               style: TextStyle(
                                 color: theme.colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: 22,
                               ),
                               decoration: InputDecoration(
-                                labelText: 'Purchase Amount in Naira (₦)',
-                                hintText: 'e.g. 5000',
-                                labelStyle: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
+                                labelText: _inputIsCrypto ? 'Amount of $_selectedAssetKey to buy' : 'Amount in Naira',
+                                hintText: _inputIsCrypto ? (isUsdt ? 'e.g. 10' : 'e.g. 0.05') : 'e.g. 5,000',
+                                prefixText: _inputIsCrypto ? '' : '₦ ',
+                                suffixText: _inputIsCrypto ? _selectedAssetKey : '',
+                                prefixStyle: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                                suffixStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 14),
+                                labelStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
                                 filled: true,
                                 fillColor: theme.colorScheme.surfaceContainerHighest,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide.none,
                                 ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                               ),
                               onChanged: (_) => setState(() {}),
                               validator: (val) {
-                                final amt = double.tryParse(val?.trim() ?? '');
-                                if (amt == null || amt < 500) {
-                                  return 'Minimum purchase amount is ₦500';
+                                if (_ngnAmount(buyRate) < 500) {
+                                  return 'Minimum purchase is ₦500 worth';
                                 }
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 20),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Estimated Asset Credit:',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${estimatedCrypto.toStringAsFixed(6)} $_selectedAssetKey',
-                                        style: TextStyle(
-                                          color: AppTheme.success(context),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Settlement Rate:',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      Text(
-                                        '₦${buyRate.toStringAsFixed(2)} / $_selectedAssetKey',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.onSurface,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                            const SizedBox(height: 24),
+                            Container(height: 1, color: theme.colorScheme.outlineVariant),
+                            const SizedBox(height: 4),
+
+                            // "You pay" / "You receive" — always shown
+                            // together regardless of which mode you're
+                            // typing in, so there's never ambiguity about
+                            // what the number you typed actually buys.
+                            _buildSummaryRow(
+                              'YOU PAY',
+                              '₦${_ngnFormat.format(ngnAmount)}',
+                            ),
+                            _buildSummaryRow(
+                              'YOU RECEIVE (ESTIMATED)',
+                              '${_cryptoFormat.format(estimatedCrypto)} $_selectedAssetKey',
+                              valueColor: AppTheme.success(context),
+                              big: true,
+                            ),
+                            _buildSummaryRow(
+                              'SETTLEMENT RATE',
+                              buyRate > 0 ? '₦${_ngnFormat.format(buyRate)} / $_selectedAssetKey' : 'Unavailable',
                             ),
                           ],
                         ),
