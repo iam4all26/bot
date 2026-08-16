@@ -74,7 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _revealController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _revealController = AnimationController(vsync: this, duration: const Duration(milliseconds: 3500));
     _fetchDashboardData();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchDashboardData(silent: true));
   }
@@ -126,6 +126,91 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (d > maxDist) maxDist = d;
     }
     return maxDist;
+  }
+
+  // "SWITCHING TO MARKET/BOT" badge — rises up from below and fades in
+  // over the first 25% of the transition, holds center-screen through the
+  // middle, then rises further and fades out over the last 25% as the
+  // portal finishes covering the screen. Uses _revealController's own
+  // value directly (this is built inside that controller's AnimatedBuilder).
+  Widget _buildModeAnnouncement(bool targetIsMarket, Color color, ThemeData theme, Size size) {
+    final t = _revealController.value;
+
+    double opacity;
+    double dy;
+    if (t < 0.25) {
+      final p = Curves.easeOutCubic.transform(t / 0.25);
+      opacity = p;
+      dy = 50 * (1 - p);
+    } else if (t < 0.75) {
+      opacity = 1.0;
+      dy = 0.0;
+    } else {
+      final p = Curves.easeInCubic.transform((t - 0.75) / 0.25);
+      opacity = 1 - p;
+      dy = -40 * p;
+    }
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, dy),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 30),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.45),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 92,
+                    height: 92,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color,
+                      boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 30, spreadRadius: 4)],
+                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 3),
+                    ),
+                    child: Icon(
+                      targetIsMarket ? PhosphorIcons.storefrontFill : PhosphorIcons.robotFill,
+                      color: Colors.white,
+                      size: 42,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    targetIsMarket ? 'FIAT MARKET' : 'BOT MODE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 24,
+                      letterSpacing: 2,
+                      shadows: [Shadow(color: color.withOpacity(0.8), blurRadius: 20)],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    targetIsMarket ? 'Switching to Market...' : 'Switching to Bot Mode...',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _markAsClosingOrHiding(Iterable<int> ids) {
@@ -765,6 +850,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               ),
                             ),
                           ),
+                          // "Switching to X" announcement: rises in from below,
+                          // holds center-screen, then rises out and fades as
+                          // the portal finishes covering the screen.
+                          _buildModeAnnouncement(_pendingMarketMode!, targetColor, theme, size),
                         ],
                       );
                     },
