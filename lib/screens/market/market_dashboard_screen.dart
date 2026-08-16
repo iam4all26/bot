@@ -22,6 +22,7 @@ class MarketDashboardScreen extends StatefulWidget {
 
 class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
   bool _isLoading = true;
+  String? _errorMessage;
   double _totalPortfolioNaira = 0.0;
   double _totalPortfolioUsdt = 0.0;
   double _usdtSellRate = 1600.0;
@@ -56,13 +57,23 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
       setState(() {
         _isLoading = false;
         if (res['status'] == 'success' && res['data'] != null) {
+          _errorMessage = null;
           final data = res['data'];
           _balances = data['balances'] ?? {};
           _assets = data['assets'] ?? [];
           _transactions = data['transactions'] ?? [];
           _usdtSellRate = double.tryParse(data['usdt_sell_rate']?.toString() ?? '1600') ?? 1600.0;
 
-          _calculatePortfolioTotals();
+          try {
+            _calculatePortfolioTotals();
+          } catch (e) {
+            // Don't let a portfolio-math hiccup blank the whole screen —
+            // the asset/transaction lists below still render fine on
+            // their own; just the totals card falls back to 0.
+            debugPrint('MarketDashboardScreen: portfolio total calc failed: $e');
+          }
+        } else {
+          _errorMessage = res['message']?.toString() ?? 'Could not load your market data.';
         }
       });
     }
@@ -197,6 +208,29 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
                 children: [
+                  if (_errorMessage != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.danger(context).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.danger(context).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(PhosphorIcons.warningCircleFill, color: AppTheme.danger(context), size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(_errorMessage!, style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
+                          TextButton(
+                            onPressed: () => _fetchHubData(),
+                            child: Text('RETRY', style: GoogleFonts.spaceGrotesk(color: AppTheme.danger(context), fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
                   // Portfolio Card
                   GlassCard(
                     padding: const EdgeInsets.all(24),
@@ -297,135 +331,12 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                       padding: EdgeInsets.zero,
                       child: Column(
                         children: _assets.asMap().entries.map((entry) {
-                          int idx = entry.key;
-                          var a = entry.value;
-
-                          final String symbol = a['symbol'] ?? 'USDT';
-                          final String? chain = a['chain'];
-                          final String? chainName = a['chain_name'];
-                          final bool isUsdt = chain == null || symbol == 'USDT';
-
-                          final Color assetColor = _getAssetColor(symbol);
-
-                          final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
-                          final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
-                          final double balance = isUsdt
-                              ? usdtTotal
-                              : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
-
-                          final double sellRate = double.tryParse(a['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
-                          final double nairaVal = balance * sellRate;
-                          final double usdVal = _usdtSellRate > 0 ? nairaVal / _usdtSellRate : 0.0;
-
-                          return Column(
-                            children: [
-                              if (idx > 0)
-                                Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: assetColor.withOpacity(0.12),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: assetColor.withOpacity(0.2)),
-                                      ),
-                                      child: Image.network(
-                                        'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Center(
-                                            child: Text(
-                                              symbol.substring(0, 1).toUpperCase(),
-                                              style: GoogleFonts.spaceGrotesk(
-                                                color: assetColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Text(
-                                                symbol,
-                                                style: GoogleFonts.spaceGrotesk(
-                                                  color: theme.colorScheme.onSurface,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15,
-                                                ),
-                                              ),
-                                              if (chainName != null) ...[
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: theme.colorScheme.surfaceContainerHighest,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    chainName,
-                                                    style: GoogleFonts.spaceGrotesk(
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: theme.colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            sellRate > 0
-                                                ? 'Rate: ₦${sellRate.toStringAsFixed(2)}'
-                                                : 'Rate Unavailable',
-                                            style: GoogleFonts.spaceGrotesk(
-                                              color: theme.colorScheme.onSurfaceVariant,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '\$${usdVal.toStringAsFixed(2)}',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: theme.colorScheme.onSurfaceVariant,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
+                          try {
+                            return _buildAssetRow(entry.key, entry.value, theme);
+                          } catch (e) {
+                            debugPrint('MarketDashboardScreen: skipped a malformed asset row: $e');
+                            return const SizedBox.shrink();
+                          }
                         }).toList(),
                       ),
                     ),
@@ -458,114 +369,167 @@ class _MarketDashboardScreenState extends State<MarketDashboardScreen> {
                       padding: EdgeInsets.zero,
                       child: Column(
                         children: _transactions.asMap().entries.map((entry) {
-                          int idx = entry.key;
-                          var t = entry.value;
-
-                          final String type = t['type'] ?? 'buy';
-                          final String status = t['status'] ?? 'pending';
-                          final double amount = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
-                          final String asset = t['asset'] ?? 'USDT';
-                          final double nairaVal = double.tryParse(t['naira_value']?.toString() ?? '0') ?? 0.0;
-
-                          final bool isBuy = type == 'buy';
-                          final bool isConfirmed = status == 'confirmed';
-
-                          Color statusColor = AppTheme.warning(context);
-                          if (isConfirmed) statusColor = AppTheme.success(context);
-                          if (status == 'failed') statusColor = AppTheme.danger(context);
-
-                          return Column(
-                            children: [
-                              if (idx > 0)
-                                Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: (isBuy ? AppTheme.success(context) : theme.primaryColor).withOpacity(0.12),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        isBuy ? PhosphorIcons.arrowDownLeftBold : PhosphorIcons.arrowUpRightBold,
-                                        color: isBuy ? AppTheme.success(context) : theme.primaryColor,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            isBuy ? 'Bought $asset' : 'Sent / Cashed Out',
-                                            style: GoogleFonts.spaceGrotesk(
-                                              color: theme.colorScheme.onSurface,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _formatDate(t['created_at']),
-                                            style: GoogleFonts.spaceGrotesk(
-                                              color: theme.colorScheme.onSurfaceVariant,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '${isBuy ? '+' : '-'}${amount.toStringAsFixed(4)} $asset',
-                                          style: GoogleFonts.spaceGrotesk(
-                                            color: isBuy ? AppTheme.success(context) : theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              '₦${nairaVal.toStringAsFixed(2)}',
-                                              style: GoogleFonts.spaceGrotesk(
-                                                color: theme.colorScheme.onSurfaceVariant,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              width: 6,
-                                              height: 6,
-                                              decoration: BoxDecoration(
-                                                color: statusColor,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
+                          try {
+                            return _buildTransactionRow(entry.key, entry.value, theme);
+                          } catch (e) {
+                            debugPrint('MarketDashboardScreen: skipped a malformed transaction row: $e');
+                            return const SizedBox.shrink();
+                          }
                         }).toList(),
                       ),
                     ),
                 ],
               ),
       ),
+    );
+  }
+
+  Widget _buildAssetRow(int idx, dynamic a, ThemeData theme) {
+    final String symbol = a['symbol'] ?? 'USDT';
+    final String? chain = a['chain'];
+    final String? chainName = a['chain_name'];
+    final bool isUsdt = chain == null || symbol == 'USDT';
+
+    final Color assetColor = _getAssetColor(symbol);
+
+    final Map<String, dynamic> nativeBals = _balances['native'] ?? {};
+    final double usdtTotal = double.tryParse(_balances['usdt_total']?.toString() ?? '0') ?? 0.0;
+    final double balance = isUsdt
+        ? usdtTotal
+        : (double.tryParse(nativeBals[chain]?.toString() ?? '0') ?? 0.0);
+
+    final double sellRate = double.tryParse(a['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
+    final double nairaVal = balance * sellRate;
+    final double usdVal = _usdtSellRate > 0 ? nairaVal / _usdtSellRate : 0.0;
+    final String symbolInitial = symbol.isNotEmpty ? symbol.substring(0, 1).toUpperCase() : '?';
+
+    return Column(
+      children: [
+        if (idx > 0) Divider(color: theme.colorScheme.outlineVariant, height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: assetColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: assetColor.withOpacity(0.2)),
+                ),
+                child: Image.network(
+                  'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/${symbol.toLowerCase()}.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Text(
+                        symbolInitial,
+                        style: GoogleFonts.spaceGrotesk(color: assetColor, fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(symbol, style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                        if (chainName != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6)),
+                            child: Text(chainName, style: GoogleFonts.spaceGrotesk(fontSize: 9, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sellRate > 0 ? 'Rate: ₦${sellRate.toStringAsFixed(2)}' : 'Rate Unavailable',
+                      style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('\$${usdVal.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text('${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionRow(int idx, dynamic t, ThemeData theme) {
+    final String type = t['type'] ?? 'buy';
+    final String status = t['status'] ?? 'pending';
+    final double amount = double.tryParse(t['amount']?.toString() ?? '0') ?? 0.0;
+    final String asset = t['asset'] ?? 'USDT';
+    final double nairaVal = double.tryParse(t['naira_value']?.toString() ?? '0') ?? 0.0;
+
+    final bool isBuy = type == 'buy';
+    final bool isConfirmed = status == 'confirmed';
+
+    Color statusColor = AppTheme.warning(context);
+    if (isConfirmed) statusColor = AppTheme.success(context);
+    if (status == 'failed') statusColor = AppTheme.danger(context);
+
+    return Column(
+      children: [
+        if (idx > 0) Divider(color: theme.colorScheme.outlineVariant, height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: (isBuy ? AppTheme.success(context) : theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(isBuy ? PhosphorIcons.arrowDownLeftBold : PhosphorIcons.arrowUpRightBold, color: isBuy ? AppTheme.success(context) : theme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(isBuy ? 'Bought $asset' : 'Sent / Cashed Out', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(_formatDate(t['created_at']), style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('${isBuy ? '+' : '-'}${amount.toStringAsFixed(4)} $asset', style: GoogleFonts.spaceGrotesk(color: isBuy ? AppTheme.success(context) : theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('₦${nairaVal.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 6),
+                      Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
