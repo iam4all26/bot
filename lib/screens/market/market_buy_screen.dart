@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
+import 'market_checkout_webview_screen.dart';
 
 class MarketBuyScreen extends StatefulWidget {
   const MarketBuyScreen({super.key});
@@ -94,23 +95,16 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
       setState(() => _isSubmitting = false);
       if (res['status'] == 'success' && res['data'] != null && res['data']['redirect_url'] != null) {
         final String redirectUrl = res['data']['redirect_url'];
-        final Uri url = Uri.parse(redirectUrl);
+        final String reference = res['data']['reference']?.toString() ?? '';
 
-        if (await canLaunchUrl(url)) {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Redirecting to secure gateway checkout...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              backgroundColor: AppTheme.success(context),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Could not launch payment gateway URL.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              backgroundColor: AppTheme.danger(context),
-            ),
-          );
+        final result = await Navigator.of(context).push<CheckoutExit>(
+          MaterialPageRoute(
+            builder: (_) => MarketCheckoutWebviewScreen(checkoutUrl: redirectUrl, reference: reference),
+          ),
+        );
+
+        if (result == CheckoutExit.completed && mounted) {
+          await _pollTransactionStatus(reference);
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -120,6 +114,64 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
           ),
         );
       }
+    }
+  }
+
+  // Polls the Bearer-authenticated status endpoint after the checkout
+  // WebView hands back control. The provider webhook is usually instant,
+  // but this gives it a few seconds of room before falling back to a
+  // "still confirming" message instead of leaving the user guessing.
+  Future<void> _pollTransactionStatus(String reference) async {
+    if (reference.isEmpty || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          backgroundColor: theme.colorScheme.surface,
+          content: Row(
+            children: [
+              CircularProgressIndicator(color: theme.primaryColor, strokeWidth: 2.5),
+              const SizedBox(width: 20),
+              const Expanded(child: Text('Confirming your payment...', style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+          ),
+        );
+      },
+    );
+
+    final api = context.read<ApiService>();
+    String txStatus = 'processing';
+
+    for (int attempt = 0; attempt < 6; attempt++) {
+      final res = await api.checkTransactionStatus(reference);
+      if (res['status'] == 'success' && res['data'] != null) {
+        txStatus = res['data']['tx_status']?.toString() ?? 'processing';
+        if (txStatus == 'confirmed') break;
+      }
+      if (attempt < 5) await Future.delayed(const Duration(seconds: 2));
+    }
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close the "confirming" dialog
+
+    if (txStatus == 'confirmed') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Payment confirmed — your balance has been credited.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          backgroundColor: AppTheme.success(context),
+        ),
+      );
+      Navigator.of(context).pop(); // back out to the market hub so balances refresh
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Still confirming with the payment provider. Your balance updates automatically once it settles — check your transaction history shortly.", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          backgroundColor: AppTheme.warning(context),
+        ),
+      );
     }
   }
 
