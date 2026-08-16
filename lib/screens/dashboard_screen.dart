@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -30,11 +31,20 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   bool _isMarketMode = false;
   int _botTabIndex = 0;
   int _marketTabIndex = 0;
   final ValueNotifier<int> _adminViewIndex = ValueNotifier<int>(0);
+
+  // Exchange-style "portal" mode switch: a colored circle expands from the
+  // switch button and reveals the new mode underneath, instead of a plain
+  // slide/fade. _pendingMarketMode is non-null only while the reveal is
+  // mid-animation; the real _isMarketMode flips once it completes.
+  final GlobalKey _switchButtonKey = GlobalKey();
+  late final AnimationController _revealController;
+  Offset? _revealOrigin;
+  bool? _pendingMarketMode;
 
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -64,6 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _revealController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
     _fetchDashboardData();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchDashboardData(silent: true));
   }
@@ -72,7 +83,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void dispose() {
     _pollingTimer?.cancel();
     _adminViewIndex.dispose();
+    _revealController.dispose();
     super.dispose();
+  }
+
+  // Captures the switch button's on-screen center, then grows a colored
+  // circle from that point to reveal the other mode underneath — the same
+  // "portal" pattern used by Binance/Coinbase Wallet's Web2⇄Web3 switch.
+  void _triggerModeSwitch() {
+    final renderBox = _switchButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.attached) {
+      _revealOrigin = renderBox.localToGlobal(renderBox.size.center(Offset.zero));
+    } else {
+      final size = MediaQuery.of(context).size;
+      _revealOrigin = Offset(size.width / 2, size.height - 90);
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() => _pendingMarketMode = !_isMarketMode);
+
+    _revealController.forward(from: 0).then((_) {
+      if (!mounted) return;
+      setState(() {
+        _isMarketMode = _pendingMarketMode!;
+        _pendingMarketMode = null;
+      });
+      _revealController.reset();
+    });
+  }
+
+  double _revealMaxRadius(Size screenSize) {
+    if (_revealOrigin == null) return screenSize.longestSide;
+    final corners = [
+      Offset.zero,
+      Offset(screenSize.width, 0),
+      Offset(0, screenSize.height),
+      Offset(screenSize.width, screenSize.height),
+    ];
+    double maxDist = 0;
+    for (final c in corners) {
+      final d = (c - _revealOrigin!).distance;
+      if (d > maxDist) maxDist = d;
+    }
+    return maxDist;
   }
 
   void _markAsClosingOrHiding(Iterable<int> ids) {
@@ -568,11 +621,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildActionNavItem(ThemeData theme) {
     return InkWell(
-      onTap: () {
-        setState(() {
-          _isMarketMode = !_isMarketMode;
-        });
-      },
+      onTap: _pendingMarketMode == null ? _triggerModeSwitch : null,
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       child: Column(
@@ -580,15 +629,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           AnimatedContainer(
+            key: _switchButtonKey,
             duration: const Duration(milliseconds: 300),
             width: 48,
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _isMarketMode ? theme.primaryColor : AppTheme.success(context),
+              color: (_pendingMarketMode ?? _isMarketMode) ? theme.primaryColor : AppTheme.success(context),
               boxShadow: [
                 BoxShadow(
-                  color: (_isMarketMode ? theme.primaryColor : AppTheme.success(context)).withOpacity(0.4), 
+                  color: ((_pendingMarketMode ?? _isMarketMode) ? theme.primaryColor : AppTheme.success(context)).withOpacity(0.4), 
                   blurRadius: 8, 
                   offset: const Offset(0, 2)
                 )
@@ -609,8 +659,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
               child: Icon(
-                _isMarketMode ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
-                key: ValueKey<bool>(_isMarketMode),
+                (_pendingMarketMode ?? _isMarketMode) ? PhosphorIcons.robotFill : PhosphorIcons.storefrontFill, 
+                key: ValueKey<bool>(_pendingMarketMode ?? _isMarketMode),
                 color: Colors.white, 
                 size: 22
               ),
@@ -673,31 +723,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
         body: AnimatedCryptoBackground(
           child: SafeArea(
             bottom: false, 
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                // Determines if this child is the incoming or outgoing Market screen
-                final bool isMarketChild = child.key == const ValueKey('market_mode');
-                
-                // If it is the Market, it drops from the top (-1.0). If Bot, it comes from the bottom (1.0).
-                final offsetTween = Tween<Offset>(
-                  begin: Offset(0.0, isMarketChild ? -1.0 : 1.0),
-                  end: Offset.zero,
-                );
+            child: Stack(
+              children: [
+                // Base layer: whatever mode is currently active.
+                IgnorePointer(
+                  ignoring: _pendingMarketMode != null,
+                  child: _isMarketMode 
+                      ? IndexedStack(key: const ValueKey('market_mode'), index: _marketTabIndex, children: marketPages)
+                      : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
+                ),
 
-                return SlideTransition(
-                  position: offsetTween.animate(animation),
-                  child: FadeTransition(
-                    opacity: animation,
-                    child: child,
+                // Portal layer: only present mid-transition. Grows a circle
+                // from the switch button outward, revealing the target mode.
+                if (_pendingMarketMode != null)
+                  AnimatedBuilder(
+                    animation: _revealController,
+                    builder: (context, _) {
+                      final size = MediaQuery.of(context).size;
+                      final maxRadius = _revealMaxRadius(size);
+                      final curved = Curves.easeOutCubic.transform(_revealController.value);
+                      final radius = maxRadius * curved;
+                      final targetColor = _pendingMarketMode! ? theme.primaryColor : AppTheme.success(context);
+
+                      return Stack(
+                        children: [
+                          ClipPath(
+                            clipper: _CircleRevealClipper(center: _revealOrigin ?? Offset(size.width / 2, size.height), radius: radius),
+                            child: _pendingMarketMode!
+                                ? IndexedStack(key: const ValueKey('market_mode_reveal'), index: _marketTabIndex, children: marketPages)
+                                : IndexedStack(key: const ValueKey('bot_mode_reveal'), index: _botTabIndex, children: botPages),
+                          ),
+                          // Glowing ring riding the edge of the expanding circle.
+                          IgnorePointer(
+                            child: CustomPaint(
+                              size: size,
+                              painter: _RevealRingPainter(
+                                center: _revealOrigin ?? Offset(size.width / 2, size.height),
+                                radius: radius,
+                                color: targetColor,
+                                opacity: (1 - curved).clamp(0.0, 1.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                );
-              },
-              child: _isMarketMode 
-                  ? IndexedStack(key: const ValueKey('market_mode'), index: _marketTabIndex, children: marketPages)
-                  : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
+              ],
             ),
           ),
         ),
@@ -709,7 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 64,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: _isMarketMode 
+              children: (_pendingMarketMode ?? _isMarketMode)
                   ? [
                       _buildNavItem(PhosphorIcons.squaresFour, PhosphorIcons.squaresFourFill, 'Hub', 0, theme, true),
                       _buildNavItem(PhosphorIcons.qrCode, PhosphorIcons.qrCodeFill, 'Receive', 1, theme, true),
@@ -1421,5 +1493,59 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
         ),
       ),
     );
+  }
+}
+
+// Clips content to a circle centered at [center] with the given [radius].
+// Used to grow the incoming mode's content out from the switch button.
+class _CircleRevealClipper extends CustomClipper<Path> {
+  final Offset center;
+  final double radius;
+
+  _CircleRevealClipper({required this.center, required this.radius});
+
+  @override
+  Path getClip(Size size) {
+    return Path()..addOval(Rect.fromCircle(center: center, radius: radius));
+  }
+
+  @override
+  bool shouldReclip(_CircleRevealClipper oldClipper) {
+    return oldClipper.center != center || oldClipper.radius != radius;
+  }
+}
+
+// Draws a soft glowing ring right at the edge of the expanding reveal
+// circle — the little "energy" touch that sells the portal effect, fading
+// out as the circle finishes covering the screen.
+class _RevealRingPainter extends CustomPainter {
+  final Offset center;
+  final double radius;
+  final Color color;
+  final double opacity;
+
+  _RevealRingPainter({required this.center, required this.radius, required this.color, required this.opacity});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (opacity <= 0 || radius <= 0) return;
+
+    final glowPaint = Paint()
+      ..color = color.withOpacity(0.5 * opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 18
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
+    canvas.drawCircle(center, radius, glowPaint);
+
+    final ringPaint = Paint()
+      ..color = color.withOpacity(0.9 * opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawCircle(center, radius, ringPaint);
+  }
+
+  @override
+  bool shouldRepaint(_RevealRingPainter oldDelegate) {
+    return oldDelegate.center != center || oldDelegate.radius != radius || oldDelegate.opacity != opacity;
   }
 }
