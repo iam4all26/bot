@@ -12,6 +12,7 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
 import 'solana_icon.dart';
+import 'chain_icon.dart';
 
 class PnlShareDialog extends StatefulWidget {
   final Map<String, dynamic> tradeData;
@@ -28,6 +29,18 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   
   bool _isSaving = false;
   bool _isSharing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final chain = (widget.tradeData['chain'] ?? 'solana').toString();
+    final iconUrl = ChainIcon.iconUrlFor(chain);
+    if (iconUrl != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) precacheImage(NetworkImage(iconUrl), context);
+      });
+    }
+  }
 
   Future<Uint8List?> _getReceiptBytes() async {
     try {
@@ -209,17 +222,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(color: AppTheme.kainuwaPurple.withOpacity(0.2), shape: BoxShape.circle),
-                                child: tradeChain == 'solana'
-                                    ? const SolanaIcon(size: 18, color: AppTheme.kainuwaPurple)
-                                    : SizedBox(
-                                        width: 18, height: 18,
-                                        child: Center(
-                                          child: Text(
-                                            tradeChain == 'bsc' ? 'B' : 'R',
-                                            style: GoogleFonts.spaceGrotesk(color: AppTheme.kainuwaPurple, fontWeight: FontWeight.w900, fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
+                                child: ChainIcon(chain: tradeChain, size: 18, color: AppTheme.kainuwaPurple),
                               ),
                               const SizedBox(width: 10),
                               Column(
