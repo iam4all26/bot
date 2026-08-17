@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/solana_icon.dart';
+import '../widgets/chain_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';
 import 'admin_screen.dart';
@@ -1023,9 +1024,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                               width: 14, height: 14,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(color: cColor.withOpacity(0.15), shape: BoxShape.circle),
-                              child: chain == 'solana' 
-                                  ? const SolanaIcon(size: 8, color: AppTheme.kainuwaPurple)
-                                  : Text(chain == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: cColor)),
+                              child: ChainIcon(chain: chain, size: 9, color: cColor),
                             ),
                           if (!isCopied) const SizedBox(width: 6),
                           if (isCopied) Icon(PhosphorIcons.checkCircleFill, size: 14, color: cColor),
@@ -1106,9 +1105,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 width: 28, height: 28,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(color: (_chainColors[chainId] ?? theme.primaryColor).withOpacity(0.12), shape: BoxShape.circle),
-                                child: chainId == 'solana'
-                                    ? const SolanaIcon(size: 14, color: AppTheme.kainuwaPurple)
-                                    : Text(chainId == 'bsc' ? 'B' : 'R', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _chainColors[chainId])),
+                                child: ChainIcon(chain: chainId, size: 16, color: _chainColors[chainId] ?? theme.primaryColor),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
