@@ -238,7 +238,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
               child: Form(
                 key: _formKey,
                 child: Column(

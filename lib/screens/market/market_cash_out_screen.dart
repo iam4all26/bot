@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/withdrawal_pin_modal.dart';
+import '../../widgets/bank_selector_sheet.dart';
 import 'set_pin_screen.dart';
 
 class MarketCashOutScreen extends StatefulWidget {
@@ -183,6 +184,23 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     }
   }
 
+  Future<void> _openBankSelector() async {
+    final selected = await showBankSelectorSheet(
+      context,
+      banks: _banks,
+      currentCode: _selectedBankCode,
+    );
+    if (selected == null) return;
+
+    setState(() {
+      _selectedBankCode = selected['code']?.toString();
+      _resolvedAccountName = null;
+    });
+    if (_accountNumberController.text.trim().length == 10 && _selectedBankCode != null) {
+      _resolveAccount(_accountNumberController.text.trim(), _selectedBankCode!);
+    }
+  }
+
   String _numberToWords(double amount) {
     if (amount <= 0) return '';
     final int integerPart = amount.floor();
@@ -328,7 +346,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -614,48 +632,90 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          DropdownButtonFormField<String>(
-                            value: _selectedBankCode,
-                            dropdownColor: theme.colorScheme.surface,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: 'Select Destination Bank',
-                              labelStyle: TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                              filled: true,
-                              fillColor: theme.colorScheme.surfaceContainerHighest,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                            items: _banks.map<DropdownMenuItem<String>>((b) {
-                              return DropdownMenuItem<String>(
-                                value: b['code']?.toString(),
-                                child: Text(
-                                  b['name']?.toString() ?? 'Bank',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              setState(() {
-                                _selectedBankCode = val;
-                                _resolvedAccountName = null;
-                              });
-                              if (_accountNumberController.text.trim().length == 10) {
-                                _resolveAccount(_accountNumberController.text.trim(), val!);
-                              }
-                            },
+                          FormField<String>(
+                            initialValue: _selectedBankCode,
                             validator: (val) {
-                              if (val == null || val.isEmpty) return 'Bank selection required';
+                              if (_selectedBankCode == null) return 'Bank selection required';
                               return null;
+                            },
+                            builder: (fieldState) {
+                              final selectedBank = _banks.firstWhere(
+                                (b) => b['code']?.toString() == _selectedBankCode,
+                                orElse: () => null,
+                              );
+                              final String? bankName = selectedBank?['name']?.toString();
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () async {
+                                      await _openBankSelector();
+                                      fieldState.didChange(_selectedBankCode);
+                                    },
+                                    child: InputDecorator(
+                                      decoration: InputDecoration(
+                                        labelText: 'Select Destination Bank',
+                                        labelStyle: TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontSize: 12,
+                                        ),
+                                        filled: true,
+                                        fillColor: theme.colorScheme.surfaceContainerHighest,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          borderSide: fieldState.hasError ? BorderSide(color: AppTheme.danger(context), width: 1.5) : BorderSide.none,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          if (bankName != null) ...[
+                                            Container(
+                                              width: 26,
+                                              height: 26,
+                                              decoration: BoxDecoration(
+                                                color: theme.primaryColor.withOpacity(0.14),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                bankName.substring(0, 1).toUpperCase(),
+                                                style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.w900, fontSize: 12),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                          ],
+                                          Expanded(
+                                            child: Text(
+                                              bankName ?? 'Tap to choose a bank',
+                                              style: TextStyle(
+                                                color: bankName != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Icon(PhosphorIcons.caretDownBold, color: theme.colorScheme.onSurfaceVariant, size: 16),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (fieldState.hasError)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6, left: 12),
+                                      child: Text(
+                                        fieldState.errorText!,
+                                        style: TextStyle(color: AppTheme.danger(context), fontSize: 11, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                ],
+                              );
                             },
                           ),
                           const SizedBox(height: 16),
