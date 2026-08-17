@@ -1,47 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../providers/currency_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
+import '../../utils/thousands_formatter.dart';
 import 'market_checkout_webview_screen.dart';
-
-// Live-formats a numeric field with thousands separators as the user
-// types (28000 -> 28,000). Cursor always lands at the end after a
-// reformat — the standard, low-risk approach banking/finance apps use for
-// amount fields, since people type/backspace from the end almost always.
-class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.text.isEmpty) return newValue;
-
-    final raw = newValue.text.replaceAll(',', '');
-    final parts = raw.split('.');
-    String integerPart = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
-    final String decimalPart = parts.length > 1 ? '.${parts[1].replaceAll(RegExp(r'[^0-9]'), '')}' : (raw.endsWith('.') ? '.' : '');
-
-    integerPart = integerPart.replaceFirst(RegExp(r'^0+(?=\d)'), '');
-    if (integerPart.isEmpty) integerPart = '0';
-
-    final buffer = StringBuffer();
-    final reversedDigits = integerPart.split('').reversed.toList();
-    for (int i = 0; i < reversedDigits.length; i++) {
-      if (i != 0 && i % 3 == 0) buffer.write(',');
-      buffer.write(reversedDigits[i]);
-    }
-    final formattedInt = buffer.toString().split('').reversed.join();
-    final newText = formattedInt + decimalPart;
-
-    return TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
-}
 
 class MarketBuyScreen extends StatefulWidget {
   const MarketBuyScreen({super.key});
@@ -65,6 +33,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
   bool _inputIsCrypto = false;
 
   static final NumberFormat _ngnFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _usdFormat = NumberFormat('#,##0.00');
   static final NumberFormat _cryptoFormat = NumberFormat('#,##0.######');
 
   Color _getAssetColor(String symbol) {
@@ -267,7 +236,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
   // Row(spaceBetween) rows, where a long label sitting directly beside a
   // long comma-formatted number had nowhere to go but overlap on
   // narrower screens.
-  Widget _buildSummaryRow(String label, String value, {Color? valueColor, bool big = false}) {
+  Widget _buildSummaryRow(String label, String value, {Color? valueColor, bool big = false, String? subtitle}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -287,6 +256,13 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
               fontSize: big ? 18 : 14,
             ),
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(color: (valueColor ?? theme.colorScheme.onSurfaceVariant).withOpacity(0.75), fontWeight: FontWeight.w600, fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
@@ -295,6 +271,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currency = context.watch<CurrencyProvider>();
 
     final assetData = _getSelectedAssetData();
     final double buyRate = double.tryParse(assetData?['ngn_buy_rate']?.toString() ?? '0') ?? 0.0;
@@ -304,6 +281,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
     final double estimatedCrypto = buyRate > 0
         ? (_inputIsCrypto ? _typedValue : ngnAmount / buyRate)
         : 0.0;
+    final double ngnAmountInUsd = currency.exchangeRate > 0 ? ngnAmount / currency.exchangeRate : 0.0;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -479,7 +457,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                             TextFormField(
                               controller: _amountController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [_ThousandsSeparatorInputFormatter()],
+                              inputFormatters: [ThousandsSeparatorInputFormatter()],
                               style: TextStyle(
                                 color: theme.colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
@@ -520,6 +498,7 @@ class _MarketBuyScreenState extends State<MarketBuyScreen> {
                             _buildSummaryRow(
                               'YOU PAY',
                               '₦${_ngnFormat.format(ngnAmount)}',
+                              subtitle: '≈ \$${_usdFormat.format(ngnAmountInUsd)}',
                             ),
                             _buildSummaryRow(
                               'YOU RECEIVE (ESTIMATED)',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
@@ -18,6 +19,10 @@ class _MarketReceiveScreenState extends State<MarketReceiveScreen> {
   bool _isLoading = true;
   Map<String, dynamic> _addresses = {};
   List<dynamic> _assets = [];
+
+  static final NumberFormat _crypto2dpFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _crypto4dpFormat = NumberFormat('#,##0.0000');
+  String _formatBalance(double val, bool isUsdt) => (isUsdt ? _crypto2dpFormat : _crypto4dpFormat).format(val);
   Map<String, dynamic> _balances = {};
 
   String _selectedAssetKey = 'USDT';
@@ -232,7 +237,7 @@ class _MarketReceiveScreenState extends State<MarketReceiveScreen> {
                                     ),
                                     const Spacer(),
                                     Text(
-                                      '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
+                                      '${_formatBalance(balance, isUsdt)} $symbol',
                                       style: TextStyle(
                                         color: theme.colorScheme.onSurfaceVariant,
                                         fontSize: 12,

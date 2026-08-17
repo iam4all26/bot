@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/currency_provider.dart';
@@ -9,6 +10,7 @@ import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/withdrawal_pin_modal.dart';
 import '../../widgets/bank_selector_sheet.dart';
+import '../../utils/thousands_formatter.dart';
 import 'set_pin_screen.dart';
 
 class MarketCashOutScreen extends StatefulWidget {
@@ -28,6 +30,14 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
   bool _isSubmitting = false;
   bool _isResolvingAccount = false;
   bool _hasPin = false;
+
+  static final NumberFormat _ngnFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _usdFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _crypto2dpFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _crypto4dpFormat = NumberFormat('#,##0.0000');
+  static final NumberFormat _crypto6dpFormat = NumberFormat('#,##0.######');
+
+  String _formatBalance(double val, bool isUsdt) => (isUsdt ? _crypto2dpFormat : _crypto4dpFormat).format(val);
 
   String _selectedAssetKey = 'USDT';
   String? _selectedBankCode;
@@ -116,30 +126,30 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
   }
 
   void _onCryptoInputChanged(String value) {
-    final cryptoVal = double.tryParse(value.trim()) ?? 0.0;
+    final cryptoVal = double.tryParse(value.replaceAll(',', '').trim()) ?? 0.0;
     final assetData = _getSelectedAssetData();
     final double sellRate = double.tryParse(assetData?['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
 
     final fiatVal = cryptoVal * sellRate;
-    _fiatAmountController.text = fiatVal > 0 ? fiatVal.toStringAsFixed(2) : '';
+    _fiatAmountController.text = fiatVal > 0 ? _ngnFormat.format(fiatVal) : '';
     setState(() {});
   }
 
   void _onFiatInputChanged(String value) {
-    final fiatVal = double.tryParse(value.trim()) ?? 0.0;
+    final fiatVal = double.tryParse(value.replaceAll(',', '').trim()) ?? 0.0;
     final assetData = _getSelectedAssetData();
     final double sellRate = double.tryParse(assetData?['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
 
     if (sellRate > 0) {
       final cryptoVal = fiatVal / sellRate;
-      _cryptoAmountController.text = cryptoVal > 0 ? cryptoVal.toStringAsFixed(6) : '';
+      _cryptoAmountController.text = cryptoVal > 0 ? _crypto6dpFormat.format(cryptoVal) : '';
     }
     setState(() {});
   }
 
   void _setMaxAmount() {
     final balance = _getAvailableBalance();
-    _cryptoAmountController.text = balance.toString();
+    _cryptoAmountController.text = _crypto6dpFormat.format(balance);
     _onCryptoInputChanged(balance.toString());
   }
 
@@ -259,7 +269,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
       return;
     }
 
-    final amount = double.tryParse(_cryptoAmountController.text.trim()) ?? 0.0;
+    final amount = double.tryParse(_cryptoAmountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final balance = _getAvailableBalance();
 
     if (amount <= 0 || amount > balance) {
@@ -324,7 +334,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
     final currency = context.watch<CurrencyProvider>();
 
     final double availableBalance = _getAvailableBalance();
-    final double typedFiat = double.tryParse(_fiatAmountController.text.trim()) ?? 0.0;
+    final double typedFiat = double.tryParse(_fiatAmountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final String amountInWords = _numberToWords(typedFiat);
 
     return Scaffold(
@@ -441,7 +451,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                       ),
                                       const Spacer(),
                                       Text(
-                                        '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
+                                        '${_formatBalance(balance, isUsdt)} $symbol',
                                         style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 12,
@@ -498,7 +508,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
+                            '${_formatBalance(availableBalance, _selectedAssetKey == "USDT")} $_selectedAssetKey',
                             style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontSize: 20,
@@ -513,6 +523,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 child: TextFormField(
                                   controller: _cryptoAmountController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [ThousandsSeparatorInputFormatter()],
                                   style: TextStyle(
                                     color: theme.colorScheme.onSurface,
                                     fontWeight: FontWeight.bold,
@@ -533,7 +544,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                   ),
                                   onChanged: _onCryptoInputChanged,
                                   validator: (val) {
-                                    final amt = double.tryParse(val?.trim() ?? '');
+                                    final amt = double.tryParse((val ?? '').replaceAll(',', '').trim());
                                     if (amt == null || amt <= 0) return 'Enter amount';
                                     if (amt > availableBalance) return 'Exceeds balance';
                                     return null;
@@ -545,6 +556,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 child: TextFormField(
                                   controller: _fiatAmountController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [ThousandsSeparatorInputFormatter()],
                                   style: TextStyle(
                                     color: AppTheme.success(context),
                                     fontWeight: FontWeight.bold,
@@ -568,6 +580,17 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                               ),
                             ],
                           ),
+                          if (typedFiat > 0) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              '≈ \$${_usdFormat.format(currency.exchangeRate > 0 ? typedFiat / currency.exchangeRate : 0)} (Estimated USD Value)',
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
 
                           if (amountInWords.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -602,7 +625,7 @@ class _MarketCashOutScreenState extends State<MarketCashOutScreen> {
                                 ),
                               ),
                               Text(
-                                '₦${_nairaWithdrawalFee.toStringAsFixed(2)}',
+                                '₦${_ngnFormat.format(_nairaWithdrawalFee)}',
                                 style: TextStyle(
                                   color: theme.colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,

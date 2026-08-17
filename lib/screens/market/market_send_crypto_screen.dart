@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
-import '../../providers/currency_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/withdrawal_pin_modal.dart';
+import '../../utils/thousands_formatter.dart';
 import 'set_pin_screen.dart';
 
 class MarketSendCryptoScreen extends StatefulWidget {
@@ -29,6 +31,13 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
   List<dynamic> _assets = [];
   Map<String, dynamic> _balances = {};
   double _usdtSellRate = 1600.0;
+
+  static final NumberFormat _ngnFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _usdFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _crypto2dpFormat = NumberFormat('#,##0.00');
+  static final NumberFormat _crypto4dpFormat = NumberFormat('#,##0.0000');
+
+  String _formatBalance(double val, bool isUsdt) => (isUsdt ? _crypto2dpFormat : _crypto4dpFormat).format(val);
 
   Color _getAssetColor(String symbol) {
     switch (symbol.toUpperCase()) {
@@ -152,7 +161,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
       return;
     }
 
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final balance = _getAvailableBalance();
 
     if (amount <= 0 || amount > balance) {
@@ -211,10 +220,9 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currency = context.watch<CurrencyProvider>();
 
     final double availableBalance = _getAvailableBalance();
-    final double typedAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    final double typedAmount = double.tryParse(_amountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final assetData = _getSelectedAssetData();
     final double sellRate = double.tryParse(assetData?['ngn_sell_rate']?.toString() ?? '0') ?? 0.0;
     final double estimatedNaira = typedAmount * sellRate;
@@ -331,7 +339,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                                       ),
                                       const Spacer(),
                                       Text(
-                                        '${balance.toStringAsFixed(isUsdt ? 2 : 4)} $symbol',
+                                        '${_formatBalance(balance, isUsdt)} $symbol',
                                         style: TextStyle(
                                           color: theme.colorScheme.onSurfaceVariant,
                                           fontSize: 12,
@@ -388,7 +396,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${availableBalance.toStringAsFixed(4)} $_selectedAssetKey',
+                            '${_formatBalance(availableBalance, _selectedAssetKey == "USDT")} $_selectedAssetKey',
                             style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontSize: 20,
@@ -400,6 +408,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           TextFormField(
                             controller: _amountController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [ThousandsSeparatorInputFormatter()],
                             style: TextStyle(
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
@@ -420,7 +429,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                             ),
                             onChanged: (_) => setState(() {}),
                             validator: (val) {
-                              final amt = double.tryParse(val?.trim() ?? '');
+                              final amt = double.tryParse((val ?? '').replaceAll(',', '').trim());
                               if (amt == null || amt <= 0) {
                                 return 'Enter a valid amount';
                               }
@@ -433,7 +442,7 @@ class _MarketSendCryptoScreenState extends State<MarketSendCryptoScreen> {
                           if (typedAmount > 0) ...[
                             const SizedBox(height: 12),
                             Text(
-                              '≈ ${currency.format(estimatedNaira / _usdtSellRate)} (Estimated Value)',
+                              '≈ \$${_usdFormat.format(estimatedNaira / _usdtSellRate)}  •  ≈ ₦${_ngnFormat.format(estimatedNaira)} (Estimated Value)',
                               style: TextStyle(
                                 color: AppTheme.success(context),
                                 fontSize: 12,
