@@ -9,6 +9,7 @@ import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
 import 'chain_icon.dart';
@@ -28,6 +29,8 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   
   bool _isSaving = false;
   bool _isSharing = false;
+  bool _showAmounts = true;
+  String _username = '';
 
   @override
   void initState() {
@@ -38,6 +41,44 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) precacheImage(NetworkImage(iconUrl), context);
       });
+    }
+    _fetchUsername();
+  }
+
+  Future<void> _fetchUsername() async {
+    try {
+      final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
+      if (res['status'] == 'success' && mounted) {
+        setState(() {
+          _username = res['stats']?['username'] ?? '';
+        });
+      }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic> _getTierInfo(double pct) {
+    if (pct >= 0) {
+      if (pct < 10) return {'img': 'win1.png', 'title': 'HAPPY HAMMY', 'sub': 'A small win is still a win!', 'color': const Color(0xFF10B981)};
+      if (pct < 50) return {'img': 'win2.png', 'title': 'PLAYFUL KITTY', 'sub': 'Nice moves!\nKeep it up!', 'color': const Color(0xFF10B981)};
+      if (pct < 100) return {'img': 'win3.png', 'title': 'CHEERFUL CORGI', 'sub': 'Double happy!\nYou\'re doing great!', 'color': const Color(0xFF10B981)};
+      if (pct < 300) return {'img': 'win4.png', 'title': 'COOL SHIBA', 'sub': 'Now we\'re talking!\nKeep crushing it!', 'color': const Color(0xFF10B981)};
+      if (pct < 500) return {'img': 'win5.png', 'title': 'MIGHTY PENGUIN', 'sub': 'Powerful gains!\nYou\'re unstoppable!', 'color': const Color(0xFF10B981)};
+      if (pct < 1000) return {'img': 'win6.png', 'title': 'TURBO TURTLE', 'sub': 'Slow and steady?\nYou\'re way ahead!', 'color': const Color(0xFF10B981)};
+      if (pct < 2500) return {'img': 'win7.png', 'title': 'ROCKET PUP', 'sub': 'To the moon!\nUnbelievable wins!', 'color': const Color(0xFF10B981)};
+      if (pct < 5000) return {'img': 'win8.png', 'title': 'DRAGON WINNER', 'sub': 'Legendary gains!\nYou\'re on fire!', 'color': const Color(0xFF10B981)};
+      if (pct < 10000) return {'img': 'win9.png', 'title': 'KING TIGER', 'sub': 'You\'re a trading KING!\nRespect!', 'color': const Color(0xFF10B981)};
+      return {'img': 'win10.png', 'title': 'KAINUWA LEGEND', 'sub': 'You didn\'t just win...\nYou made history!', 'color': const Color(0xFF10B981)};
+    } else {
+      if (pct > -10) return {'img': 'loss1.png', 'title': 'SAD PUPPY', 'sub': 'It\'s okay, even puppies\nhave off days.', 'color': const Color(0xFFEF4444)};
+      if (pct > -20) return {'img': 'loss2.png', 'title': 'WORRIED KITTY', 'sub': 'A little setback.\nLearn and adjust.', 'color': const Color(0xFFEF4444)};
+      if (pct > -30) return {'img': 'loss3.png', 'title': 'DOWN BUNNY', 'sub': 'That hurt a bit.\nBreathe and reset.', 'color': const Color(0xFFEF4444)};
+      if (pct > -40) return {'img': 'loss4.png', 'title': 'TIRED PANDA', 'sub': 'Tough one. Stay calm,\nstay smart.', 'color': const Color(0xFFEF4444)};
+      if (pct > -50) return {'img': 'loss5.png', 'title': 'BEAR IN PAIN', 'sub': 'Deep loss.\nDon\'t give up now.', 'color': const Color(0xFFEF4444)};
+      if (pct > -60) return {'img': 'loss6.png', 'title': 'EXHAUSTED OWL', 'sub': 'Almost drained.\nProtect what\'s left.', 'color': const Color(0xFFEF4444)};
+      if (pct > -70) return {'img': 'loss7.png', 'title': 'HURTING HEDGEHOG', 'sub': 'So close to the bottom.\nHold on tight.', 'color': const Color(0xFFEF4444)};
+      if (pct > -80) return {'img': 'loss8.png', 'title': 'FROZEN PENGUIN', 'sub': 'It\'s freezing. But\nwinter doesn\'t last.', 'color': const Color(0xFFEF4444)};
+      if (pct > -90) return {'img': 'loss9.png', 'title': 'DEVASTATED SQUIRREL', 'sub': 'Almost gone.\nPlan your comeback.', 'color': const Color(0xFFEF4444)};
+      return {'img': 'loss10.png', 'title': 'GAME OVER', 'sub': 'Total loss. Reset.\nRefocus. Rise again.', 'color': const Color(0xFFEF4444)};
     }
   }
 
@@ -65,9 +106,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         final chainTag = {'solana': '#Solana', 'bsc': '#BSC', 'robinhood': '#RobinhoodChain'}[(widget.tradeData['chain'] ?? 'solana').toString()] ?? '#Crypto';
         final List<String> flexMessages = [
           'Just printed a solid gain on Kainuwa! 🚀 $chainTag',
-          'Another win on the timeline! 🤑 Powered by @kainuwaafrica',
+          'Another win on the timeline! 💰 Powered by @kainuwaafrica',
           'Snipe, profit, repeat. 🎯 @kainuwaafrica',
-          'Secured the bag. 💰 Built different. @kainuwaafrica'
+          'Secured the bag. 💼 Built different. @kainuwaafrica'
         ];
         final randomMessage = flexMessages[DateTime.now().millisecondsSinceEpoch % flexMessages.length];
         
@@ -139,6 +180,18 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
   String _formatAddress(String addr) => addr.length > 8 ? '${addr.substring(0, 4)}...${addr.substring(addr.length - 4)}' : addr;
 
+  Widget _buildStatColumn(String label, String value, Color valueColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.spaceGrotesk(color: valueColor, fontSize: 13, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = context.watch<CurrencyProvider>();
@@ -154,16 +207,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String nativeSymbol = chainNativeSymbols[tradeChain] ?? 'SOL';
     final String chainDisplayName = {'solana': 'SOLANA', 'bsc': 'BSC', 'robinhood': 'ROBINHOOD'}[tradeChain] ?? tradeChain.toUpperCase();
 
-    String mainTitle = p['display_name'] ?? 'Manual';
-    if (widget.isAdmin && mainTitle != 'Manual') mainTitle = mainTitle.toUpperCase();
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
     final String tokenPair = '${_formatAddress(p['token_address'] ?? '')} / $nativeSymbol';
-    
     final String entryMcap = _formatMcap(p['entry_mcap']);
     final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
+    final String displayUser = _username.isNotEmpty ? '@$_username' : '@kainuwaafrica';
 
-    const double canvasWidth = 600;
-    const double canvasHeight = 360;
+    final tier = _getTierInfo(pct);
+    const double canvasSize = 480;
 
     final isBusy = _isSaving || _isSharing;
 
@@ -179,41 +230,27 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
             child: RepaintBoundary(
               key: _globalKey,
               child: Container(
-                width: canvasWidth,
-                height: canvasHeight,
+                width: canvasSize,
+                height: canvasSize,
                 decoration: BoxDecoration(
                   color: const Color(0xFF0D0B18),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isProfit ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFEF4444).withOpacity(0.4), width: 2),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: tier['color'].withOpacity(0.4), width: 2),
                 ),
                 child: Stack(
                   children: [
+                    // Base Background Elements
                     Positioned.fill(
                       child: CustomPaint(
-                        painter: _ReceiptBackgroundPainter(
-                          accentColor: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                        ),
+                        painter: _ReceiptBackgroundPainter(accentColor: tier['color']),
                       ),
                     ),
 
+                    // Top Bar (Chain + KAINUWA / Username)
                     Positioned(
-                      left: -15,
-                      bottom: 0,
-                      child: Image.asset(
-                        isProfit ? 'assets/icon/chad.png' : 'assets/icon/wojak.png',
-                        height: 340,
-                        fit: BoxFit.fitHeight,
-                        alignment: Alignment.bottomLeft,
-                      ),
-                    ),
-
-                    Positioned(
-                      left: 230, 
-                      right: 28,
-                      top: 20,
-                      bottom: 20,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      top: 24, left: 24, right: 24,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -227,110 +264,117 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('KAINUWA', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
-                                  Text('ON $chainDisplayName', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                                  Text('KAINUWA', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2, height: 1.0)),
+                                  Text('ON $chainDisplayName', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                                 ],
                               )
                             ],
                           ),
-                          
-                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(PhosphorIcons.userCircleFill, color: Colors.white70, size: 14),
+                                const SizedBox(width: 6),
+                                Text(displayUser, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
 
-                          Text(tokenPair, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                          
+                    // Mascot Left Position
+                    Positioned(
+                      left: -10, bottom: 90,
+                      child: Image.asset(
+                        'assets/images/${tier['img']}',
+                        width: 250,
+                        height: 250,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+
+                    // Right Percentage & Badge Info
+                    Positioned(
+                      right: 24, top: 110,
+                      width: 210,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(tokenPair, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerRight,
                             child: Text(
                               '${isProfit ? '+' : ''}${pct.toStringAsFixed(2)}%', 
-                              style: GoogleFonts.spaceGrotesk(
-                                color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), 
-                                fontSize: 60, 
-                                fontWeight: FontWeight.w900, 
-                                height: 1.1
-                              )
+                              style: GoogleFonts.spaceGrotesk(color: tier['color'], fontSize: 54, fontWeight: FontWeight.w900, height: 1.1)
                             ),
                           ),
-                          
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(PhosphorIcons.clock, color: Colors.white54, size: 14),
-                              const SizedBox(width: 6),
-                              Text(timeInTrade, style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
-                            ]
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(color: tier['color'].withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: tier['color'].withOpacity(0.3))),
+                            child: Text(tier['title'], style: GoogleFonts.spaceGrotesk(color: tier['color'], fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                           ),
-
-                          const Spacer(),
-
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('Entry MCAP', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
-                                  Text(entryMcap, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  Text('Invested', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 13)),
-                                  Text('\$${size.toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text(currency.format(size), style: GoogleFonts.spaceGrotesk(color: Colors.white38, fontSize: 11)),
-                                ]
-                              ),
-                              const SizedBox(width: 24),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('Exit MCAP', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
-                                  Text(exitMcap, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  Text(isProfit ? 'Current Gain' : 'Current Loss', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
-                                  Text('${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981) : const Color(0xFFEF4444), fontSize: 17, fontWeight: FontWeight.bold)),
-                                  if (currency.isNaira) Text('${isProfit ? '+' : ''}${currency.format(pnl).replaceFirst('₦-', '-₦')}', style: GoogleFonts.spaceGrotesk(color: isProfit ? const Color(0xFF10B981).withOpacity(0.7) : const Color(0xFFEF4444).withOpacity(0.7), fontSize: 11)),
-                                ]
-                              ),
-                            ]
-                          ),
-
-                          const Spacer(),
-
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('Trade natively on', style: GoogleFonts.spaceGrotesk(color: Colors.white54, fontSize: 11)),
-                                  Text('@kainuwaafrica', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                                child: Image.asset(
-                                  'assets/icon/qr_code.png',
-                                  width: 48,
-                                  height: 48,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stk) => const Icon(PhosphorIcons.qrCode, color: Colors.black, size: 48),
-                                ),
-                              )
-                            ],
-                          )
+                          const SizedBox(height: 10),
+                          Text(tier['sub'], textAlign: TextAlign.right, style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500)),
                         ],
                       ),
-                    )
+                    ),
+
+                    // Footer Stats Bar
+                    Positioned(
+                      bottom: 24, left: 24, right: 24,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildStatColumn('Entry MCAP', entryMcap, Colors.white),
+                            _buildStatColumn('Exit MCAP', exitMcap, Colors.white),
+                            if (_showAmounts) _buildStatColumn('Invested', '\$${size.toStringAsFixed(2)}', Colors.white),
+                            if (_showAmounts) _buildStatColumn(isProfit ? 'Profit' : 'Loss', '${isProfit ? '+' : ''}\$${pnl.abs().toStringAsFixed(2)}', tier['color']),
+                            _buildStatColumn('Duration', timeInTrade, Colors.white70),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           
+          // Toggle Controls
+          Theme(
+            data: Theme.of(context).copyWith(unselectedWidgetColor: Colors.white54),
+            child: CheckboxListTile(
+              title: Text('Include Invested & PnL Amounts', style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+              value: _showAmounts,
+              onChanged: (val) {
+                if (val != null) setState(() => _showAmounts = val);
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: AppTheme.kainuwaPurple,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+
           Row(
             children: [
               Expanded(
@@ -383,31 +427,41 @@ class _ReceiptBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintAccent = Paint()
-      ..color = accentColor.withOpacity(0.08)
-      ..style = PaintingStyle.fill;
+    // Solid Dark Base
+    final paintBg = Paint()..color = const Color(0xFF0D0B18);
+    canvas.drawRect(Offset.zero & size, paintBg);
 
-    final path = Path()
-      ..moveTo(size.width * 0.40, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(size.width * 0.25, size.height)
-      ..close();
+    // Deep glowing radius behind the mascot
+    final paintGlowLeft = Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(size.width * 0.25, size.height * 0.6),
+        size.width * 0.55,
+        [accentColor.withOpacity(0.15), Colors.transparent],
+      );
+    canvas.drawRect(Offset.zero & size, paintGlowLeft);
 
-    canvas.drawPath(path, paintAccent);
-
+    // Subtle Grid pattern
     final paintLine = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..strokeWidth = 2
+      ..color = Colors.white.withOpacity(0.03)
+      ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
     
-    final linePath = Path()
-      ..moveTo(size.width * 0.40, 0)
-      ..lineTo(size.width * 0.25, size.height);
+    for (double i = 0; i <= size.width; i += 40) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paintLine);
+    }
+    for (double i = 0; i <= size.height; i += 40) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paintLine);
+    }
 
-    canvas.drawPath(linePath, paintLine);
+    // Top Right subtle diagonal shape
+    final path = Path()
+      ..moveTo(size.width * 0.6, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.35)
+      ..close();
+    canvas.drawPath(path, Paint()..color = accentColor.withOpacity(0.08));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
