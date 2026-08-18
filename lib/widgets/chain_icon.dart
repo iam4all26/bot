@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'solana_icon.dart';
 
-/// Renders the real crypto logo for a given chain — Solana's existing
-/// vector icon, or the actual BNB/ETH icon (via the same CDN the
-/// Buy/Send/Receive screens already use) for BSC and Robinhood Chain.
-/// Robinhood Chain's native asset is ETH, so ETH's icon is what
-/// represents it here too — matches the asset badges shown elsewhere in
-/// the app, where "Robinhood Chain" is a label next to the ETH icon.
+/// Renders the real crypto logo for a given chain — Solana, BNB (for BSC),
+/// and ETH (for Robinhood Chain, since ETH is the asset that chain
+/// represents — matches the asset badges shown elsewhere in the app,
+/// where "Robinhood Chain" is a label next to the ETH icon). All three use
+/// the same CDN the Buy/Send/Receive screens already rely on, so every
+/// chain icon in the app now comes from one consistent source instead of
+/// mixing a custom vector for Solana with network images for the rest.
 ///
 /// Falls back to a plain colored initial letter only if the network image
 /// genuinely fails to load (offline, CDN hiccup) — never as the default.
@@ -17,24 +17,20 @@ class ChainIcon extends StatelessWidget {
 
   const ChainIcon({super.key, required this.chain, required this.size, required this.color});
 
-  /// Returns the CDN icon URL for a chain, or null if it doesn't use a
-  /// network icon (Solana renders a local vector instead). Exposed so
-  /// screens that capture a screenshot (e.g. the PnL share receipt) can
-  /// precache it first — a RepaintBoundary capture happens synchronously
-  /// and won't wait for an in-flight network image to finish loading.
+  /// Returns the CDN icon URL for a chain. Exposed so screens that
+  /// capture a screenshot (e.g. the PnL share receipt) can precache it
+  /// first — a RepaintBoundary capture happens synchronously and won't
+  /// wait for an in-flight network image to finish loading.
   static String? iconUrlFor(String chain) {
-    switch (chain.toLowerCase()) {
-      case 'bsc':
-        return 'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/bnb.png';
-      case 'robinhood':
-        return 'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/eth.png';
-      default:
-        return null;
-    }
+    final symbol = _symbolFor(chain);
+    if (symbol == null) return null;
+    return 'https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/128/color/$symbol.png';
   }
 
-  String? get _iconSymbol {
+  static String? _symbolFor(String chain) {
     switch (chain.toLowerCase()) {
+      case 'solana':
+        return 'sol';
       case 'bsc':
         return 'bnb';
       case 'robinhood':
@@ -46,11 +42,8 @@ class ChainIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (chain.toLowerCase() == 'solana') {
-      return SolanaIcon(size: size, color: color);
-    }
+    final symbol = _symbolFor(chain);
 
-    final symbol = _iconSymbol;
     if (symbol == null) {
       return SizedBox(
         width: size,

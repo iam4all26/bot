@@ -10,7 +10,6 @@ import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/solana_icon.dart';
 import '../widgets/chain_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';

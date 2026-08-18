@@ -11,7 +11,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
-import 'solana_icon.dart';
 import 'chain_icon.dart';
 
 class PnlShareDialog extends StatefulWidget {
