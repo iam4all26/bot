@@ -8,8 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/closing_positions_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/live_elapsed_timer.dart';
 import '../widgets/chain_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';
@@ -70,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'today_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  final Set<int> _closingIds = {};
+  // _closingIds moved to ClosingPositionsProvider (shared across Dashboard/Positions/Hidden) — see main.dart
 
   @override
   void initState() {
@@ -237,8 +239,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _markAsClosingOrHiding(Iterable<int> ids) {
+    context.read<ClosingPositionsProvider>().markClosing(ids);
     setState(() {
-      _closingIds.addAll(ids);
       _openPositions.removeWhere((p) {
         int pid = int.tryParse(p['id'].toString()) ?? 0;
         return ids.contains(pid);
@@ -296,10 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           
           List<dynamic> rawOpen = responses[1]['open_positions'] ?? [];
           
-          _openPositions = rawOpen.where((p) {
-            int id = int.tryParse(p['id'].toString()) ?? 0;
-            return !_closingIds.contains(id);
-          }).toList();
+          _openPositions = context.read<ClosingPositionsProvider>().filterOpen(rawOpen);
           
           _stats['open_count'] = _openPositions.length;
         }
@@ -371,7 +370,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success') {
         _showFloatingSnackbar(res['message'] ?? 'Failed to hide', isError: true);
-        setState(() => _closingIds.remove(pId));
+        context.read<ClosingPositionsProvider>().clear(pId);
       }
       _fetchDashboardData(silent: true);
     }
@@ -391,7 +390,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          _showFloatingSnackbar(res['message'] ?? 'Failed to close', isError: true);
-         setState(() => _closingIds.remove(pId)); 
+         context.read<ClosingPositionsProvider>().clear(pId); 
       }
       _fetchDashboardData(silent: true);
     }
@@ -420,9 +419,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _markAsClosingOrHiding(toClose);
     await Future.delayed(const Duration(milliseconds: 350));
 
-    for (int id in toClose) {
-      await api.postEndpoint('trade.php?action=close_position', {'id': id});
-    }
+    // Fired concurrently, not one-at-a-time — see the matching fix in
+    // positions_screen.dart's _executeBatchClose for why this matters.
+    await Future.wait(toClose.map((id) async {
+      try {
+        await api.postEndpoint('trade.php?action=close_position', {'id': id});
+      } catch (e) { /* individual failures surface via the next poll */ }
+    }));
     
     if (mounted) _fetchDashboardData(silent: true);
   }
@@ -1246,7 +1249,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(height: 12),
             GlassCard(
               padding: EdgeInsets.zero,
-              child: Column(
+              child: Builder(builder: (context) {
+                final closingProvider = context.watch<ClosingPositionsProvider>();
+                return Column(
                 children: _openPositions.asMap().entries.map((entry) {
                   int idx = entry.key;
                   var p = entry.value;
@@ -1254,7 +1259,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
-                  final bool isClosing = _closingIds.contains(pId);
+                  final bool isClosing = closingProvider.isClosing(pId);
                   final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
                   
                   String botName = p['display_name'] ?? 'Manual';
@@ -1332,6 +1337,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                                 Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
                                                 Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                const SizedBox(height: 4),
+                                                LiveElapsedTimer(
+                                                  openedAt: p['opened_at']?.toString(),
+                                                  icon: PhosphorIcons.hourglassHigh,
+                                                  iconSize: 11,
+                                                  style: TextStyle(fontSize: 10, color: AppTheme.warning(context), fontWeight: FontWeight.bold),
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -1376,7 +1388,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ],
                   );
                 }).toList(),
-              ),
+                );
+              }),
             ),
           ],
         ],

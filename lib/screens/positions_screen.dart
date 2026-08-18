@@ -5,7 +5,9 @@ import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
+import '../providers/closing_positions_provider.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/live_elapsed_timer.dart';
 import '../theme/app_theme.dart';
 
 enum TradeEnvironment { all, real, paper }
@@ -22,7 +24,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
   bool _isManualRefreshing = false;
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  final Set<int> _closingIds = {};
+  // _closingIds moved to ClosingPositionsProvider (shared across Dashboard/Positions/Hidden) — see main.dart
 
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
   
@@ -47,8 +49,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
   // Prevents ghost trades by instantly updating local state
   void _markAsClosingOrHiding(Iterable<int> ids) {
+    context.read<ClosingPositionsProvider>().markClosing(ids);
     setState(() {
-      _closingIds.addAll(ids);
       _openPositions.removeWhere((p) {
         int pid = int.tryParse(p['id'].toString()) ?? 0;
         return ids.contains(pid);
@@ -63,12 +65,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
       setState(() {
         if (res['status'] == 'success') {
           List<dynamic> rawOpen = res['open_positions'] ?? [];
-          
-          // Strictly filter out any trades we are currently closing/hiding locally
-          _openPositions = rawOpen.where((p) {
-            int id = int.tryParse(p['id'].toString()) ?? 0;
-            return !_closingIds.contains(id);
-          }).toList();
+          _openPositions = context.read<ClosingPositionsProvider>().filterOpen(rawOpen);
         }
         _isLoading = false;
       });
@@ -168,7 +165,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     if (mounted) {
       if (res['status'] != 'success') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to hide', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
-        setState(() => _closingIds.remove(pId));
+        context.read<ClosingPositionsProvider>().clear(pId);
       }
       _fetchPositions(silent: true);
     }
@@ -188,7 +185,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.danger(context)));
-         setState(() => _closingIds.remove(pId));
+         context.read<ClosingPositionsProvider>().clear(pId);
       }
       _fetchPositions(silent: true);
     }
@@ -392,12 +389,22 @@ class _PositionsScreenState extends State<PositionsScreen> {
     int successCount = 0;
     final api = context.read<ApiService>();
 
-    for (int id in unlockedIds) {
+    // Fired concurrently, not one-at-a-time — a sequential await loop here
+    // was the actual cause of batch closes taking 50s-1min: with N
+    // positions, the old loop waited for the FULL round-trip of each
+    // close (PHP -> bot engine -> on-chain confirmation) before even
+    // starting the next one, so total wait time was N times a single
+    // close's duration. Firing them together means total wait time is
+    // roughly however long the SLOWEST single close takes, not the sum.
+    final results = await Future.wait(unlockedIds.map((id) async {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
-        if (res['status'] == 'success' || res['status'] == 'closed') successCount++;
-      } catch (e) { print(e); }
-    }
+        return res['status'] == 'success' || res['status'] == 'closed';
+      } catch (e) {
+        return false;
+      }
+    }));
+    successCount = results.where((ok) => ok).length;
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully closed $successCount / ${unlockedIds.length} trades.', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), backgroundColor: AppTheme.success(context)));
@@ -557,6 +564,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
     final isAdmin = apiService.role == 'admin';
 
     final finalOpenList = _openPositions.where(_passesEnvFilter).toList();
+    final closingProvider = context.watch<ClosingPositionsProvider>();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -630,7 +638,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                           final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                           final bool cpIsProfit = (cpnl ?? 0) >= 0;
                           final pId = int.tryParse(p['id'].toString()) ?? 0;
-                          final bool isClosing = _closingIds.contains(pId);
+                          final bool isClosing = closingProvider.isClosing(pId);
                           final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
 
                           final isCopy = p['wallet_label'] != null && p['wallet_label'].toString() != 'Manual' && p['wallet_label'].toString().isNotEmpty;
@@ -706,6 +714,13 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                     Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                     const SizedBox(height: 2),
                                                     Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                    const SizedBox(height: 4),
+                                                    LiveElapsedTimer(
+                                                      openedAt: p['opened_at']?.toString(),
+                                                      icon: PhosphorIcons.hourglassHigh,
+                                                      iconSize: 11,
+                                                      style: TextStyle(fontSize: 10, color: AppTheme.warning(context), fontWeight: FontWeight.bold),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
