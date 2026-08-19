@@ -7,6 +7,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_background.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pnl_share_dialog.dart';
 
 class WalletHistoryScreen extends StatefulWidget {
   final int walletId;
@@ -108,6 +109,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
   Widget build(BuildContext context) {
     final currency = context.watch<CurrencyProvider>();
     final theme = Theme.of(context);
+    final isAdmin = context.read<ApiService>().role == 'admin';
 
     if (_isLoading) {
       return Scaffold(
@@ -314,14 +316,50 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                                   ],
                                 ),
                               ),
-                              if (isOpen)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.3))), child: Text('OPEN', style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
-                              else if (isWin)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.success(context).withOpacity(0.3))), child: Text('WIN', style: TextStyle(color: AppTheme.success(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
-                              else if (isLoss)
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.danger(context).withOpacity(0.3))), child: Text('LOSS', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
-                              else
-                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text('MANUAL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isOpen)
+                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.info(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.info(context).withOpacity(0.3))), child: Text('OPEN', style: TextStyle(color: AppTheme.info(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
+                                  else if (isWin)
+                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.success(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.success(context).withOpacity(0.3))), child: Text('WIN', style: TextStyle(color: AppTheme.success(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
+                                  else if (isLoss)
+                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: AppTheme.danger(context).withOpacity(0.12), borderRadius: BorderRadius.circular(6), border: Border.all(color: AppTheme.danger(context).withOpacity(0.3))), child: Text('LOSS', style: TextStyle(color: AppTheme.danger(context), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)))
+                                  else
+                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(6), border: Border.all(color: theme.colorScheme.outlineVariant)), child: Text('MANUAL', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1))),
+                                  
+                                  const SizedBox(width: 8),
+                                  
+                                  InkWell(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => PnlShareDialog(
+                                          tradeData: p as Map<String, dynamic>, 
+                                          isAdmin: isAdmin,
+                                        ),
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: theme.primaryColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(PhosphorIcons.shareNetworkBold, color: theme.primaryColor, size: 14), 
+                                          const SizedBox(width: 4), 
+                                          Text('Share', style: TextStyle(color: theme.primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                           const SizedBox(height: 20),
