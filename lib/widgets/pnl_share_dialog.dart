@@ -9,6 +9,7 @@ import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../theme/app_theme.dart';
@@ -49,17 +50,37 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
   Future<void> _fetchUsername() async {
     try {
+      // 1. Check local cache first for instant load
+      final prefs = await SharedPreferences.getInstance();
+      final cachedName = prefs.getString('cached_kainuwa_username');
+      
+      if (cachedName != null && cachedName.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _username = cachedName;
+            _isLoadingUsername = false;
+          });
+        }
+      }
+
+      // 2. Silently fetch from server to keep cache fresh
       final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
       if (res['status'] == 'success' && mounted) {
-        setState(() {
-          _username = res['stats']?['username'] ?? '';
-          _isLoadingUsername = false;
-        });
-      } else {
+        final fetchedName = res['stats']?['username'] ?? '';
+        if (fetchedName.isNotEmpty) {
+          await prefs.setString('cached_kainuwa_username', fetchedName);
+          setState(() {
+            _username = fetchedName;
+            _isLoadingUsername = false;
+          });
+        } else if (cachedName == null) {
+          if (mounted) setState(() => _isLoadingUsername = false);
+        }
+      } else if (cachedName == null) {
         if (mounted) setState(() => _isLoadingUsername = false);
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingUsername = false);
+      if (mounted && _isLoadingUsername) setState(() => _isLoadingUsername = false);
     }
   }
 
@@ -76,7 +97,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       if (pct < 10000) return {'img': 'win9.png', 'title': 'KING TIGER', 'sub': 'You\'re a trading KING!\nRespect!', 'color': const Color(0xFF10B981)};
       return {'img': 'win10.png', 'title': 'KAINUWA LEGEND', 'sub': 'You didn\'t just win...\nYou made history!', 'color': const Color(0xFF10B981)};
     } else {
-      // Changed to >= to ensure edge numbers like exactly -60.0 don't fall through incorrectly
       if (pct >= -10) return {'img': 'loss1.png', 'title': 'SAD PUPPY', 'sub': 'It\'s okay, even puppies\nhave off days.', 'color': const Color(0xFFEF4444)};
       if (pct >= -20) return {'img': 'loss2.png', 'title': 'WORRIED KITTY', 'sub': 'A little setback.\nLearn and adjust.', 'color': const Color(0xFFEF4444)};
       if (pct >= -30) return {'img': 'loss3.png', 'title': 'DOWN BUNNY', 'sub': 'That hurt a bit.\nBreathe and reset.', 'color': const Color(0xFFEF4444)};
@@ -298,7 +318,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 3. Grounding Shadow for Mascot (Moved UP to avoid overlapping text)
+                      // 3. Grounding Shadow for Mascot 
                       Positioned(
                         left: 15, bottom: 145,
                         child: Container(
@@ -310,7 +330,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 4. Mascot Image (Moved UP and slightly scaled to fit above stats)
+                      // 4. Mascot Image 
                       Positioned(
                         left: -5, bottom: 135,
                         child: Image.asset(
@@ -351,7 +371,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 6. Stats Row (Moved explicitly to bottom: 70 to clear the mascot image)
+                      // 6. Stats Row 
                       Positioned(
                         bottom: 70, left: 24, right: 24,
                         child: Container(
@@ -374,7 +394,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 7. Footer: QR Code & Brand Tagline (QR code properly boxed)
+                      // 7. Footer: QR Code & Brand Tagline 
                       Positioned(
                         bottom: 20, left: 24, right: 24,
                         child: Row(
