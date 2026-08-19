@@ -11,19 +11,22 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../providers/currency_provider.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'chain_icon.dart';
 
 class PnlShareDialog extends StatefulWidget {
   final Map<String, dynamic> tradeData;
   final bool isAdmin;
-  final String username;
+  /// Optional override. If omitted, the dialog fetches the current user's
+  /// username itself (same call dashboard_screen.dart already uses).
+  final String? username;
 
   const PnlShareDialog({
     super.key,
     required this.tradeData,
     required this.isAdmin,
-    this.username = 'Trader',
+    this.username,
   });
 
   @override
@@ -36,6 +39,9 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   bool _isSaving = false;
   bool _isSharing = false;
   bool _showAmounts = true;
+  String? _fetchedUsername;
+
+  String get _displayUsername => widget.username ?? _fetchedUsername ?? 'Trader';
 
   // ── Tier metadata — matches assets/images/win1..10.png & loss1..10.png ──
   static const List<Map<String, String>> _winTiers = [
@@ -110,8 +116,12 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
   @override
   void initState() {
     super.initState();
+
     final chain = (widget.tradeData['chain'] ?? 'solana').toString();
     final iconUrl = ChainIcon.iconUrlFor(chain);
+
+    if (widget.username == null) _fetchUsername();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (iconUrl != null) precacheImage(NetworkImage(iconUrl), context);
@@ -123,6 +133,20 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
       final tier = _tierIndex(pct.abs(), isProfit);
       precacheImage(AssetImage(_tierAsset(isProfit, tier)), context);
     });
+  }
+
+  Future<void> _fetchUsername() async {
+    try {
+      final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
+      if (mounted && res['status'] == 'success') {
+        final uname = res['stats']?['username']?.toString();
+        if (uname != null && uname.isNotEmpty && uname != 'null') {
+          setState(() => _fetchedUsername = uname);
+        }
+      }
+    } catch (_) {
+      // Silent fail — card just shows the 'Trader' fallback.
+    }
   }
 
   Future<Uint8List?> _getReceiptBytes() async {
@@ -340,7 +364,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                             children: [
                               const Icon(PhosphorIcons.userFill, color: Colors.white54, size: 12),
                               const SizedBox(width: 5),
-                              Text('@${widget.username}', style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text('@$_displayUsername', style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
