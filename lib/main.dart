@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/currency_provider.dart';
 import 'providers/theme_provider.dart';
-import 'providers/closing_positions_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 
@@ -35,7 +34,6 @@ class _KainuwaBotAppState extends State<KainuwaBotApp> {
         Provider<ApiService>.value(value: _apiService),
         ChangeNotifierProvider(create: (_) => CurrencyProvider()..fetchLiveRate(_apiService)),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => ClosingPositionsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
