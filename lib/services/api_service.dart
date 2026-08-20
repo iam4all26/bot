@@ -34,6 +34,19 @@ class ApiService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Intercepts scary system errors and returns a clean, user-friendly message
+  String _formatError(Object e) {
+    final str = e.toString().toLowerCase();
+    if (str.contains('socketexception') || 
+        str.contains('clientexception') || 
+        str.contains('connection timed out') || 
+        str.contains('connection closed') ||
+        str.contains('failed host lookup')) {
+      return 'Network timeout. Please check your internet connection and try again.';
+    }
+    return 'An unexpected network error occurred. Please try again.';
+  }
+
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final res = await http.post(
@@ -64,7 +77,7 @@ class ApiService extends ChangeNotifier {
       }
       return data;
     } catch (e) {
-      return {'status': 'error', 'message': 'Network connection failed. Please try again.'};
+      return {'status': 'error', 'message': _formatError(e)};
     }
   }
 
@@ -91,7 +104,7 @@ class ApiService extends ChangeNotifier {
       );
       return jsonDecode(res.body);
     } catch (e) {
-      return {'status': 'error', 'message': 'GET Parse Error: $e'};
+      return {'status': 'error', 'message': _formatError(e)};
     }
   }
 
@@ -108,7 +121,7 @@ class ApiService extends ChangeNotifier {
       );
       return jsonDecode(res.body);
     } catch (e) {
-      return {'status': 'error', 'message': 'API Error: $e'};
+      return {'status': 'error', 'message': _formatError(e)};
     }
   }
 
