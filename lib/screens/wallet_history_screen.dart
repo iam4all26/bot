@@ -70,6 +70,14 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
     return '${address.substring(0, 6)}...${address.substring(address.length - 4)}';
   }
 
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _maskAddress(address?.toString() ?? '');
+  }
+
   String formatLagosTime(String? utcString) {
     if (utcString == null || utcString.isEmpty) return '-';
     try {
@@ -293,6 +301,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                   final isOpen = p['status'] == 'open';
                   final isWin = p['close_reason'] == 'TP_HIT' || p['close_reason'] == 'TRAILING_SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl > 0);
                   final isLoss = p['close_reason'] == 'SL_HIT' || (p['close_reason'] == 'MANUAL' && pnl < 0);
+                  final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
@@ -308,8 +317,8 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                                 child: Row(
                                   children: [
                                     Text(
-                                      _maskAddress(p['token_address']),
-                                      style: TextStyle(color: AppTheme.info(context), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14),
+                                      tokenDisplay,
+                                      style: TextStyle(color: AppTheme.info(context), fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                     const SizedBox(width: 4),
                                     Icon(PhosphorIcons.arrowUpRightBold, color: AppTheme.info(context), size: 14),

@@ -57,9 +57,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _refetchAll();
-    // Closed trades don't move like open ones do — this just catches newly
-    // closed trades while the screen is open. Far lighter than before:
-    // paginated + trimmed payload, and only every 20s instead of every 5s.
     _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refetchAll(silent: true));
   }
 
@@ -176,7 +173,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         setState(() => _hidingIds.remove(pId));
         return;
       }
-      // No need to hit the network again for this — just drop it locally.
       setState(() {
         _closedPositions.removeWhere((item) => (int.tryParse(item['id'].toString()) ?? 0) == pId);
         _totalCount = _totalCount > 0 ? _totalCount - 1 : 0;
@@ -186,9 +182,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  // Groups the currently-loaded page(s) by month for display. Filtering and
-  // stats are already done server-side (see _fetchHistoryPage / _fetchHistoryStats) —
-  // this only handles presentation grouping.
   void _processData() {
     Map<String, List<dynamic>> grouped = {};
     for (var p in _closedPositions) {
@@ -263,6 +256,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _formatAddress(String addr) => addr.length <= 12 ? addr : '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
+
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _formatAddress(address?.toString() ?? '');
+  }
 
   Widget _buildEnvChip(String label, TradeEnvironment env, ThemeData theme) {
     final isSelected = _selectedEnv == env;
@@ -353,8 +354,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final currency = context.watch<CurrencyProvider>();
     final isAdmin = context.read<ApiService>().role == 'admin';
 
-    // Built from server-computed win rates (global, always complete) instead
-    // of scanning whatever page happens to be loaded on the phone.
     final Set<String> uniqueBots = {'All Bots', ..._winRates.keys};
 
     return Scaffold(
@@ -549,6 +548,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               final size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
                               final pct = size > 0 ? (pnl / size) * 100 : 0.0;
                               final isReal = p['is_real'] == 1 || p['is_real'] == '1';
+                              final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
                               
                               String closeReasonBadge = '';
                               Color closeReasonColor = AppTheme.info(context);
@@ -633,7 +633,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                                             spacing: 6,
                                                             runSpacing: 6,
                                                             children: [
-                                                              Text(_formatAddress(p['token_address'] ?? ''), style: TextStyle(color: theme.colorScheme.onSurface, fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                                                              Text(tokenDisplay, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 15)),
                                                               Container(
                                                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                                                 decoration: BoxDecoration(color: chainColor.withOpacity(0.12), borderRadius: BorderRadius.circular(5), border: Border.all(color: chainColor.withOpacity(0.3))),

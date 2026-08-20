@@ -8,10 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
-import '../providers/closing_positions_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/live_elapsed_timer.dart';
 import '../widgets/chain_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';
@@ -39,10 +37,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   int _marketTabIndex = 0;
   final ValueNotifier<int> _adminViewIndex = ValueNotifier<int>(0);
 
-  // Exchange-style "portal" mode switch: a colored circle expands from the
-  // switch button and reveals the new mode underneath, instead of a plain
-  // slide/fade. _pendingMarketMode is non-null only while the reveal is
-  // mid-animation; the real _isMarketMode flips once it completes.
   final GlobalKey _switchButtonKey = GlobalKey();
   late final AnimationController _revealController;
   Offset? _revealOrigin;
@@ -72,18 +66,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'today_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  // _closingIds moved to ClosingPositionsProvider (shared across Dashboard/Positions/Hidden) — see main.dart
+  final Set<int> _closingIds = {};
 
   @override
   void initState() {
     super.initState();
     _revealController = AnimationController(vsync: this, duration: const Duration(milliseconds: 3500));
     _revealController.addListener(() {
-      // The wipe fully covers the screen at t=0.5 (see _revealCoverage).
-      // That's the one instant nothing is visible underneath it, so it's
-      // the only safe moment to swap which mode's content is mounted —
-      // swapping any earlier/later would let both layouts peek through
-      // together, which is what caused the overlapping/merging look.
       if (!_contentSwapped && _pendingMarketMode != null && _revealController.value >= 0.5) {
         _contentSwapped = true;
         setState(() => _isMarketMode = _pendingMarketMode!);
@@ -101,13 +90,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.dispose();
   }
 
-  // Captures the switch button's on-screen center, then wipes a solid
-  // colored circle out from that point to fully cover the screen, swaps
-  // the real content underneath while hidden, then shrinks the same
-  // circle back down to reveal it — the same "portal" pattern used by
-  // Binance/Coinbase Wallet's Web2⇄Web3 switch. The circle never contains
-  // live page content itself, so Market's and Bot mode's very different
-  // layouts never render on screen at the same time.
   void _triggerModeSwitch() {
     final renderBox = _switchButtonKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null && renderBox.attached) {
@@ -144,20 +126,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return maxDist;
   }
 
-  // 0 → 1 over the first half (circle grows to fully cover the screen),
-  // then 1 → 0 over the second half (circle shrinks away again). The
-  // content swap happens right at the t=0.5 peak, when this returns 1.0
-  // and the whole screen is hidden behind the solid wipe.
   double _revealCoverage(double t) {
     if (t < 0.5) return Curves.easeOutCubic.transform(t / 0.5);
     return 1 - Curves.easeInCubic.transform((t - 0.5) / 0.5);
   }
 
-  // "SWITCHING TO MARKET/BOT" badge — rises up from below and fades in
-  // over the first 25% of the transition, holds center-screen through the
-  // middle, then rises further and fades out over the last 25% as the
-  // portal finishes covering the screen. Uses _revealController's own
-  // value directly (this is built inside that controller's AnimatedBuilder).
   Widget _buildModeAnnouncement(bool targetIsMarket, Color color, ThemeData theme, Size size) {
     final t = _revealController.value;
 
@@ -239,8 +212,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _markAsClosingOrHiding(Iterable<int> ids) {
-    context.read<ClosingPositionsProvider>().markClosing(ids);
     setState(() {
+      _closingIds.addAll(ids);
       _openPositions.removeWhere((p) {
         int pid = int.tryParse(p['id'].toString()) ?? 0;
         return ids.contains(pid);
@@ -298,7 +271,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           
           List<dynamic> rawOpen = responses[1]['open_positions'] ?? [];
           
-          _openPositions = context.read<ClosingPositionsProvider>().filterOpen(rawOpen);
+          _openPositions = rawOpen.where((p) {
+            int id = int.tryParse(p['id'].toString()) ?? 0;
+            return !_closingIds.contains(id);
+          }).toList();
           
           _stats['open_count'] = _openPositions.length;
         }
@@ -342,6 +318,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
   }
 
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _formatFullAddress(address?.toString() ?? '');
+  }
+
   Future<void> _toggleLock(dynamic p) async {
     final pId = int.tryParse(p['id'].toString()) ?? 0;
     if (pId <= 0) return;
@@ -370,7 +354,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success') {
         _showFloatingSnackbar(res['message'] ?? 'Failed to hide', isError: true);
-        context.read<ClosingPositionsProvider>().clear(pId);
+        setState(() => _closingIds.remove(pId));
       }
       _fetchDashboardData(silent: true);
     }
@@ -390,7 +374,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          _showFloatingSnackbar(res['message'] ?? 'Failed to close', isError: true);
-         context.read<ClosingPositionsProvider>().clear(pId); 
+         setState(() => _closingIds.remove(pId)); 
       }
       _fetchDashboardData(silent: true);
     }
@@ -419,13 +403,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _markAsClosingOrHiding(toClose);
     await Future.delayed(const Duration(milliseconds: 350));
 
-    // Fired concurrently, not one-at-a-time — see the matching fix in
-    // positions_screen.dart's _executeBatchClose for why this matters.
-    await Future.wait(toClose.map((id) async {
-      try {
-        await api.postEndpoint('trade.php?action=close_position', {'id': id});
-      } catch (e) { /* individual failures surface via the next poll */ }
-    }));
+    for (int id in toClose) {
+      await api.postEndpoint('trade.php?action=close_position', {'id': id});
+    }
     
     if (mounted) _fetchDashboardData(silent: true);
   }
@@ -836,10 +816,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             bottom: false, 
             child: Stack(
               children: [
-                // Base layer: whatever mode is currently active. This
-                // flips mid-transition (see the _revealController listener
-                // in initState) at the exact instant the wipe below fully
-                // covers the screen, so the swap itself is never visible.
                 IgnorePointer(
                   ignoring: _pendingMarketMode != null,
                   child: _isMarketMode 
@@ -847,11 +823,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
                 ),
 
-                // Wipe layer: only present mid-transition. A solid colored
-                // circle grows from the switch button to fully cover the
-                // screen, then shrinks away again — it never contains live
-                // page content, so Market's and Bot mode's very different
-                // layouts are never rendered on screen at the same time.
                 if (_pendingMarketMode != null)
                   AnimatedBuilder(
                     animation: _revealController,
@@ -877,7 +848,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ),
                               ),
                             ),
-                            // Glowing ring riding the edge of the wipe circle.
                             CustomPaint(
                               size: size,
                               painter: _RevealRingPainter(
@@ -887,8 +857,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 opacity: 1.0,
                               ),
                             ),
-                            // "Switching to X" announcement: rises in, holds
-                            // through the full-cover midpoint, rises out.
                             _buildModeAnnouncement(_pendingMarketMode!, targetColor, theme, size),
                           ],
                         ),
@@ -1249,9 +1217,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(height: 12),
             GlassCard(
               padding: EdgeInsets.zero,
-              child: Builder(builder: (context) {
-                final closingProvider = context.watch<ClosingPositionsProvider>();
-                return Column(
+              child: Column(
                 children: _openPositions.asMap().entries.map((entry) {
                   int idx = entry.key;
                   var p = entry.value;
@@ -1259,7 +1225,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
-                  final bool isClosing = closingProvider.isClosing(pId);
+                  final bool isClosing = _closingIds.contains(pId);
                   final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
                   
                   String botName = p['display_name'] ?? 'Manual';
@@ -1274,6 +1240,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final double sl = double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0.0;
                   final double size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
                   final double pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
+                  final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
 
                   return Column(
                     children: [
@@ -1298,7 +1265,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                             child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          Text(tokenDisplay, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
                                           const SizedBox(width: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1337,13 +1304,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                                 Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
                                                 Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                                                const SizedBox(height: 4),
-                                                LiveElapsedTimer(
-                                                  openedAt: p['opened_at']?.toString(),
-                                                  icon: PhosphorIcons.hourglassHigh,
-                                                  iconSize: 11,
-                                                  style: TextStyle(fontSize: 10, color: AppTheme.warning(context), fontWeight: FontWeight.bold),
-                                                ),
                                               ],
                                             ),
                                           ),
@@ -1388,8 +1348,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ],
                   );
                 }).toList(),
-                );
-              }),
+              ),
             ),
           ],
         ],
@@ -1628,8 +1587,6 @@ class _CurrencyCalculatorDialogState extends State<CurrencyCalculatorDialog> {
   }
 }
 
-// Clips content to a circle centered at [center] with the given [radius].
-// Used to grow the incoming mode's content out from the switch button.
 class _CircleRevealClipper extends CustomClipper<Path> {
   final Offset center;
   final double radius;
@@ -1647,9 +1604,6 @@ class _CircleRevealClipper extends CustomClipper<Path> {
   }
 }
 
-// Draws a soft glowing ring right at the edge of the expanding reveal
-// circle — the little "energy" touch that sells the portal effect, fading
-// out as the circle finishes covering the screen.
 class _RevealRingPainter extends CustomPainter {
   final Offset center;
   final double radius;
