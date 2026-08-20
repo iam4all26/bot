@@ -24,7 +24,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
   bool _isManualRefreshing = false;
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  // _closingIds moved to ClosingPositionsProvider (shared across Dashboard/Positions/Hidden) — see main.dart
 
   TradeEnvironment _selectedEnv = TradeEnvironment.all;
   
@@ -47,7 +46,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     super.dispose();
   }
 
-  // Prevents ghost trades by instantly updating local state
   void _markAsClosingOrHiding(Iterable<int> ids) {
     context.read<ClosingPositionsProvider>().markClosing(ids);
     setState(() {
@@ -98,13 +96,15 @@ class _PositionsScreenState extends State<PositionsScreen> {
     } catch (_) { return utcString; }
   }
 
-  String calculateTimeInTrade(String? openedAtStr) {
+  String calculateTimeInTrade(String? openedAtStr, [String? closedAtStr]) {
     if (openedAtStr == null || openedAtStr.isEmpty) return '-';
     try {
       String startStr = openedAtStr.replaceAll(' ', 'T');
       if (!startStr.endsWith('Z')) startStr += 'Z';
       final start = DateTime.parse(startStr);
-      DateTime end = DateTime.now().toUtc();
+      DateTime end = closedAtStr != null && closedAtStr.isNotEmpty 
+          ? DateTime.parse(closedAtStr.replaceAll(' ', 'T') + (closedAtStr.endsWith('Z') ? '' : 'Z')) 
+          : DateTime.now().toUtc();
 
       final diff = end.difference(start);
       if (diff.inMinutes < 1) return '< 1m';
@@ -119,7 +119,8 @@ class _PositionsScreenState extends State<PositionsScreen> {
 
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
-    double val = double.tryParse(v.toString()) ?? 0.0;
+    double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000000) return '\$${(val / 1000000000).toStringAsFixed(2)}B';
     if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
     if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
     return '\$${val.round()}';
@@ -128,6 +129,14 @@ class _PositionsScreenState extends State<PositionsScreen> {
   String _formatFullAddress(String addr) {
     if (addr.length <= 12) return addr;
     return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
+  }
+
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _formatFullAddress(address?.toString() ?? '');
   }
 
   Future<void> _toggleLock(dynamic p) async {
@@ -389,13 +398,6 @@ class _PositionsScreenState extends State<PositionsScreen> {
     int successCount = 0;
     final api = context.read<ApiService>();
 
-    // Fired concurrently, not one-at-a-time — a sequential await loop here
-    // was the actual cause of batch closes taking 50s-1min: with N
-    // positions, the old loop waited for the FULL round-trip of each
-    // close (PHP -> bot engine -> on-chain confirmation) before even
-    // starting the next one, so total wait time was N times a single
-    // close's duration. Firing them together means total wait time is
-    // roughly however long the SLOWEST single close takes, not the sum.
     final results = await Future.wait(unlockedIds.map((id) async {
       try {
         final res = await api.postEndpoint('trade.php?action=close_position', {'id': id});
@@ -655,6 +657,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                           final double sl = double.tryParse(p['sl_percent']?.toString() ?? '0') ?? 0.0;
                           final double size = double.tryParse(p['virtual_usd_amount']?.toString() ?? '0') ?? 0.0;
                           final double pct = double.tryParse(p['change_percent']?.toString() ?? '0') ?? 0.0;
+                          final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
 
                           return AnimatedSize(
                             duration: const Duration(milliseconds: 350),
@@ -676,7 +679,7 @@ class _PositionsScreenState extends State<PositionsScreen> {
                                                 child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
                                               ),
                                               const SizedBox(width: 8),
-                                              Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                              Text(tokenDisplay, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
                                               const SizedBox(width: 6),
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),

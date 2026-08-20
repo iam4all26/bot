@@ -9,6 +9,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/glass_card.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_background.dart';
+import '../widgets/live_elapsed_timer.dart';
 
 class HiddenPositionsScreen extends StatefulWidget {
   const HiddenPositionsScreen({super.key});
@@ -96,6 +97,7 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000000) return '\$${(val / 1000000000).toStringAsFixed(2)}B';
     if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
     if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
     return '\$${val.round()}';
@@ -104,6 +106,35 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
   String _formatFullAddress(String addr) {
     if (addr.length <= 12) return addr;
     return '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}';
+  }
+
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _formatFullAddress(address?.toString() ?? '');
+  }
+
+  String calculateTimeInTrade(String? openedAtStr, [String? closedAtStr]) {
+    if (openedAtStr == null || openedAtStr.isEmpty) return '-';
+    try {
+      String startStr = openedAtStr.replaceAll(' ', 'T');
+      if (!startStr.endsWith('Z')) startStr += 'Z';
+      final start = DateTime.parse(startStr);
+      DateTime end = closedAtStr != null && closedAtStr.isNotEmpty 
+          ? DateTime.parse(closedAtStr.replaceAll(' ', 'T') + (closedAtStr.endsWith('Z') ? '' : 'Z')) 
+          : DateTime.now().toUtc();
+
+      final diff = end.difference(start);
+      if (diff.inMinutes < 1) return '< 1m';
+
+      List<String> parts = [];
+      if (diff.inDays > 0) parts.add('${diff.inDays}d');
+      if (diff.inHours % 24 > 0) parts.add('${diff.inHours % 24}h');
+      if (diff.inMinutes % 60 > 0) parts.add('${diff.inMinutes % 60}m');
+      return parts.join(' ');
+    } catch (_) { return '-'; }
   }
 
   Future<void> _toggleLock(dynamic p) async {
@@ -483,6 +514,7 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
                   final String chainRaw = (p['chain'] ?? 'solana').toString().toLowerCase();
                   final String chainLabel = {'bsc': 'BSC', 'robinhood': 'RBH'}[chainRaw] ?? 'SOL';
                   final Color chainColor = _chainColors[chainRaw] ?? AppTheme.kainuwaPurple;
+                  final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
                   
                   String botName = p['display_name'] ?? 'Manual';
                   if (isAdmin && botName != 'Manual') botName = botName.toUpperCase();
@@ -509,7 +541,7 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
                                           child: Icon(isLocked ? PhosphorIcons.lockKeyFill : PhosphorIcons.lockKeyOpen, color: isLocked ? AppTheme.warning(context) : theme.colorScheme.onSurfaceVariant.withOpacity(0.5), size: 16),
                                         ),
                                         const SizedBox(width: 8),
-                                        Text(_formatFullAddress(p['token_address']), style: TextStyle(fontFamily: 'monospace', color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
+                                        Text(tokenDisplay, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.bold)),
                                         const SizedBox(width: 6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -553,9 +585,25 @@ class _HiddenPositionsScreenState extends State<HiddenPositionsScreen> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'] ?? p['close_mcap'])}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                              Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • ${p['status'] == 'open' ? 'Live' : 'Exit'}: ${_formatMcap(p['current_mcap'] ?? p['close_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                               const SizedBox(height: 2),
-                                              Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                              Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                              const SizedBox(height: 4),
+                                              if (p['status'] == 'open')
+                                                LiveElapsedTimer(
+                                                  openedAt: p['opened_at']?.toString(),
+                                                  icon: PhosphorIcons.hourglassHigh,
+                                                  iconSize: 11,
+                                                  style: TextStyle(fontSize: 10, color: AppTheme.warning(context), fontWeight: FontWeight.bold),
+                                                )
+                                              else
+                                                Row(
+                                                  children: [
+                                                    Icon(PhosphorIcons.hourglassHigh, color: theme.colorScheme.onSurfaceVariant, size: 11),
+                                                    const SizedBox(width: 4),
+                                                    Text(calculateTimeInTrade(p['opened_at']?.toString(), p['closed_at']?.toString()), style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                                                  ]
+                                                ),
                                             ],
                                           ),
                                         ),
