@@ -50,7 +50,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
   Future<void> _fetchUsername() async {
     try {
-      // 1. Check local cache first for instant load
       final prefs = await SharedPreferences.getInstance();
       final cachedName = prefs.getString('cached_kainuwa_username');
       
@@ -63,7 +62,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
         }
       }
 
-      // 2. Silently fetch from server to keep cache fresh
       final res = await context.read<ApiService>().getEndpoint('positions.php?action=fetch');
       if (res['status'] == 'success' && mounted) {
         final fetchedName = res['stats']?['username'] ?? '';
@@ -208,6 +206,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
   String _formatAddress(String addr) => addr.length > 8 ? '${addr.substring(0, 4)}...${addr.substring(addr.length - 4)}' : addr;
 
+  String _formatTokenDisplay(dynamic symbol, dynamic address) {
+    final s = symbol?.toString().trim();
+    if (s != null && s.isNotEmpty && !['UNKNOWN', 'MANUAL', 'N/A'].contains(s.toUpperCase())) {
+      return s.startsWith('\$') ? s : '\$$s';
+    }
+    return _formatAddress(address?.toString() ?? '');
+  }
+
   Widget _buildStatColumn(String label, String value, Color valueColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,7 +228,6 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final currency = context.watch<CurrencyProvider>();
     final p = widget.tradeData;
     
     final pnl = double.tryParse(p['pnl_usd']?.toString() ?? '0') ?? 0.0;
@@ -234,7 +239,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
     final String chainDisplayName = {'solana': 'SOLANA', 'bsc': 'BSC', 'robinhood': 'ROBINHOOD'}[tradeChain] ?? tradeChain.toUpperCase();
 
     final String timeInTrade = calculateTimeInTrade(p['opened_at'], p['closed_at']);
-    final String tokenAddress = _formatAddress(p['token_address'] ?? '');
+    final String tokenDisplay = _formatTokenDisplay(p['symbol'], p['token_address']);
     final String entryMcap = _formatMcap(p['entry_mcap']);
     final String exitMcap = _formatMcap(p['close_mcap'] ?? p['current_mcap']);
     
@@ -318,7 +323,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 3. Grounding Shadow for Mascot 
+                      // 3. Grounding Shadow for Mascot
                       Positioned(
                         left: 15, bottom: 145,
                         child: Container(
@@ -330,7 +335,7 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 4. Mascot Image 
+                      // 4. Mascot Image
                       Positioned(
                         left: -5, bottom: 135,
                         child: Image.asset(
@@ -342,14 +347,14 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                         ),
                       ),
 
-                      // 5. Right Percentage & Badge Info
+                      // 5. Right Percentage, X Multiplier & Badge Info
                       Positioned(
                         right: 24, top: 110,
                         width: 220,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(tokenAddress, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text(tokenDisplay, style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 4),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -359,7 +364,15 @@ class _PnlShareDialogState extends State<PnlShareDialog> {
                                 style: GoogleFonts.spaceGrotesk(color: tier['color'], fontSize: 54, fontWeight: FontWeight.w900, height: 1.1)
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            if (isProfit && pct > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2, bottom: 4),
+                                child: Text(
+                                  '${((pct / 100) + 1).toStringAsFixed(2)}X', 
+                                  style: GoogleFonts.spaceGrotesk(color: tier['color'], fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.2)
+                                ),
+                              ),
+                            const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(color: tier['color'].withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: tier['color'].withOpacity(0.3))),
@@ -510,7 +523,6 @@ class _ReceiptBackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
 
-    // 1. Deep Solid Gradient Background
     final bgPaint = Paint()
       ..shader = ui.Gradient.linear(
         Offset.zero, 
@@ -519,7 +531,6 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       );
     canvas.drawRect(rect, bgPaint);
 
-    // 2. Cyber Grid Layer
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.02)
       ..strokeWidth = 1
@@ -532,7 +543,6 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), gridPaint);
     }
 
-    // 3. Central Radial Glow Behind Mascot
     final auraPaint = Paint()
       ..shader = ui.Gradient.radial(
         Offset(size.width * 0.25, size.height * 0.55), 
@@ -541,7 +551,6 @@ class _ReceiptBackgroundPainter extends CustomPainter {
       );
     canvas.drawRect(rect, auraPaint);
 
-    // 4. Subtle Top-Right Accent Slash
     final slashPath = Path()
       ..moveTo(size.width * 0.65, 0)
       ..lineTo(size.width, 0)
