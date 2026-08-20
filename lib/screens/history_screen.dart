@@ -388,6 +388,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     onRefresh: () => _refetchAll(),
                     color: theme.primaryColor,
                     child: CustomScrollView(
+                    key: const PageStorageKey('history_list_key'),
                     slivers: [
                       SliverToBoxAdapter(
                         child: Padding(
