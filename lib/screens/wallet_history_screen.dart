@@ -60,6 +60,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000000) return '\$${(val / 1000000000).toStringAsFixed(2)}B';
     if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
     if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
     return '\$${val.round()}';
