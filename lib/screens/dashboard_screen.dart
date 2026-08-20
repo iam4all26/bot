@@ -8,8 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/closing_positions_provider.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/live_elapsed_timer.dart';
 import '../widgets/chain_icon.dart';
 import '../theme/app_theme.dart';
 import 'positions_screen.dart';
@@ -66,7 +68,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic> _stats = {'open_count': 0, 'total_pnl': 0.0, 'today_pnl': 0.0, 'total_trades': 0, 'username': 'Loading...'};
   List<dynamic> _openPositions = [];
   Timer? _pollingTimer;
-  final Set<int> _closingIds = {};
 
   @override
   void initState() {
@@ -212,8 +213,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   void _markAsClosingOrHiding(Iterable<int> ids) {
+    context.read<ClosingPositionsProvider>().markClosing(ids);
     setState(() {
-      _closingIds.addAll(ids);
       _openPositions.removeWhere((p) {
         int pid = int.tryParse(p['id'].toString()) ?? 0;
         return ids.contains(pid);
@@ -271,10 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           
           List<dynamic> rawOpen = responses[1]['open_positions'] ?? [];
           
-          _openPositions = rawOpen.where((p) {
-            int id = int.tryParse(p['id'].toString()) ?? 0;
-            return !_closingIds.contains(id);
-          }).toList();
+          _openPositions = context.read<ClosingPositionsProvider>().filterOpen(rawOpen);
           
           _stats['open_count'] = _openPositions.length;
         }
@@ -308,6 +306,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   String _formatMcap(dynamic v) {
     if (v == null) return '-';
     double val = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+    if (val >= 1000000000) return '\$${(val / 1000000000).toStringAsFixed(2)}B';
     if (val >= 1000000) return '\$${(val / 1000000).toStringAsFixed(2)}M';
     if (val >= 1000) return '\$${(val / 1000).toStringAsFixed(1)}K';
     return '\$${val.round()}';
@@ -354,7 +353,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success') {
         _showFloatingSnackbar(res['message'] ?? 'Failed to hide', isError: true);
-        setState(() => _closingIds.remove(pId));
+        context.read<ClosingPositionsProvider>().clear(pId);
       }
       _fetchDashboardData(silent: true);
     }
@@ -374,7 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (mounted) {
       if (res['status'] != 'success' && res['status'] != 'closed') {
          _showFloatingSnackbar(res['message'] ?? 'Failed to close', isError: true);
-         setState(() => _closingIds.remove(pId)); 
+         context.read<ClosingPositionsProvider>().clear(pId); 
       }
       _fetchDashboardData(silent: true);
     }
@@ -403,9 +402,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _markAsClosingOrHiding(toClose);
     await Future.delayed(const Duration(milliseconds: 350));
 
-    for (int id in toClose) {
-      await api.postEndpoint('trade.php?action=close_position', {'id': id});
-    }
+    await Future.wait(toClose.map((id) async {
+      try {
+        await api.postEndpoint('trade.php?action=close_position', {'id': id});
+      } catch (e) { /* individual failures surface via the next poll */ }
+    }));
     
     if (mounted) _fetchDashboardData(silent: true);
   }
@@ -816,6 +817,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             bottom: false, 
             child: Stack(
               children: [
+                // Base layer: whatever mode is currently active. This
+                // flips mid-transition (see the _revealController listener
+                // in initState) at the exact instant the wipe below fully
+                // covers the screen, so the swap itself is never visible.
                 IgnorePointer(
                   ignoring: _pendingMarketMode != null,
                   child: _isMarketMode 
@@ -823,6 +828,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       : IndexedStack(key: const ValueKey('bot_mode'), index: _botTabIndex, children: botPages),
                 ),
 
+                // Wipe layer: only present mid-transition. A solid colored
+                // circle grows from the switch button to fully cover the
+                // screen, then shrinks away again — it never contains live
+                // page content, so Market's and Bot mode's very different
+                // layouts are never rendered on screen at the same time.
                 if (_pendingMarketMode != null)
                   AnimatedBuilder(
                     animation: _revealController,
@@ -848,6 +858,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 ),
                               ),
                             ),
+                            // Glowing ring riding the edge of the wipe circle.
                             CustomPaint(
                               size: size,
                               painter: _RevealRingPainter(
@@ -857,6 +868,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 opacity: 1.0,
                               ),
                             ),
+                            // "Switching to X" announcement: rises in, holds
+                            // through the full-cover midpoint, rises out.
                             _buildModeAnnouncement(_pendingMarketMode!, targetColor, theme, size),
                           ],
                         ),
@@ -1217,7 +1230,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const SizedBox(height: 12),
             GlassCard(
               padding: EdgeInsets.zero,
-              child: Column(
+              child: Builder(builder: (context) {
+                final closingProvider = context.watch<ClosingPositionsProvider>();
+                return Column(
                 children: _openPositions.asMap().entries.map((entry) {
                   int idx = entry.key;
                   var p = entry.value;
@@ -1225,7 +1240,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   final double? cpnl = double.tryParse(p['unrealized_pnl']?.toString() ?? '');
                   final bool cpIsProfit = (cpnl ?? 0) >= 0;
                   final pId = int.tryParse(p['id'].toString()) ?? 0;
-                  final bool isClosing = _closingIds.contains(pId);
+                  final bool isClosing = closingProvider.isClosing(pId);
                   final bool isLocked = p['is_locked'] == 1 || p['is_locked'] == '1';
                   
                   String botName = p['display_name'] ?? 'Manual';
@@ -1304,6 +1319,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                                 Text('Size: \$${size.toStringAsFixed(2)} • Entry: ${_formatMcap(p['entry_mcap'])} • Live: ${_formatMcap(p['current_mcap'])}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                                                 const SizedBox(height: 2),
                                                 Text('TP: ${tp > 0 ? "+$tp%" : "None"} • SL: ${sl > 0 ? "-$sl%" : "None"}', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                                                const SizedBox(height: 4),
+                                                LiveElapsedTimer(
+                                                  openedAt: p['opened_at']?.toString(),
+                                                  icon: PhosphorIcons.hourglassHigh,
+                                                  iconSize: 11,
+                                                  style: TextStyle(fontSize: 10, color: AppTheme.warning(context), fontWeight: FontWeight.bold),
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -1348,7 +1370,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ],
                   );
                 }).toList(),
-              ),
+                );
+              }),
             ),
           ],
         ],
