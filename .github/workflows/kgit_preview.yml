@@ -1,0 +1,73 @@
+# Installed by K-Git Studio. Web preview of a Flutter app.
+name: K-Git Web Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kgit-preview
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate web host files (if missing)
+        run: |
+          set -euo pipefail
+          if [ ! -d web ]; then
+            flutter create --platforms=web --project-name app /tmp/kgit_web_scaffold
+            cp -r /tmp/kgit_web_scaffold/web ./web
+          fi
+
+      - name: Build web
+        run: |
+          flutter pub get
+          flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+
+      - name: Upload Pages files
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Keep a downloadable copy
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-preview
+          path: build/web
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Show the link
+        run: echo "Preview URL ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
