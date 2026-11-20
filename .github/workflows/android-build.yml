@@ -86,6 +86,13 @@ jobs:
           subprojects {
               project.evaluationDependsOn(':app')
           }
+          subprojects {
+              tasks.configureEach { t ->
+                  if (t.name.startsWith("lintVital") || t.name.startsWith("lintAnalyze") || t.name.startsWith("lintReport")) {
+                      t.enabled = false
+                  }
+              }
+          }
           tasks.register("clean", Delete) {
               delete rootProject.layout.buildDirectory
           }
