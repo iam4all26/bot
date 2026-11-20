@@ -103,7 +103,7 @@ jobs:
 
           android {
               namespace "com.kainuwa.bot"
-              compileSdk 36
+              compileSdk 37
 
               compileOptions {
                   coreLibraryDesugaringEnabled true
